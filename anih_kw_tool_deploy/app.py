@@ -476,16 +476,8 @@ if run_btn:
             lambda x: int(x) if pd.notna(x) and x is not None else "-"
         )
 
-        def color_tier(val: str) -> str:
-            palette = {
-                "Tier1": "background-color:#d4edda;color:#155724",
-                "Tier2": "background-color:#fff3cd;color:#856404",
-                "Tier3": "background-color:#d1ecf1;color:#0c5460",
-            }
-            return palette.get(val, "")
-
         st.dataframe(
-            display_df.style.applymap(color_tier, subset=["Tier"]),
+            display_df,
             use_container_width=True,
             height=520,
         )
