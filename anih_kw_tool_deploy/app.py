@@ -1,6 +1,11 @@
 """
-ANIHA 勝てるKW発掘ツール v1.6
-売れたKWかつ利益が出ているKWのみを抽出し、A/Bランクで優先分類します。
+ANIHA 勝てるKW発掘ツール v1.8.1
+- Aランク CSV / A_only.zip に詳細列追加（ROAS・売上・広告費・注文数・CVR・クリック数・インプレッション）
+- 分析フロー詳細表示（売上条件通過・ROAS条件通過 件数）
+- Aランク上位10KW表示
+- 全CSV ROAS降順ソート
+- Aランク専用ZIP (A_only.zip)
+- session_state 結果保持
 """
 from __future__ import annotations
 
@@ -86,7 +91,6 @@ def assign_official_campaign(theme: str) -> str:
 
 
 def find_col(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
-    """列名候補を優先順で検索。大文字小文字無視のフォールバックあり。"""
     for c in candidates:
         if c in df.columns:
             return c
@@ -98,10 +102,6 @@ def find_col(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
 
 
 def is_already_covered(kw_norm: str, registered_set: set[str]) -> bool:
-    """
-    登録済みKW（2語以上）が候補KWに部分一致で含まれていれば True を返す。
-    例: 登録済み「犬 涙やけ」→ 候補「犬 涙やけ サプリ」は除外
-    """
     for reg in registered_set:
         if len(reg.split()) < 2:
             continue
@@ -111,8 +111,109 @@ def is_already_covered(kw_norm: str, registered_set: set[str]) -> bool:
 
 
 def assign_rank(roas: float) -> str:
-    """ROAS >= 3.0 → A、2.0 <= ROAS < 3.0 → B"""
     return "A" if roas >= 3.0 else "B"
+
+
+def clear_results() -> None:
+    for key in ["has_results", "df_win", "df_a", "df_b", "flow_stats", "debug_info"]:
+        st.session_state.pop(key, None)
+
+
+# ════════════════════════════════════════════════════════
+# CSV / ZIP 生成（ROAS降順）
+# ════════════════════════════════════════════════════════
+
+def _out_cols(df: pd.DataFrame) -> list[str]:
+    base = ["campaign_theme", "keyword", "rank", "ROAS", "sales", "cost"]
+    if "orders" in df.columns:
+        base.append("orders")
+    if "units" in df.columns:
+        base.append("units")
+    return [c for c in base if c in df.columns]
+
+
+_COL_RENAME = {
+    "campaign_theme": "キャンペーン名",
+    "keyword":        "検索語句",
+    "rank":           "ランク",
+    "ROAS":           "ROAS",
+    "sales":          "売上",
+    "cost":           "広告費",
+    "orders":         "商品購入数",
+    "units":          "注文数",
+}
+
+
+def make_csv_bytes(df: pd.DataFrame) -> bytes:
+    d = df[_out_cols(df)].rename(columns=_COL_RENAME).copy()
+    d["ROAS"] = d["ROAS"].round(2)
+    d = d.sort_values("ROAS", ascending=False)
+    return d.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+
+
+def make_zip_bytes(df_win: pd.DataFrame) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for camp in OFFICIAL_CAMPAIGNS:
+            df_c = df_win[df_win["campaign_theme"] == camp]
+            if df_c.empty:
+                continue
+            kw_csv = (
+                df_c.sort_values("ROAS", ascending=False)[["keyword"]]
+                .rename(columns={"keyword": "Keyword"})
+                .to_csv(index=False, encoding="utf-8-sig")
+                .encode("utf-8-sig")
+            )
+            zf.writestr(f"winner_keywords_{camp}.csv", kw_csv)
+            for rank_label in ("A", "B"):
+                df_r = df_c[df_c["rank"] == rank_label].sort_values("ROAS", ascending=False)
+                if not df_r.empty:
+                    r_csv = (
+                        df_r[["keyword"]]
+                        .rename(columns={"keyword": "Keyword"})
+                        .to_csv(index=False, encoding="utf-8-sig")
+                        .encode("utf-8-sig")
+                    )
+                    zf.writestr(f"{camp}_{rank_label}.csv", r_csv)
+    return buf.getvalue()
+
+
+def make_a_full_csv_bytes(df: pd.DataFrame) -> bytes:
+    """Aランク用詳細CSV（CVR・クリック数・インプレッション含む）ROAS降順。"""
+    base = ["campaign_theme", "keyword", "ROAS", "sales", "cost"]
+    for col in ["orders", "CVR", "clicks", "impressions"]:
+        if col in df.columns:
+            base.append(col)
+    d = df[[c for c in base if c in df.columns]].copy()
+    d["ROAS"] = d["ROAS"].round(2)
+    d = d.sort_values("ROAS", ascending=False)
+    rename_map = {
+        "campaign_theme": "キャンペーン名",
+        "keyword":        "検索語",
+        "ROAS":           "ROAS",
+        "sales":          "売上",
+        "cost":           "広告費",
+        "orders":         "注文数",
+        "CVR":            "CVR",
+        "clicks":         "クリック数",
+        "impressions":    "インプレッション",
+    }
+    d = d.rename(columns=rename_map)
+    if "CVR" in d.columns:
+        d["CVR"] = d["CVR"].apply(lambda x: f"{x:.1f}%")
+    return d.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+
+
+def make_a_only_zip_bytes(df_a: pd.DataFrame) -> bytes:
+    """Aランクのみ キャンペーン別 ZIP (A_only.zip)。詳細列付き。"""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for camp in OFFICIAL_CAMPAIGNS:
+            df_c = df_a[df_a["campaign_theme"] == camp]
+            if df_c.empty:
+                continue
+            zf.writestr(f"{camp}_A.csv", make_a_full_csv_bytes(df_c))
+    return buf.getvalue()
 
 
 # ════════════════════════════════════════════════════════
@@ -120,12 +221,11 @@ def assign_rank(roas: float) -> str:
 # ════════════════════════════════════════════════════════
 
 st.set_page_config(
-    page_title="ANIHA 勝てるKW発掘ツール v1.6",
+    page_title="ANIHA 勝てるKW発掘ツール v1.8",
     page_icon="🐾",
     layout="wide",
 )
 
-# ── サイドバー ────────────────────────────────────────────
 with st.sidebar:
     st.header("フィルター設定")
     brand_text = st.text_area(
@@ -141,66 +241,60 @@ with st.sidebar:
     for camp, price in PRICE_MASTER.items():
         st.caption(f"{camp}：¥{price:,}")
     st.markdown("---")
-    st.caption("ANIHA 勝てるKW発掘ツール v1.6")
+    st.caption("ANIHA 勝てるKW発掘ツール v1.8")
 
-# ── タイトル ──────────────────────────────────────────────
-st.title("🐾 ANIHA 勝てるKW発掘ツール v1.6")
+st.title("🐾 ANIHA 勝てるKW発掘ツール v1.8")
 st.markdown("**売れたKWかつ利益が出ているKWのみを抽出し、A/Bランクで優先分類します。**")
 
-# ── ① ツール運用手順 ─────────────────────────────────────
-with st.expander("【ツール運用手順】", expanded=True):
+with st.expander("【ANIHA広告運用手順】", expanded=True):
     st.markdown("""
 **目的：属人化しないAmazon広告運用**
 
-① Amazon検索語句レポートCSVをダウンロード  
-② AmazonターゲットKWレポートCSVをダウンロード  
-③ ツールへ投入  
-④ 勝てるKW抽出を実行  
-⑤ キャンペーン別CSVをダウンロード  
-⑥ Amazon広告へ追加（Aランク優先）  
+① Amazon広告管理画面から検索語句レポートをダウンロード
+② Amazon広告管理画面からターゲットKWレポートをダウンロード
+③ ANIHAツールへアップロード
+④ 勝ちKW抽出を実行
+⑤ Aランク一括ZIPをダウンロード
+⑥ Amazon広告へ追加
 """)
 
-# ── ② ファイルアップロード ────────────────────────────────
 st.markdown("---")
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("① 検索語句レポート")
     search_file = st.file_uploader(
-        "Amazon 検索語句レポートCSV", type="csv", key="search"
+        "Amazon 検索語句レポートCSV", type="csv",
+        key="search", on_change=clear_results,
     )
 with c2:
     st.subheader("② ターゲットKWレポート")
     target_file = st.file_uploader(
-        "Amazon ターゲットKWレポートCSV", type="csv", key="target"
+        "Amazon ターゲットKWレポートCSV", type="csv",
+        key="target", on_change=clear_results,
     )
 
-# ── ③ KW選定ロジック ─────────────────────────────────────
 st.markdown("---")
 st.subheader("【KW選定ロジック】")
 st.info(
-    "本ツールは **売れたKW** かつ **利益が出ているKW** のみ抽出します。\n\n"
-    "**採用条件（変更不可）**\n\n"
-    "① 商品売価2個分以上の売上\n\n"
-    "② ROAS 2.0以上\n\n"
-    "両方を満たしたKWのみ採用\n\n"
-    "登録済KW除外 → 部分一致除外 → ブランドKW除外 → ASIN除外 → "
-    "売上判定（売価×2以上） → ROAS判定（2.0以上） → 勝ちKW抽出"
+    "登録済みKW除外 → 部分一致除外 → ブランドKW除外 → ASIN除外\n\n"
+    "↓\n\n"
+    "売上判定（売価×2以上） → ROAS判定（2.0以上）\n\n"
+    "↓\n\n"
+    "**Aランク**：ROAS 3.0以上 ／ **Bランク**：ROAS 2.0以上 3.0未満"
 )
 
-# ── ④ KW優先度説明 ───────────────────────────────────────
-st.subheader("【KW優先度について】")
 ab1, ab2 = st.columns(2)
 with ab1:
     st.success(
         "**🏆 Aランク**\n\n"
         "ROAS **3.0以上**\n\n"
-        "優先的に広告追加するKW"
+        "最優先で広告追加するKW"
     )
 with ab2:
     st.warning(
         "**📋 Bランク**\n\n"
         "ROAS **2.0以上 3.0未満**\n\n"
-        "売れているが優先度はAランクより低いKW"
+        "検討用KW"
     )
 
 st.markdown("---")
@@ -221,40 +315,19 @@ if run_btn:
 
     with st.spinner("処理中..."):
 
-        # ── ファイル読込 ──────────────────────────────────
         df_search = read_csv_auto(search_file)
         df_target = read_csv_auto(target_file)
 
-        # ── 列名自動判定（検索語句レポート）────────────────
-        kw_col = find_col(df_search, [
-            "検索用語", "カスタマーの検索用語",
-            "Customer Search Term", "search term",
-        ])
-        campaign_col = find_col(df_search, [
-            "キャンペーン名", "Campaign Name", "campaign name",
-        ])
-        sales_col = find_col(df_search, [
-            "売上", "売上額", "合計売上", "広告費売上高",
-            "7日間の総売上高", "Attributed Sales", "Sales",
-        ])
-        cost_col = find_col(df_search, [
-            "合計費用", "費用", "広告費", "コスト",
-            "Cost", "Spend", "spend",
-        ])
-        orders_col = find_col(df_search, [
-            "商品購入数", "注文数", "注文された商品点数",
-            "Orders", "Purchases",
-        ])
-        units_col = find_col(df_search, [
-            "注文された商品点数", "注文数", "商品購入数",
-            "Units", "Orders",
-        ])
-        target_kw_col = find_col(df_target, [
-            "ターゲティング", "キーワード",
-            "Targeting", "Keyword", "keyword",
-        ])
+        kw_col        = find_col(df_search, ["検索用語", "カスタマーの検索用語", "Customer Search Term", "search term"])
+        campaign_col  = find_col(df_search, ["キャンペーン名", "Campaign Name", "campaign name"])
+        sales_col     = find_col(df_search, ["売上", "売上額", "合計売上", "広告費売上高", "7日間の総売上高", "Attributed Sales", "Sales"])
+        cost_col      = find_col(df_search, ["合計費用", "費用", "広告費", "コスト", "Cost", "Spend", "spend"])
+        orders_col      = find_col(df_search, ["商品購入数", "注文数", "注文された商品点数", "Orders", "Purchases"])
+        units_col       = find_col(df_search, ["注文された商品点数", "注文数", "商品購入数", "Units", "Orders"])
+        clicks_col      = find_col(df_search, ["クリック数", "クリック", "Clicks", "clicks"])
+        impressions_col = find_col(df_search, ["インプレッション数", "インプレッション", "Impressions", "impressions"])
+        target_kw_col   = find_col(df_target, ["ターゲティング", "キーワード", "Targeting", "Keyword", "keyword"])
 
-        # ── 必須列チェック ────────────────────────────────
         missing = []
         if not kw_col:       missing.append("検索用語")
         if not campaign_col: missing.append("キャンペーン名")
@@ -269,72 +342,63 @@ if run_btn:
             st.write("検出列:", list(df_target.columns))
             st.stop()
 
-        total_before = len(df_search)
-
-        # ── 数値変換 ──────────────────────────────────────
         for col in [sales_col, cost_col]:
             df_search[col] = pd.to_numeric(
-                df_search[col].astype(str)
-                    .str.replace(",", "").str.replace("¥", ""),
+                df_search[col].astype(str).str.replace(",", "").str.replace("¥", ""),
                 errors="coerce",
             ).fillna(0)
         if orders_col:
-            df_search[orders_col] = pd.to_numeric(
-                df_search[orders_col], errors="coerce"
-            ).fillna(0)
+            df_search[orders_col] = pd.to_numeric(df_search[orders_col], errors="coerce").fillna(0)
         if units_col and units_col != orders_col:
-            df_search[units_col] = pd.to_numeric(
-                df_search[units_col], errors="coerce"
+            df_search[units_col] = pd.to_numeric(df_search[units_col], errors="coerce").fillna(0)
+        if clicks_col:
+            df_search[clicks_col] = pd.to_numeric(
+                df_search[clicks_col].astype(str).str.replace(",", ""), errors="coerce"
+            ).fillna(0)
+        if impressions_col:
+            df_search[impressions_col] = pd.to_numeric(
+                df_search[impressions_col].astype(str).str.replace(",", ""), errors="coerce"
             ).fillna(0)
 
-        # ── テーマ付与 ────────────────────────────────────
         df_search["kw_norm"] = df_search[kw_col].apply(normalize_text)
         df_search["campaign_theme"] = df_search[campaign_col].apply(
             lambda x: assign_official_campaign(extract_campaign_theme(str(x)))
         )
 
-        # ── オート広告のみに絞り込み ──────────────────────
-        mask_auto = df_search[campaign_col].str.contains(
-            "オート|auto", case=False, na=False
-        )
-        n_non_auto = int((~mask_auto).sum())
+        # STEP1: オート広告のみ
+        mask_auto = df_search[campaign_col].str.contains("オート|auto", case=False, na=False)
+        n_auto_total = int(mask_auto.sum())
         df_auto = df_search[mask_auto].copy()
 
-        # ── 登録済みKWセット ──────────────────────────────
-        registered_set: set[str] = set(
-            df_target[target_kw_col].apply(normalize_text)
-        )
+        # STEP2: 登録済みKW除外（完全一致 + 部分一致）
+        registered_set: set[str] = set(df_target[target_kw_col].apply(normalize_text))
         registered_set.discard("")
 
-        # ── STEP3: 完全一致除外 ───────────────────────────
         mask_exact = df_auto["kw_norm"].isin(registered_set)
         n_exact = int(mask_exact.sum())
         df_step = df_auto[~mask_exact].copy()
 
-        # ── STEP4: 部分一致除外 ───────────────────────────
-        mask_partial = df_step["kw_norm"].apply(
-            lambda k: is_already_covered(k, registered_set)
-        )
+        mask_partial = df_step["kw_norm"].apply(lambda k: is_already_covered(k, registered_set))
         n_partial = int(mask_partial.sum())
         df_step = df_step[~mask_partial].copy()
+        n_after_registered = len(df_step)
 
-        # ── STEP5: ブランドKW除外 ─────────────────────────
-        mask_brand = df_step["kw_norm"].apply(
-            lambda k: any(b in k for b in brand_excludes)
-        )
+        # STEP3: ブランドKW除外
+        mask_brand = df_step["kw_norm"].apply(lambda k: any(b in k for b in brand_excludes))
         n_brand = int(mask_brand.sum())
         df_step = df_step[~mask_brand].copy()
+        n_after_brand = len(df_step)
 
-        # ── STEP6: ASIN除外 ───────────────────────────────
+        # STEP4: ASIN除外
         mask_asin = df_step["kw_norm"].apply(is_asin)
         n_asin = int(mask_asin.sum())
         df_step = df_step[~mask_asin].copy()
+        n_after_asin = len(df_step)
 
-        # ── 集計 ──────────────────────────────────────────
+        # STEP5: 集計
         agg_dict = {
             "keyword":        (kw_col, "first"),
-            "campaign_theme": ("campaign_theme",
-                               lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
+            "campaign_theme": ("campaign_theme", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
             "sales":          (sales_col, "sum"),
             "cost":           (cost_col,  "sum"),
         }
@@ -342,6 +406,10 @@ if run_btn:
             agg_dict["orders"] = (orders_col, "sum")
         if units_col and units_col != orders_col:
             agg_dict["units"] = (units_col, "sum")
+        if clicks_col:
+            agg_dict["clicks"] = (clicks_col, "sum")
+        if impressions_col:
+            agg_dict["impressions"] = (impressions_col, "sum")
 
         agg = (
             df_step.groupby("kw_norm")
@@ -349,273 +417,271 @@ if run_btn:
             .reset_index(drop=True)
         )
 
-        n_after_exclusion = len(agg)
-
-        # ── ROAS計算 ──────────────────────────────────────
         agg["ROAS"] = agg.apply(
             lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0,
             axis=1,
         )
-
-        # ── 勝ちKW判定（採用条件は変更しない） ────────────
+        # CVR = 注文数 / クリック数 × 100
+        if "clicks" in agg.columns and "orders" in agg.columns:
+            agg["CVR"] = agg.apply(
+                lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0,
+                axis=1,
+            )
         agg["price"] = agg["campaign_theme"].map(PRICE_MASTER)
         agg_priced = agg[agg["price"].notna()].copy()
 
-        mask_win = (
-            (agg_priced["sales"] >= agg_priced["price"] * 2)
-            & (agg_priced["ROAS"] >= 2.0)
-        )
-        df_win = agg_priced[mask_win].copy()
+        # 売上条件（売価×2以上）
+        mask_sales = agg_priced["sales"] >= agg_priced["price"] * 2
+        n_sales_pass = int(mask_sales.sum())
+        agg_sales = agg_priced[mask_sales].copy()
 
-        # ── A/Bランク付与 ─────────────────────────────────
+        # ROAS条件（2.0以上）
+        mask_roas = agg_sales["ROAS"] >= 2.0
+        n_roas_pass = int(mask_roas.sum())
+        df_win = agg_sales[mask_roas].copy()
         df_win["rank"] = df_win["ROAS"].apply(assign_rank)
 
-        df_a = df_win[df_win["rank"] == "A"].copy()
-        df_b = df_win[df_win["rank"] == "B"].copy()
-        n_win = len(df_win)
-        n_a   = len(df_a)
-        n_b   = len(df_b)
+        # session_state へ保存
+        st.session_state["has_results"] = True
+        st.session_state["df_win"]      = df_win
+        st.session_state["df_a"]        = df_win[df_win["rank"] == "A"].copy()
+        st.session_state["df_b"]        = df_win[df_win["rank"] == "B"].copy()
+        st.session_state["flow_stats"]  = {
+            "n_auto_total":       n_auto_total,
+            "n_exact":            n_exact,
+            "n_partial":          n_partial,
+            "n_after_registered": n_after_registered,
+            "n_brand":            n_brand,
+            "n_after_brand":      n_after_brand,
+            "n_asin":             n_asin,
+            "n_after_asin":       n_after_asin,
+            "n_sales_pass":       n_sales_pass,
+            "n_roas_pass":        n_roas_pass,
+        }
+        st.session_state["debug_info"] = {
+            "cost_col":        cost_col,
+            "sales_col":       sales_col,
+            "orders_col":      orders_col,
+            "clicks_col":      clicks_col,
+            "impressions_col": impressions_col,
+            "registered_len":  len(registered_set),
+            "brand_excludes":  brand_excludes,
+        }
 
-    # ════════════════════════════════════════════════════════
-    # 結果表示
-    # ════════════════════════════════════════════════════════
 
-    st.markdown("---")
+# ════════════════════════════════════════════════════════
+# 結果表示（session_state から描画）
+# ════════════════════════════════════════════════════════
 
-    # 抽出フロー
-    st.subheader("今回の抽出フロー")
-    st.markdown(f"""
+if not st.session_state.get("has_results", False):
+    st.stop()
+
+st.success("✅ 分析結果は保持されています。再抽出は不要です。複数CSVを連続ダウンロードできます。")
+
+df_win: pd.DataFrame = st.session_state["df_win"]
+df_a:   pd.DataFrame = st.session_state["df_a"]
+df_b:   pd.DataFrame = st.session_state["df_b"]
+fs = st.session_state["flow_stats"]
+
+n_win = len(df_win)
+n_a   = len(df_a)
+n_b   = len(df_b)
+
+# ── 分析結果フロー ────────────────────────────────────
+st.markdown("---")
+st.subheader("分析結果")
+
+st.markdown(f"""
 | ステップ | 内容 | 件数 |
 |---|---|---|
-| 検索語句レポート | 読込 | **{total_before:,}件** |
-| オート広告絞込 | マニュアル除外 | −{n_non_auto:,}件 |
-| 登録済KW除外 | 完全一致 | −{n_exact:,}件 |
-| 部分一致除外 | 部分包含 | −{n_partial:,}件 |
-| ブランドKW除外 | | −{n_brand:,}件 |
-| ASIN除外 | | −{n_asin:,}件 |
-| **勝ちKW合計** | 売価×2 & ROAS≥2.0 | **{n_win:,}件** |
-| **　└ Aランク** | ROAS≥3.0 | **{n_a:,}件** |
-| **　└ Bランク** | 2.0≤ROAS<3.0 | **{n_b:,}件** |
+| 検索語総数 | オート広告 | **{fs['n_auto_total']:,}件** |
+| 登録済みKW除外後 | 完全一致 −{fs['n_exact']:,} ／ 部分一致 −{fs['n_partial']:,} | **{fs['n_after_registered']:,}件** |
+| ブランド除外後 | −{fs['n_brand']:,}件 | **{fs['n_after_brand']:,}件** |
+| ASIN除外後 | −{fs['n_asin']:,}件 | **{fs['n_after_asin']:,}件** |
+| 売上条件通過 | 売価×2以上 | **{fs['n_sales_pass']:,}件** |
+| ROAS条件通過 | ROAS≥2.0 | **{fs['n_roas_pass']:,}件** |
+| **Aランク** | ROAS≥3.0 | **{n_a:,}件** |
+| **Bランク** | 2.0≤ROAS<3.0 | **{n_b:,}件** |
+| **合計** | | **{n_win:,}件** |
 """)
 
-    if df_win.empty:
-        st.warning(
-            "勝ちKWが見つかりませんでした。\n\n"
-            "・検索語句レポートの期間を広げてください\n"
-            "・オート広告キャンペーンが含まれているか確認してください"
-        )
-        with st.expander("デバッグ情報"):
-            st.write(f"登録済みKW数: {len(registered_set):,}")
-            st.write(f"集計後KW数: {n_after_exclusion:,}")
-        st.stop()
-
-    # ── サマリー ─────────────────────────────────────────
-    st.markdown("---")
-    st.subheader("分析結果")
-
-    total_sales = df_win["sales"].sum()
-    total_cost  = df_win["cost"].sum()
-    avg_roas    = round(total_sales / total_cost, 2) if total_cost > 0 else 0.0
-
-    a_sales   = df_a["sales"].sum()
-    a_cost    = df_a["cost"].sum()
-    a_roas    = round(a_sales / a_cost, 2) if a_cost > 0 else 0.0
-    b_sales   = df_b["sales"].sum()
-    b_cost    = df_b["cost"].sum()
-    b_roas    = round(b_sales / b_cost, 2) if b_cost > 0 else 0.0
-
-    # 合計行
-    sm1, sm2, sm3, sm4 = st.columns(4)
-    sm1.metric("勝ちKW 合計", f"{n_win:,} 件")
-    sm2.metric("総売上", f"¥{total_sales:,.0f}")
-    sm3.metric("総広告費", f"¥{total_cost:,.0f}")
-    sm4.metric("平均ROAS", f"{avg_roas:.2f}")
-
-    # A/B行
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.success(f"**🏆 Aランク：{n_a:,}件**")
-        a1, a2, a3 = st.columns(3)
-        a1.metric("件数", f"{n_a:,}")
-        a2.metric("総売上", f"¥{a_sales:,.0f}")
-        a3.metric("平均ROAS", f"{a_roas:.2f}")
-    with col_b:
-        st.warning(f"**📋 Bランク：{n_b:,}件**")
-        b1, b2, b3 = st.columns(3)
-        b1.metric("件数", f"{n_b:,}")
-        b2.metric("総売上", f"¥{b_sales:,.0f}")
-        b3.metric("平均ROAS", f"{b_roas:.2f}")
-
-    # キャンペーン別件数
-    st.markdown("**キャンペーン別件数**")
-    camp_counts = (
-        df_win["campaign_theme"]
-        .value_counts()
-        .reindex(OFFICIAL_CAMPAIGNS, fill_value=0)
+if df_win.empty:
+    st.warning(
+        "勝ちKWが見つかりませんでした。\n\n"
+        "・検索語句レポートの期間を広げてください\n"
+        "・オート広告キャンペーンが含まれているか確認してください"
     )
-    active = camp_counts[camp_counts > 0]
-    items = list(active.items())
-    for i in range(0, len(items), 6):
-        chunk = items[i:i + 6]
-        cols = st.columns(len(chunk))
-        for col, (name, cnt) in zip(cols, chunk):
-            col.metric(name, f"{int(cnt):,} 件")
+    st.stop()
 
-    # ── ダウンロード ──────────────────────────────────────
-    st.markdown("---")
-    st.subheader("ダウンロード")
+# ── A/B サマリー ──────────────────────────────────────
+a_sales = df_a["sales"].sum()
+a_cost  = df_a["cost"].sum()
+a_roas  = round(a_sales / a_cost, 2) if a_cost > 0 else 0.0
+b_sales = df_b["sales"].sum()
+b_cost  = df_b["cost"].sum()
+b_roas  = round(b_sales / b_cost, 2) if b_cost > 0 else 0.0
 
-    out_base = ["campaign_theme", "keyword", "rank", "sales", "cost", "ROAS"]
-    if "orders" in df_win.columns:
-        out_base.append("orders")
-    if "units" in df_win.columns:
-        out_base.append("units")
+col_a, col_b = st.columns(2)
+with col_a:
+    st.success(f"**🏆 Aランク：{n_a:,}件**")
+    a1, a2, a3, a4 = st.columns(4)
+    a1.metric("件数",     f"{n_a:,}")
+    a2.metric("総売上",   f"¥{a_sales:,.0f}")
+    a3.metric("総広告費", f"¥{a_cost:,.0f}")
+    a4.metric("平均ROAS", f"{a_roas:.2f}")
+with col_b:
+    st.warning(f"**📋 Bランク：{n_b:,}件**")
+    b1, b2, b3, b4 = st.columns(4)
+    b1.metric("件数",     f"{n_b:,}")
+    b2.metric("総売上",   f"¥{b_sales:,.0f}")
+    b3.metric("総広告費", f"¥{b_cost:,.0f}")
+    b4.metric("平均ROAS", f"{b_roas:.2f}")
 
-    col_rename_map = {
+# ── キャンペーン別件数 ────────────────────────────────
+st.markdown("**キャンペーン別件数**")
+camp_counts = (
+    df_win["campaign_theme"]
+    .value_counts()
+    .reindex(OFFICIAL_CAMPAIGNS, fill_value=0)
+)
+active_items = [(k, v) for k, v in camp_counts.items() if v > 0]
+for i in range(0, len(active_items), 6):
+    chunk = active_items[i:i + 6]
+    cols  = st.columns(len(chunk))
+    for col, (name, cnt) in zip(cols, chunk):
+        col.metric(name, f"{int(cnt):,} 件")
+
+# ── Aランク上位10KW ───────────────────────────────────
+st.markdown("---")
+st.subheader("🏆 Aランク上位10KW")
+
+if df_a.empty:
+    st.info("Aランクのキーワードはありません。")
+else:
+    top10_base = ["campaign_theme", "keyword", "ROAS", "sales", "cost"]
+    if "orders" in df_a.columns:
+        top10_base.append("orders")
+    top10 = (
+        df_a[top10_base]
+        .sort_values("ROAS", ascending=False)
+        .head(10)
+        .reset_index(drop=True)
+    )
+    top10.index = top10.index + 1
+    top10_disp = top10.rename(columns={
         "campaign_theme": "キャンペーン名",
-        "keyword":        "検索語句",
-        "rank":           "ランク",
+        "keyword":        "検索語",
+        "ROAS":           "ROAS",
         "sales":          "売上",
         "cost":           "広告費",
-        "ROAS":           "ROAS",
-        "orders":         "商品購入数",
-        "units":          "注文数",
-    }
+        "orders":         "注文数",
+    }).copy()
+    top10_disp["売上"]  = top10_disp["売上"].apply(lambda x: f"¥{x:,.0f}")
+    top10_disp["広告費"] = top10_disp["広告費"].apply(lambda x: f"¥{x:,.0f}")
+    top10_disp["ROAS"]  = top10_disp["ROAS"].round(2)
+    st.dataframe(top10_disp, use_container_width=True)
 
-    def make_csv(df: pd.DataFrame) -> bytes:
-        d = df[[c for c in out_base if c in df.columns]].rename(columns=col_rename_map).copy()
-        d = d.sort_values(["キャンペーン名", "売上"], ascending=[True, False])
-        d["ROAS"] = d["ROAS"].round(2)
-        return d.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+# ── ダウンロード ──────────────────────────────────────
+st.markdown("---")
+st.subheader("ダウンロード")
+st.caption("どれをダウンロードしても分析結果は消えません。複数CSV連続ダウンロード可能です。")
 
-    all_bytes = make_csv(df_win)
-    a_bytes   = make_csv(df_a)
-    b_bytes   = make_csv(df_b)
+all_bytes    = make_csv_bytes(df_win)
+a_bytes      = make_a_full_csv_bytes(df_a)
+b_bytes      = make_csv_bytes(df_b)
+zip_bytes    = make_zip_bytes(df_win)
+a_only_bytes = make_a_only_zip_bytes(df_a)
 
-    # キャンペーン別 + A/B別 ZIP
-    zip_buf = io.BytesIO()
-    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for camp in OFFICIAL_CAMPAIGNS:
-            df_c = df_win[df_win["campaign_theme"] == camp]
-            if df_c.empty:
-                continue
-            # 全件CSV（Keywordのみ）
-            kw_csv = (
-                df_c[["keyword"]]
-                .rename(columns={"keyword": "Keyword"})
-                .sort_values("Keyword")
-                .to_csv(index=False, encoding="utf-8-sig")
-                .encode("utf-8-sig")
-            )
-            zf.writestr(f"winner_keywords_{camp}.csv", kw_csv)
+st.download_button(
+    "🏆 Aランク一括ZIPダウンロード (A_only.zip)",
+    data=a_only_bytes,
+    file_name="A_only.zip",
+    mime="application/zip",
+    use_container_width=True,
+    type="primary",
+)
 
-            # Aランク
-            df_ca = df_c[df_c["rank"] == "A"]
-            if not df_ca.empty:
-                ca_csv = (
-                    df_ca[["keyword"]]
-                    .rename(columns={"keyword": "Keyword"})
-                    .sort_values("Keyword")
-                    .to_csv(index=False, encoding="utf-8-sig")
-                    .encode("utf-8-sig")
-                )
-                zf.writestr(f"{camp}_A.csv", ca_csv)
+st.markdown("**個別ダウンロード**")
+dl1, dl2, dl3, dl4 = st.columns(4)
+with dl1:
+    st.download_button(
+        "① 全件CSV",
+        data=all_bytes,
+        file_name="winner_keywords_all.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+with dl2:
+    st.download_button(
+        "② Aランク CSV",
+        data=a_bytes,
+        file_name="winner_keywords_A.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+with dl3:
+    st.download_button(
+        "③ Bランク CSV",
+        data=b_bytes,
+        file_name="winner_keywords_B.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+with dl4:
+    st.download_button(
+        "④ キャンペーン別ZIP",
+        data=zip_bytes,
+        file_name="winner_keywords_zip.zip",
+        mime="application/zip",
+        use_container_width=True,
+    )
 
-            # Bランク
-            df_cb = df_c[df_c["rank"] == "B"]
-            if not df_cb.empty:
-                cb_csv = (
-                    df_cb[["keyword"]]
-                    .rename(columns={"keyword": "Keyword"})
-                    .sort_values("Keyword")
-                    .to_csv(index=False, encoding="utf-8-sig")
-                    .encode("utf-8-sig")
-                )
-                zf.writestr(f"{camp}_B.csv", cb_csv)
+# ── キャンペーン別テーブル ────────────────────────────
+st.markdown("---")
+st.subheader("キャンペーン別 勝てるKW（ROAS降順）")
 
-    zip_bytes = zip_buf.getvalue()
+disp_base = ["keyword", "rank", "ROAS", "sales", "cost"]
+if "orders" in df_win.columns:
+    disp_base.append("orders")
 
-    dl1, dl2, dl3, dl4 = st.columns(4)
-    with dl1:
-        st.download_button(
-            "① 全件CSV",
-            data=all_bytes,
-            file_name="winner_keywords_all.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-    with dl2:
-        st.download_button(
-            "② Aランク CSV",
-            data=a_bytes,
-            file_name="winner_keywords_A.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-    with dl3:
-        st.download_button(
-            "③ Bランク CSV",
-            data=b_bytes,
-            file_name="winner_keywords_B.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-    with dl4:
-        st.download_button(
-            "④ キャンペーン別ZIP",
-            data=zip_bytes,
-            file_name="winner_keywords_zip.zip",
-            mime="application/zip",
-            use_container_width=True,
-        )
+for camp in OFFICIAL_CAMPAIGNS:
+    df_camp = df_win[df_win["campaign_theme"] == camp].copy()
+    if df_camp.empty:
+        continue
+    df_camp = df_camp.sort_values("ROAS", ascending=False).reset_index(drop=True)
+    cnt   = len(df_camp)
+    cnt_a = int((df_camp["rank"] == "A").sum())
+    cnt_b = int((df_camp["rank"] == "B").sum())
+    price     = PRICE_MASTER.get(camp, 0)
+    threshold = price * 2
+    label = f"▼ {camp}（合計{cnt:,}件 ／ A:{cnt_a}件 B:{cnt_b}件）"
+    with st.expander(label, expanded=False):
+        disp = df_camp[[c for c in disp_base if c in df_camp.columns]].copy()
+        disp = disp.rename(columns={
+            "keyword": "検索語句", "rank": "ランク",
+            "ROAS": "ROAS", "sales": "売上", "cost": "広告費",
+            "orders": "商品購入数",
+        })
+        disp.index = disp.index + 1
+        disp["売価判定"] = f"✓ ¥{threshold:,}以上"
+        disp["ROAS判定"] = disp["ROAS"].apply(lambda r: f"✓ {r:.2f} ≥ 2.0")
+        disp["売上"]  = disp["売上"].apply(lambda x: f"¥{x:,.0f}")
+        disp["広告費"] = disp["広告費"].apply(lambda x: f"¥{x:,.0f}")
+        disp["ROAS"]  = disp["ROAS"].round(2)
+        st.dataframe(disp, use_container_width=True)
 
-    # ── キャンペーン別テーブル ──────────────────────────
-    st.markdown("---")
-    st.subheader("キャンペーン別 勝てるKW（A/Bランク付き）")
-
-    disp_base = ["keyword", "rank", "sales", "cost", "ROAS"]
-    if "orders" in df_win.columns:
-        disp_base.append("orders")
-
-    for camp in OFFICIAL_CAMPAIGNS:
-        df_camp = df_win[df_win["campaign_theme"] == camp].copy()
-        if df_camp.empty:
-            continue
-        df_camp = df_camp.sort_values(
-            ["rank", "ROAS"], ascending=[True, False]
-        ).reset_index(drop=True)
-        cnt   = len(df_camp)
-        cnt_a = int((df_camp["rank"] == "A").sum())
-        cnt_b = int((df_camp["rank"] == "B").sum())
-        price     = PRICE_MASTER.get(camp, 0)
-        threshold = price * 2
-        label = f"▼ {camp}（合計{cnt:,}件 ／ A:{cnt_a}件 B:{cnt_b}件）"
-        with st.expander(label, expanded=False):
-            disp = df_camp[[c for c in disp_base if c in df_camp.columns]].copy()
-            disp = disp.rename(columns={
-                "keyword": "検索語句", "rank": "ランク",
-                "sales": "売上", "cost": "広告費",
-                "ROAS": "ROAS", "orders": "商品購入数",
-            })
-            disp["売価判定"] = f"✓ ¥{threshold:,}以上"
-            disp["ROAS判定"] = disp["ROAS"].apply(
-                lambda r: f"✓ {r:.2f} ≥ 2.0"
-            )
-            disp["売上"] = disp["売上"].apply(lambda x: f"¥{x:,.0f}")
-            disp["広告費"] = disp["広告費"].apply(lambda x: f"¥{x:,.0f}")
-            disp["ROAS"] = disp["ROAS"].round(2)
-            st.dataframe(disp, use_container_width=True, hide_index=True)
-
-    # ── デバッグ ─────────────────────────────────────────
-    with st.expander("デバッグ情報"):
-        d1, d2, d3, d4, d5 = st.columns(5)
-        d1.metric("登録済KW除外", f"{n_exact:,}")
-        d2.metric("部分一致除外", f"{n_partial:,}")
-        d3.metric("ブランド除外", f"{n_brand:,}")
-        d4.metric("ASIN除外", f"{n_asin:,}")
-        d5.metric("集計後KW数", f"{n_after_exclusion:,}")
-        st.write("費用列:", cost_col)
-        st.write("売上列:", sales_col)
-        st.write("注文列:", orders_col)
-        st.write(f"ブランド除外語: {brand_excludes}")
-        st.write(f"登録済みKW数: {len(registered_set):,}")
+# ── デバッグ ──────────────────────────────────────────
+di = st.session_state.get("debug_info", {})
+with st.expander("デバッグ情報"):
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric("完全一致除外",  f"{fs['n_exact']:,}")
+    d2.metric("部分一致除外",  f"{fs['n_partial']:,}")
+    d3.metric("ブランド除外",  f"{fs['n_brand']:,}")
+    d4.metric("ASIN除外",     f"{fs['n_asin']:,}")
+    st.write("費用列:", di.get("cost_col"))
+    st.write("売上列:", di.get("sales_col"))
+    st.write("注文列:", di.get("orders_col"))
+    st.write("クリック列:", di.get("clicks_col"))
+    st.write("インプレッション列:", di.get("impressions_col"))
+    st.write("ブランド除外語:", di.get("brand_excludes"))
+    st.write(f"登録済みKW数: {di.get('registered_len', 0):,}")
