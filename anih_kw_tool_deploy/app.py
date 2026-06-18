@@ -5,6 +5,7 @@ Amazon SP広告の勝ちKWを自動抽出する Streamlit アプリ
 修正履歴:
   v2.0 - 完全リライト（ラッコ/Tier/DataDive削除、ROAS勝ちKW判定、売価マスタ）
   v2.1 - 採用理由表示、サマリー強化、選定ロジック説明更新
+  v2.1.1 - 列名自動判定を強化（合計費用を最優先、日英両対応）
 """
 from __future__ import annotations
 
@@ -34,7 +35,6 @@ OFFICIAL_CAMPAIGNS = [
     "乳酸菌犬", "肉球S",
 ]
 
-# 商品売価マスタ（税込定価）
 PRICE_MASTER: dict[str, int] = {
     "ふりかけ犬": 2450,
     "お口周り":   1480,
@@ -102,6 +102,7 @@ def assign_official_campaign(theme: str) -> str:
 
 
 def find_col(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
+    """列名候補リストを優先順で検索。大文字小文字を無視したフォールバックあり。"""
     for c in candidates:
         if c in df.columns:
             return c
@@ -137,7 +138,7 @@ with st.sidebar:
     for camp, price in PRICE_MASTER.items():
         st.caption(f"{camp}：¥{price:,}")
     st.markdown("---")
-    st.caption("ANIHA 勝ちKW抽出ツール v2.1")
+    st.caption("ANIHA 勝ちKW抽出ツール v2.1.1")
 
 st.title("🐾 ANIHA 勝ちKW抽出ツール")
 
@@ -234,16 +235,30 @@ if run_btn:
         # ── STEP1: 検索語句レポート読込 ──────────────────────
         df_search = read_csv_auto(search_file)
 
-        kw_col       = find_col(df_search, ["検索用語", "Customer Search Term", "search term"])
-        campaign_col = find_col(df_search, ["キャンペーン名", "Campaign Name", "campaign name"])
-        sales_col    = find_col(df_search, ["売上", "広告費売上高", "7日間の総売上高", "Sales", "sales"])
-        cost_col     = find_col(df_search, ["費用", "コスト", "Spend", "Cost", "spend"])
+        # 列名自動判定（日本語版・英語版・仕様変更に対応）
+        kw_col = find_col(df_search, [
+            "検索用語", "カスタマーの検索用語",
+            "Customer Search Term", "search term",
+        ])
+        campaign_col = find_col(df_search, [
+            "キャンペーン名",
+            "Campaign Name", "campaign name",
+        ])
+        sales_col = find_col(df_search, [
+            "売上", "合計売上", "広告費売上高", "7日間の総売上高",
+            "Sales", "Revenue", "sales",
+        ])
+        # 費用列：合計費用を最優先（Amazon日本版の実列名）
+        cost_col = find_col(df_search, [
+            "合計費用", "費用", "コスト",
+            "Cost", "Spend", "spend", "cost",
+        ])
 
         missing = []
         if not kw_col:       missing.append("検索用語")
         if not campaign_col: missing.append("キャンペーン名")
         if not sales_col:    missing.append("売上")
-        if not cost_col:     missing.append("費用/コスト")
+        if not cost_col:     missing.append("合計費用/費用")
         if missing:
             st.error(f"検索語句レポートに必要な列が見つかりません: {missing}")
             st.write("検出された列:", list(df_search.columns))
@@ -251,10 +266,10 @@ if run_btn:
 
         # ── STEP2: ターゲットKW読込 ──────────────────────────
         df_target = read_csv_auto(target_file)
-        target_kw_col = find_col(
-            df_target,
-            ["ターゲティング", "キーワード", "Targeting", "Keyword", "keyword"],
-        )
+        target_kw_col = find_col(df_target, [
+            "ターゲティング", "キーワード",
+            "Targeting", "Keyword", "keyword",
+        ])
         if not target_kw_col:
             st.error("ターゲットKWレポートにターゲティング/キーワード列が見つかりません")
             st.write("検出された列:", list(df_target.columns))
@@ -463,5 +478,7 @@ if run_btn:
         d1.metric("登録済KW除外", f"{n_registered:,} 件")
         d2.metric("ブランドKW除外", f"{n_brand:,} 件")
         d3.metric("集計後KW（除外後）", f"{n_after_exclusion:,} 件")
+        st.write("費用列:", cost_col)
+        st.write("売上列:", sales_col)
         st.write(f"ブランド除外語: {brand_excludes}")
         st.write(f"登録済みKW数: {len(registered_kws):,}")
