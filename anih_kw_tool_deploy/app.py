@@ -341,8 +341,26 @@ st.markdown("""
     letter-spacing: .08em; padding: 8px 0 4px 0; border-bottom: 1px solid #2d3250; margin-bottom: 12px; }
 </style>""", unsafe_allow_html=True)
 
+# ── ロゴ読込（assets/logo.png または logo.png）──────────────────
+import pathlib as _pl, base64 as _b64
+def _load_logo(width_px: int = 180) -> str:
+    for p in [_pl.Path("assets/logo.png"), _pl.Path("logo.png")]:
+        if p.exists():
+            b64 = _b64.b64encode(p.read_bytes()).decode()
+            tag = '<img src="data:image/png;base64,' + b64 + '" width="' + str(width_px) + '" style="object-fit:contain;">'
+            return tag
+    return ""  # ロゴなし → 空文字
+
 with st.sidebar:
-    st.markdown("### ⚙️ 設定")
+    # サイドバーロゴ
+    _sb_logo = _load_logo(130)
+    if _sb_logo:
+        st.markdown(_sb_logo, unsafe_allow_html=True)
+        st.markdown("")
+    st.markdown("""<div style="line-height:1.4;">
+        <div style="font-size:1rem;font-weight:700;color:#e8eaf0;">🚀 ANIHA Command Center</div>
+        <div style="font-size:.75rem;color:#8b93a7;margin-top:2px;">Amazon Advertising Intelligence</div>
+    </div>""", unsafe_allow_html=True)
     st.markdown("---")
     st.markdown("<p class=\"section-header\">ブランド除外</p>", unsafe_allow_html=True)
     bt = st.text_area("ブランド除外（改行区切り）", value=DEFAULT_BRANDS, height=100, label_visibility="collapsed")
@@ -357,11 +375,25 @@ with st.sidebar:
     for _c, _p in PRICES.items():
         st.caption(f"{_c}：¥{_p:,}")
     st.markdown("---")
-    st.caption("ANIHA 勝ちKW抽出ツール 最終確定版")
+    st.caption("ANIHA Command Center v1.0")
 
 # --- Header ---
-st.markdown("## 🐾 ANIHA 勝ちKW抽出ツール")
-st.markdown("<p style=\"color:#6b7280;font-size:.9rem;margin-top:-12px;\">Amazon SP広告 オート広告から勝ちKWを自動抽出 — DataDive連携対応版</p>", unsafe_allow_html=True)
+_h_logo = _load_logo(200)
+_h1, _h2 = st.columns([1, 3])
+with _h1:
+    if _h_logo:
+        st.markdown(_h_logo, unsafe_allow_html=True)
+    else:
+        st.markdown('''<div style="font-size:2.5rem;line-height:1;">🐾</div>''', unsafe_allow_html=True)
+with _h2:
+    st.markdown("""<div style="padding-top:8px;">
+        <div style="font-size:1.6rem;font-weight:800;color:#e8eaf0;letter-spacing:-.01em;">
+            🚀 ANIHA Command Center</div>
+        <div style="font-size:.95rem;color:#8b93a7;margin-top:2px;">
+            Amazon Advertising Intelligence Platform</div>
+        <div style="font-size:.82rem;color:#6b7280;margin-top:2px;">
+            ANIHA専用のAmazon広告運用分析プラットフォーム</div>
+    </div>""", unsafe_allow_html=True)
 st.markdown("---")
 
 # --- File Upload ---
