@@ -675,7 +675,59 @@ def page_add_kw():
 
     render_logic_section(
         "📋 Amazon追加用KW判定ロジック",
-        '''<p style="color:#4A5568;font-size:.85rem;">後日追加予定 — 判定フロー・ROAS閾値・同一意図KW統合ロジックを記載します。</p>''',
+        '''
+<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
+<thead>
+  <tr style="background:#DBEAFE;">
+    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>
+    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>
+  </tr>
+</thead>
+<tbody>
+  <tr style="background:#F1F5F9;">
+    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【目的】</td>
+  </tr>
+  <tr>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;" colspan="2">
+      売上実績のある検索語句から、Amazonへ追加すべき <b>勝ちKW</b> を抽出します。<br>
+      <span style="font-size:.8rem;color:#718096;">オート広告で成果が出た語句を手動・フレーズ・完全一致へ昇格するための候補抽出です。</span>
+    </td>
+  </tr>
+  <tr style="background:#F1F5F9;">
+    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【抽出条件】</td>
+  </tr>
+  <tr>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">信頼度フィルター</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
+      注文数 ≥ 3件 <b>かつ</b> クリック数 ≥ 5 <b>かつ</b> 広告費 ≥ ¥300<br>
+      <span style="font-size:.8rem;color:#718096;">サイドバーで変更可能</span>
+    </td>
+  </tr>
+  <tr style="background:#F0FFF4;">
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">採用条件</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">売上 ≥ 売価 × 2 <b>かつ</b> ROAS ≥ 2.0</td>
+  </tr>
+  <tr style="background:#F1F5F9;">
+    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【ランク分類】</td>
+  </tr>
+  <tr>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2F855A;">🏆 Aランク</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS ≥ 5.0 ／ 最優先追加候補</td>
+  </tr>
+  <tr style="background:#EAF2FF;">
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#3B82F6;">🚀 B+ランク</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">3.5 ≤ ROAS &lt; 5.0 ／ 追加推奨候補</td>
+  </tr>
+  <tr>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#F59E0B;">👀 Bランク</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">2.0 ≤ ROAS &lt; 3.5 ／ 監視候補</td>
+  </tr>
+</tbody>
+</table>
+<p style="font-size:.78rem;color:#718096;margin-top:10px;">
+  ▶ 同一意図KW統合: 語順・表記ゆれが同じKWは代表1件に集約<br>
+  ▶ ブランドワード・商品コード・タイトル文字列は自動除外
+</p>''',
     )
     st.markdown("")
     # ② キャンペーン選択
@@ -751,7 +803,55 @@ def page_del_kw():
     _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "≤ 0.5"), ("勝ちKW", "除外")])
     render_logic_section(
         "🚫 Amazon削除用KW判定ロジック",
-        '''<p style="color:#4A5568;font-size:.85rem;">後日追加予定 — 削除KW判定条件・広告費閾値・除外ロジックを記載します。</p>''',
+        '''
+<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
+<thead>
+  <tr style="background:#DBEAFE;">
+    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>
+    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>
+  </tr>
+</thead>
+<tbody>
+  <tr style="background:#F1F5F9;">
+    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【対象】</td>
+  </tr>
+  <tr>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">分析対象</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">オート広告の検索語句のみ</td>
+  </tr>
+  <tr style="background:#F1F5F9;">
+    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【削除条件】</td>
+  </tr>
+  <tr style="background:#FFF5F5;">
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">🚫 削除対象</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
+      広告費 ≥ 売価 × 2 <b>かつ</b> ROAS &lt; 0.5<br>
+      <span style="font-size:.8rem;color:#718096;">→ 完全一致で除外登録することを推奨</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#718096;">⚪ データ不足</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
+      上記条件を満たさない場合<br>
+      <span style="font-size:.8rem;color:#718096;">→ 変更なし（経過観察）</span>
+    </td>
+  </tr>
+  <tr style="background:#F1F5F9;">
+    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【除外ルール】</td>
+  </tr>
+  <tr>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">勝ちKW除外</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
+      追加用KW（勝ちKW）と重複するものは削除対象から除外<br>
+      <span style="font-size:.8rem;color:#718096;">→ 勝ちKWを誤って削除しないための保護処理</span>
+    </td>
+  </tr>
+</tbody>
+</table>
+<p style="font-size:.78rem;color:#718096;margin-top:10px;">
+  ▶ 基本思想: 売価の2倍以上広告費を使っても売上が立たない検索語句を除外する<br>
+  ▶ ダウンロードページからキャンペーン別ZIPで出力可能
+</p>''',
     )
     st.markdown("")
     _del_camps = ["全キャンペーン"]
