@@ -144,7 +144,7 @@ def tonum(s: pd.Series) -> pd.Series:
     ).fillna(0)
 
 def clear():
-    for k in ["has_results", "df_win", "df_a", "df_bp", "df_b", "df_del", "stats", "dbg"]:
+    for k in ["has_results", "df_win", "df_a", "df_bp", "df_b", "df_del", "df_cpc", "stats", "dbg"]:
         st.session_state.pop(k, None)
 
 # ===================================================
@@ -212,6 +212,82 @@ def del_camp_zip(df_del: pd.DataFrame) -> bytes:
             kws = dc.sort_values("cost", ascending=False)["keyword"].tolist()
             csv_content = "keyword\n" + "\n".join(kws)
             zf.writestr(f"{c}_削除KW.csv", csv_content.encode("utf-8-sig"))
+    return buf.getvalue()
+
+# ===================================================
+# CPC調整ロジック
+# ===================================================
+CPC_RANK_ORDER = ["SS+", "SS", "S", "A", "B", "D", "E", "即削除", "判断保留"]
+
+def assign_cpc_rank(cost: float, orders: float, roas: float, price: float):
+    """STEP1→STEP2→STEP3→STEP4 の順で CPC ランクを返す。(rank, action, delta)"""
+    orders = orders or 0
+    # 即削除 threshold by price
+    if price <= 1500:
+        del_thresh = 3000
+    elif price <= 2000:
+        del_thresh = 4000
+    else:
+        del_thresh = 5000
+    # STEP1: 判断保留
+    if cost < 3000 or orders < 3:
+        return ("判断保留", "変更なし", 0)
+    # STEP2: SS / SS+
+    if orders >= 20 and roas >= 4.0:
+        rank, action, delta = "SS+", "CPC上げ", 5
+    elif orders >= 20 and roas >= 2.0:
+        rank, action, delta = "SS", "現状維持", 0
+    # STEP3: normal
+    elif roas >= 4.0:
+        rank, action, delta = "S", "CPC上げ", 5
+    elif roas >= 3.0:
+        rank, action, delta = "A", "現状維持", 0
+    elif roas >= 2.0:
+        rank, action, delta = "B", "現状維持", 0
+    elif roas >= 1.5:
+        rank, action, delta = "D", "CPC下げ", -5
+    else:
+        rank, action, delta = "E", "CPC下げ", -10
+    # STEP4: 即削除 override
+    if cost >= del_thresh and roas < 0.5:
+        rank, action, delta = "即削除", "即削除", 0
+    return (rank, action, delta)
+
+def build_cpc_df(df: pd.DataFrame) -> pd.DataFrame:
+    """agg（price付き）から CPC 調整テーブルを生成する。"""
+    if df.empty:
+        return df
+    d = df.copy()
+    results = d.apply(
+        lambda r: assign_cpc_rank(
+            r.get("cost", 0) or 0,
+            r.get("orders", 0) or 0,
+            r.get("ROAS", 0) or 0,
+            r.get("price", 3000) or 3000,
+        ), axis=1
+    )
+    d["cpc_rank"]   = results.apply(lambda x: x[0])
+    d["cpc_action"] = results.apply(lambda x: x[1])
+    d["cpc_delta"]  = results.apply(lambda x: x[2])
+    avg_cpc = (d["cost"] / d["clicks"].replace(0, float("nan"))).round(0) if "clicks" in d.columns else None
+    if avg_cpc is not None:
+        d["avg_cpc"]  = avg_cpc.fillna(0).astype(int)
+        d["rec_cpc"]  = (d["avg_cpc"] + d["cpc_delta"]).clip(lower=1)
+    return d
+
+def cpc_camp_zip(df_cpc: pd.DataFrame) -> bytes:
+    buf = io.BytesIO()
+    cols_out = [c for c in ["keyword","campaign_theme","ROAS","cost","sales","orders",
+                             "avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_cpc.columns]
+    rename_map = {"keyword":"検索語句","campaign_theme":"キャンペーン","cost":"広告費",
+                  "sales":"売上","orders":"購入数","avg_cpc":"現在CPC","cpc_rank":"判定ランク",
+                  "cpc_action":"推奨アクション","cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for c in CAMPAIGNS:
+            dc = df_cpc[df_cpc["campaign_theme"] == c]
+            if dc.empty: continue
+            out = dc[cols_out].rename(columns=rename_map)
+            zf.writestr(f"{c}_CPC調整表.csv", out.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"))
     return buf.getvalue()
 
 # ===================================================
@@ -388,12 +464,15 @@ if run:
         df_del_ = agg[del_mask].copy()
         df_del_ = df_del_[~df_del_["keyword"].isin(win_kws)].copy()
         df_del_.drop(columns=["price"], inplace=True, errors="ignore")
+        # CPC調整テーブル: agg（price付き）全件から生成
+        df_cpc_ = build_cpc_df(agg.copy())
         st.session_state.update({
             "has_results": True, "df_win": dw,
             "df_a": dw[dw["rank"]==RA].copy(),
             "df_bp": dw[dw["rank"]==RBP].copy(),
             "df_b": dw[dw["rank"]==RB].copy(),
             "df_del": df_del_,
+            "df_cpc": df_cpc_,
             "stats": {
                 "n_auto":n_auto,"n_ex":n_ex,"n_pt":n_pt,"n_ar":n_ar,
                 "n_br":n_br,"n_cd":n_cd,"n_tl":n_tl,"n_ae":n_ae,
@@ -425,9 +504,8 @@ dd:  pd.DataFrame = st.session_state.get("df_del", pd.DataFrame())
 sv = st.session_state["stats"]
 
 na = len(da); nbp = len(dbp); nb = len(db)
+dc_cpc: pd.DataFrame = st.session_state.get("df_cpc", pd.DataFrame())
 
-st.markdown("---")
-k1, k2, k3, k4, k5 = st.columns(5)
 def kpi(col, icon, label, value, sub=""):
     col.markdown(f"""<div class="kpi-card">
         <div class="kpi-icon">{icon}</div>
@@ -436,17 +514,12 @@ def kpi(col, icon, label, value, sub=""):
         <div class="kpi-sub">{sub}</div>
     </div>""", unsafe_allow_html=True)
 
-kpi(k1, "🏆", "A ランク", f"{na}件", "高優先度追加候補")
-kpi(k2, "🚀", "B+ ランク", f"{nbp}件", "追加検討候補")
-kpi(k3, "👀", "B ランク", f"{nb}件", "監視候補")
-kpi(k4, "📦", "抽出前", "{}件".format(sv["n_pre"]), "フィルター適用前")
-kpi(k5, "🎯", "抽出後", "{}件".format(sv["nf"]), "同一意図KW統合後")
-st.markdown("---")
 # ===================================================
-# 4タブ レイアウト
+# タブ レイアウト（6タブ）
 # ===================================================
-tab_res, tab_add, tab_del, tab_dl, tab_manual = st.tabs([
+tab_res, tab_cpc, tab_add, tab_del, tab_dl, tab_manual = st.tabs([
     "📊 分析結果",
+    "📈 CPC調整表",
     "📋 Amazon追加用KW",
     "🚫 Amazon削除用KW",
     "📥 ダウンロード",
@@ -457,6 +530,15 @@ tab_res, tab_add, tab_del, tab_dl, tab_manual = st.tabs([
 # TAB①: 分析結果
 # ===================================================
 with tab_res:
+    # KPIカード（分析結果タブ専用）
+    st.markdown("---")
+    k1, k2, k3, k4, k5 = st.columns(5)
+    kpi(k1, "🏆", "A ランク", f"{na}件", "高優先度追加候補")
+    kpi(k2, "🚀", "B+ ランク", f"{nbp}件", "追加検討候補")
+    kpi(k3, "👀", "B ランク", f"{nb}件", "監視候補")
+    kpi(k4, "📦", "抽出前", "{}件".format(sv["n_pre"]), "フィルター適用前")
+    kpi(k5, "🎯", "抽出後", "{}件".format(sv["nf"]), "同一意図KW統合後")
+    st.markdown("---")
     # 分析フローサマリー
     with st.expander("📊 分析フロー詳細", expanded=False):
         st.markdown(f"""
@@ -498,6 +580,93 @@ with tab_res:
 # ===================================================
 # TAB②: Amazon登録用KW
 # ===================================================
+# ===================================================
+# TAB②: CPC調整表
+# ===================================================
+with tab_cpc:
+    st.markdown("")
+    st.markdown("""<div style="margin-bottom:8px;">
+        <span style="font-size:1.25rem;font-weight:700;color:#e8eaf0;">📈 CPC調整表</span>
+        <span style="font-size:.85rem;color:#8b93a7;margin-left:12px;">利益最大化・検索シェア拡大</span>
+    </div>""", unsafe_allow_html=True)
+
+    if dc_cpc.empty:
+        st.info("分析を実行してください。")
+    else:
+        _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "D", "E", "即削除", "判断保留"]
+        _RANK_COLOR = {
+            "SS+": "#f6c90e", "SS": "#e8b400", "S": "#6c63ff",
+            "A": "#38b2ac", "B": "#4299e1", "D": "#ed8936",
+            "E": "#e53e3e", "即削除": "#742a2a", "判断保留": "#718096",
+        }
+        _ACTION_COLOR = {
+            "CPC上げ": "#6c63ff", "現状維持": "#38b2ac",
+            "CPC下げ": "#ed8936", "即削除": "#e53e3e", "変更なし": "#718096",
+        }
+
+        # ① キャンペーン選択
+        cpc_camps = [c for c in CAMPAIGNS if not dc_cpc[dc_cpc["campaign_theme"]==c].empty]
+        cpc_sel_col, _ = st.columns([3, 2])
+        with cpc_sel_col:
+            cpc_camp = st.selectbox("キャンペーン（CPC）", cpc_camps,
+                label_visibility="collapsed", key="cpc_camp_sel")
+        df_c = dc_cpc[dc_cpc["campaign_theme"] == cpc_camp].copy()
+
+        # ② CPC専用KPIカード
+        st.markdown("---")
+        cpc_counts = {r: int((df_c["cpc_rank"]==r).sum()) for r in _RANK_ORDER}
+        kpi_ranks   = ["SS+","SS","S","A","B","D","E","即削除"]
+        kpi_cols    = st.columns(len(kpi_ranks))
+        for col, rk in zip(kpi_cols, kpi_ranks):
+            col.markdown(f"""<div class="kpi-card" style="border-top:3px solid {_RANK_COLOR[rk]};">
+                <div class="kpi-label">{rk}</div>
+                <div class="kpi-value" style="font-size:1.6rem;color:{_RANK_COLOR[rk]};">{cpc_counts[rk]}</div>
+                <div class="kpi-sub">件</div>
+            </div>""", unsafe_allow_html=True)
+        if cpc_counts["判断保留"] > 0:
+            st.caption(f"⏸ 判断保留: {cpc_counts['判断保留']}件（広告費¥3,000未満 または 購入数3件未満）")
+        st.markdown("---")
+
+        # ③④ 詳細テーブル（ランク順）
+        disp_cols = [c for c in ["keyword","ROAS","cost","sales","orders",
+                                  "avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
+        _rename = {"keyword":"検索語句","cost":"広告費","sales":"売上","orders":"購入数",
+                   "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
+                   "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
+
+        cat_type = pd.CategoricalDtype(categories=_RANK_ORDER, ordered=True)
+        df_c["_rank_cat"] = df_c["cpc_rank"].astype(cat_type)
+        df_c = df_c.sort_values(["_rank_cat","ROAS"], ascending=[True, False]).drop(columns=["_rank_cat"])
+        df_c = df_c.reset_index(drop=True)
+        df_c.index = df_c.index + 1
+
+        _disp = df_c[disp_cols].rename(columns=_rename).copy()
+        if "広告費" in _disp.columns: _disp["広告費"] = _disp["広告費"].apply(lambda x: f"¥{x:,.0f}")
+        if "売上"   in _disp.columns: _disp["売上"]   = _disp["売上"].apply(lambda x: f"¥{x:,.0f}")
+        if "ROAS"   in _disp.columns: _disp["ROAS"]   = _disp["ROAS"].round(2)
+        if "変更幅" in _disp.columns: _disp["変更幅"] = _disp["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
+        if "現在CPC" in _disp.columns: _disp["現在CPC"] = _disp["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
+        if "推奨CPC" in _disp.columns: _disp["推奨CPC"] = _disp["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
+
+        def _rank_color_row(row):
+            rk = row.get("判定ランク","")
+            c  = _RANK_COLOR.get(rk, "")
+            return [f"color:{c};font-weight:700" if col=="判定ランク" else "" for col in row.index]
+
+        st.dataframe(
+            _disp.style.apply(_rank_color_row, axis=1),
+            use_container_width=True, height=480,
+        )
+
+        # ダウンロード（このキャンペーン）
+        _dl_cols = [c for c in ["keyword","ROAS","cost","sales","orders",
+                                 "avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
+        _dl_df = df_c[_dl_cols].rename(columns=_rename)
+        _dl_csv = _dl_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+        st.download_button(f"📥 {cpc_camp}_CPC調整表.csv をダウンロード",
+            data=_dl_csv, file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv")
+
+
 with tab_add:
     st.markdown("")
     st.markdown("""<div style="margin-bottom:8px;">
@@ -695,6 +864,27 @@ with tab_dl:
             _d["ROAS"]  = _d["ROAS"].round(2)
             if "CVR" in _d.columns: _d["CVR"] = _d["CVR"].apply(lambda x: f"{x:.1f}%")
             st.dataframe(_d, use_container_width=True)
+
+    # CPC調整表ダウンロード
+    st.markdown("---")
+    st.markdown("**📈 CPC調整表**")
+    if not dc_cpc.empty:
+        _cpc_zip = cpc_camp_zip(dc_cpc)
+        _cpc_all_cols = [c for c in ["keyword","campaign_theme","ROAS","cost","sales","orders",
+                                      "avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in dc_cpc.columns]
+        _cpc_rename = {"keyword":"検索語句","campaign_theme":"キャンペーン","cost":"広告費",
+                       "sales":"売上","orders":"購入数","avg_cpc":"現在CPC","cpc_rank":"判定ランク",
+                       "cpc_action":"推奨アクション","cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
+        _cpc_all_csv = dc_cpc[_cpc_all_cols].rename(columns=_cpc_rename).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+        dca1, dca2 = st.columns(2)
+        dca1.download_button("📦 キャンペーン別_CPC調整表.zip",
+            data=_cpc_zip, file_name="キャンペーン別_CPC調整表.zip", mime="application/zip",
+            use_container_width=True, type="primary")
+        dca2.download_button("📋 全キャンペーン_CPC調整表.csv",
+            data=_cpc_all_csv, file_name="全キャンペーン_CPC調整表.csv", mime="text/csv",
+            use_container_width=True)
+    else:
+        st.info("分析を実行するとCPC調整表をダウンロードできます。")
 
     dbg = st.session_state.get("dbg", {})
     with st.expander("🔧 デバッグ情報", expanded=False):
