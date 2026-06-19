@@ -617,6 +617,26 @@ def kpi(col, icon: str, label: str, value: str, sub: str = "",
         <div class="kpi-sub">{sub}</div>
     </div>''', unsafe_allow_html=True)
 
+
+# ─── 判定ロジック表示ヘルパー ────────────────────────────
+_LOGIC_BOX_STYLE = (
+    "background:#F8FBFF;border:1px solid #D9E8FF;"
+    "border-radius:8px;padding:16px 20px;line-height:1.7;"
+)
+def render_logic_section(title: str, content_html: str):
+    """📖 判定ロジックを見る — 各ページ共通の折りたたみ式ロジック表示エリア。
+    title        : 表示タイトル（例: "📋 Amazon追加用KW判定ロジック"）
+    content_html : ロジック本文（HTML文字列）
+    """
+    with st.expander("📖 判定ロジックを見る", expanded=False):
+        st.markdown(
+            f'''<div style="{_LOGIC_BOX_STYLE}">
+<div style="font-weight:700;font-size:.92rem;color:#1A365D;margin-bottom:12px;">{title}</div>
+{content_html}
+</div>''',
+            unsafe_allow_html=True,
+        )
+
 # ===================================================
 # ページ関数
 # ===================================================
@@ -653,6 +673,11 @@ def page_add_kw():
         ("最小広告費",  f'¥{sv["mco"]:,}'),
     ])
 
+    render_logic_section(
+        "📋 Amazon追加用KW判定ロジック",
+        '''<p style="color:#4A5568;font-size:.85rem;">後日追加予定 — 判定フロー・ROAS閾値・同一意図KW統合ロジックを記載します。</p>''',
+    )
+    st.markdown("")
     # ② キャンペーン選択
     _c1, _c2, _c3 = st.columns([3, 3, 2])
     with _c1:
@@ -724,6 +749,11 @@ def page_add_kw():
 
 def page_del_kw():
     _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "≤ 0.5"), ("勝ちKW", "除外")])
+    render_logic_section(
+        "🚫 Amazon削除用KW判定ロジック",
+        '''<p style="color:#4A5568;font-size:.85rem;">後日追加予定 — 削除KW判定条件・広告費閾値・除外ロジックを記載します。</p>''',
+    )
+    st.markdown("")
     _del_camps = ["全キャンペーン"]
     if not dd.empty and "campaign_theme" in dd.columns:
         _del_camps += [c for c in CAMPAIGNS if c in dd["campaign_theme"].values]
@@ -766,6 +796,107 @@ def page_cpc():
         "E":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
     }
     _cond_bar([("CPC調整ルール", "適用"), ("最小クリック数", f"{sv['mc']}回")])
+    render_logic_section(
+        "📈 CPC調整ロジック",
+        '''
+<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
+<thead>
+  <tr style="background:#DBEAFE;">
+    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:15%;">ランク</th>
+    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:45%;">判定条件</th>
+    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">アクション</th>
+    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">CPC変更幅</th>
+  </tr>
+</thead>
+<tbody>
+  <tr style="background:#F1F5F9;">
+    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+      【STEP 1】 データ不足判定（最優先）
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#4A5568;">判断保留</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>または</b> 購入数 &lt; 3件</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">変更なし</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+  </tr>
+  <tr style="background:#F1F5F9;">
+    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+      【STEP 2】 高実績ランク（購入数 ≥ 20件）
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#D69E2E;">SS+</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> ROAS ≥ 4.0</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
+  </tr>
+  <tr style="background:#FFFBEB;">
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#B7791F;">SS</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> 2.0 ≤ ROAS &lt; 4.0</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+  </tr>
+  <tr style="background:#F1F5F9;">
+    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+      【STEP 3】 ROASベースランク
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#553C9A;">S</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS ≥ 4.0</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
+  </tr>
+  <tr style="background:#F0FFF4;">
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2C7A7B;">A</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">3.0 ≤ ROAS &lt; 4.0</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+  </tr>
+  <tr>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2B6CB0;">B</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">2.0 ≤ ROAS &lt; 3.0</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+  </tr>
+  <tr style="background:#FFF5F5;">
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">D</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 2.0</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
+  </tr>
+  <tr style="background:#FFF5F5;">
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">E</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">0.5 ≤ ROAS &lt; 1.5</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
+  </tr>
+  <tr style="background:#F1F5F9;">
+    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+      【STEP 4】 即削除判定（広告費過多 × 低ROAS）
+    </td>
+  </tr>
+  <tr style="background:#FFF5F5;">
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#742A2A;">即削除</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
+      ROAS &lt; 0.5 <b>かつ</b> 広告費が閾値以上<br>
+      <span style="font-size:.8rem;color:#718096;">
+        売価 ≤¥1,500 → 広告費 ≥¥3,000 ／
+        売価 ≤¥2,000 → 広告費 ≥¥4,000 ／
+        売価 &gt;¥2,000 → 広告費 ≥¥5,000
+      </span>
+    </td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#742A2A;font-weight:700;">即削除</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">—</td>
+  </tr>
+</tbody>
+</table>
+<p style="font-size:.78rem;color:#718096;margin-top:10px;">
+  ▶ 判定順序: STEP1（データ不足）→ STEP2（購入数優先） → STEP3（ROASベース） → STEP4（即削除）<br>
+  ▶ 基本思想: ROASだけでなく、広告費と購入数を重視した複合判定
+</p>''',
+    )
     if dc_cpc.empty:
         st.info("分析を実行してください。")
         return
