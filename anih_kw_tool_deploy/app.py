@@ -444,7 +444,7 @@ with tab1:
             od  = fcol(dfs, ["商品購入数", "注文数", "注文された商品点数", "Orders", "Purchases"])
             clk = fcol(dfs, ["クリック数", "クリック", "Clicks", "clicks"])
             imp = fcol(dfs, ["インプレッション数", "インプレッション", "Impressions", "impressions"])
-            tkc = fcol(dft, ["ターゲッティング", "キーワード", "Targeting", "Keyword", "keyword"])
+            tkc = fcol(dft, ["ターゲティング", "ターゲッティング", "キーワード", "Targeting", "targeting", "Keyword", "keyword"])
 
             miss = [n for v, n in [(kc, "検索用語"), (cc, "キャンペーン名"), (sc, "売上"), (oc_, "広告費")] if not v]
             if miss:
