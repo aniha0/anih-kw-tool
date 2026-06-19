@@ -390,42 +390,14 @@ def _cond_bar(items: list):
     )
     st.markdown(f'<div class="cond-bar">{parts}</div>', unsafe_allow_html=True)
 
+# ─── 固定パラメータ（デフォルト値で固定）──────────────────────
+brands   = [norm(b) for b in DEFAULT_BRANDS.strip().splitlines() if b.strip()]
+min_ord  = 3
+min_clk  = 5
+min_cost = 300
+
 # ─── Sidebar ───────────────────────────────────────
 with st.sidebar:
-    _sb_logo = _load_logo(120)
-    if _sb_logo:
-        st.markdown(_sb_logo, unsafe_allow_html=True)
-        st.markdown("")
-    st.markdown("""<div style="line-height:1.5;margin-bottom:4px;">
-        <div style="font-size:1.05rem;font-weight:800;color:#1A202C;">🚀 ANIHA Command Center</div>
-        <div style="font-size:.72rem;color:#718096;">Amazon Advertising Intelligence Platform</div>
-    </div>""", unsafe_allow_html=True)
-    st.markdown("---")
-
-    # ⚙ 共通設定
-    st.markdown('<p class="section-header">⚙ 共通設定</p>', unsafe_allow_html=True)
-    st.caption("ブランド名を含む検索語句を除外します")
-    bt = st.text_area("ブランド除外ワード（改行区切り）", value=DEFAULT_BRANDS, height=90, label_visibility="collapsed")
-    brands = [norm(b) for b in bt.strip().splitlines() if b.strip()]
-    st.caption(f"除外ブランド数：{len(brands)}件")
-
-    st.caption("Amazonから出力したレポート期間と一致させてください")
-    analysis_days = st.selectbox(
-        "分析期間（日数）", [30, 60, 90, 180, 365], index=2,
-        format_func=lambda x: f"{x}日",
-    )
-    st.markdown("---")
-
-    # 🏆 勝ちKW抽出条件
-    st.markdown('<p class="section-header">🏆 勝ちKW抽出条件</p>', unsafe_allow_html=True)
-    st.caption("この条件を満たした検索語句のみ追加KW候補として判定します")
-    min_ord  = st.number_input("最小注文数",    min_value=1, max_value=20,    value=3,   step=1, help="件以上")
-    min_clk  = st.number_input("最小クリック数", min_value=1, max_value=100,   value=5,   step=1, help="クリック以上")
-    min_cost = st.number_input("最小広告費（¥）", min_value=0, max_value=10000, value=300, step=50, help="円以上")
-    st.markdown("---")
-
-    # 📂 ページナビ
-    st.markdown('<p class="section-header">📂 ページ</p>', unsafe_allow_html=True)
     NAV_PAGES = [
         "📋 Amazon追加用KW",
         "🚫 Amazon削除用KW",
@@ -437,18 +409,7 @@ with st.sidebar:
     current_page = st.radio("ページ選択", NAV_PAGES, label_visibility="collapsed")
     st.markdown("---")
 
-    # 🔧 詳細設定（将来拡張用）
-    with st.expander("🔧 詳細設定", expanded=False):
-        st.caption("🚧 準備中")
-        st.markdown("""
-*将来追加予定の設定項目:*
-- 削除KW条件
-- CPC条件
-- DateDive条件
-- 競合分析条件
-""")
-
-    st.markdown("---")
+    # 💲 売価マスタ
     st.markdown('<p class="section-header">💲 売価マスタ</p>', unsafe_allow_html=True)
     for _c, _p in PRICES.items(): st.caption(f"{_c}：¥{_p:,}")
     st.markdown("---")
