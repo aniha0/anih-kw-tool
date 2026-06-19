@@ -144,7 +144,7 @@ def tonum(s: pd.Series) -> pd.Series:
     ).fillna(0)
 
 def clear():
-    for k in ["has_results", "df_win", "df_a", "df_bp", "df_b", "stats", "dbg"]:
+    for k in ["has_results", "df_win", "df_a", "df_bp", "df_b", "df_del", "stats", "dbg"]:
         st.session_state.pop(k, None)
 
 # ===================================================
@@ -201,6 +201,17 @@ def all_zip(df: pd.DataFrame) -> bytes:
                 dr = dc[dc["rank"] == rk]
                 if not dr.empty:
                     zf.writestr(f"{c}_{fn}.csv", to_csv(dr))
+    return buf.getvalue()
+
+def del_camp_zip(df_del: pd.DataFrame) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for c in CAMPAIGNS:
+            dc = df_del[df_del["campaign_theme"] == c]
+            if dc.empty: continue
+            kws = dc.sort_values("cost", ascending=False)["keyword"].tolist()
+            csv_content = "keyword\n" + "\n".join(kws)
+            zf.writestr(f"{c}_削除KW.csv", csv_content.encode("utf-8-sig"))
     return buf.getvalue()
 
 # ===================================================
@@ -371,11 +382,18 @@ if run:
         dw = deduplicate_keyword_intent(d1)
         nf = len(dw)
         dw["rank"] = dw["ROAS"].apply(assign_rank)
+        # 削除KW: 広告費 >= 商品売価×2 かつ ROAS <= 0.5（勝ちKWを除く）
+        win_kws = set(dw["keyword"].tolist())
+        del_mask = (agg["cost"] >= agg["price"] * 2) & (agg["ROAS"] <= 0.5)
+        df_del_ = agg[del_mask].copy()
+        df_del_ = df_del_[~df_del_["keyword"].isin(win_kws)].copy()
+        df_del_.drop(columns=["price"], inplace=True, errors="ignore")
         st.session_state.update({
             "has_results": True, "df_win": dw,
             "df_a": dw[dw["rank"]==RA].copy(),
             "df_bp": dw[dw["rank"]==RBP].copy(),
             "df_b": dw[dw["rank"]==RB].copy(),
+            "df_del": df_del_,
             "stats": {
                 "n_auto":n_auto,"n_ex":n_ex,"n_pt":n_pt,"n_ar":n_ar,
                 "n_br":n_br,"n_cd":n_cd,"n_tl":n_tl,"n_ae":n_ae,
@@ -403,6 +421,7 @@ dw:  pd.DataFrame = st.session_state["df_win"]
 da:  pd.DataFrame = st.session_state["df_a"]
 dbp: pd.DataFrame = st.session_state["df_bp"]
 db:  pd.DataFrame = st.session_state["df_b"]
+dd:  pd.DataFrame = st.session_state.get("df_del", pd.DataFrame())
 sv = st.session_state["stats"]
 
 na = len(da); nbp = len(dbp); nb = len(db)
@@ -426,9 +445,10 @@ st.markdown("---")
 # ===================================================
 # 4タブ レイアウト
 # ===================================================
-tab_res, tab_kw, tab_dl, tab_manual = st.tabs([
+tab_res, tab_add, tab_del, tab_dl, tab_manual = st.tabs([
     "📊 分析結果",
-    "📋 Amazon登録用KW",
+    "📋 Amazon追加用KW",
+    "🚫 Amazon削除用KW",
     "📥 ダウンロード",
     "📖 取扱説明書",
 ])
@@ -478,10 +498,10 @@ with tab_res:
 # ===================================================
 # TAB②: Amazon登録用KW
 # ===================================================
-with tab_kw:
+with tab_add:
     st.markdown("")
     st.markdown("""<div style="margin-bottom:8px;">
-        <span style="font-size:1.25rem;font-weight:700;color:#e8eaf0;">📋 Amazon登録用KW</span>
+        <span style="font-size:1.25rem;font-weight:700;color:#e8eaf0;">📋 Amazon追加用KW</span>
         <span style="font-size:.85rem;color:#8b93a7;margin-left:12px;">部分一致（Broad）登録専用</span>
     </div>""", unsafe_allow_html=True)
 
@@ -494,25 +514,22 @@ with tab_kw:
         </div>""", unsafe_allow_html=True)
     else:
         camp_labels = [f"{c}（{len(df_c)}件）" for c, df_c in camps_info]
-
         kw_col, _ = st.columns([3, 2])
         with kw_col:
             sel_label = st.selectbox(
                 "キャンペーンを選択",
-                camp_labels,
-                index=0,
+                camp_labels, index=0,
                 label_visibility="collapsed",
                 placeholder="キャンペーンを選択してください",
             )
-        sel_idx = camp_labels.index(sel_label)
+        sel_idx   = camp_labels.index(sel_label)
         sel_camp, sel_df = camps_info[sel_idx]
         kw_sorted = sel_df.sort_values("ROAS", ascending=False)["keyword"].tolist()
-        kw_text = "\n".join(kw_sorted)
+        kw_text   = "\n".join(kw_sorted)
 
-        st.markdown(f"""<div style="
-            background:#1e2130;border-radius:12px;
-            padding:20px 24px;margin:12px 0 4px;
-            border-left:4px solid #6c63ff;">
+        # ② 件数カード
+        st.markdown(f"""<div style="background:#1e2130;border-radius:12px;
+            padding:20px 24px;margin:12px 0 8px;border-left:4px solid #6c63ff;">
             <div style="font-size:.78rem;color:#8b93a7;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">選択中キャンペーン</div>
             <div style="font-size:1.4rem;font-weight:700;color:#e8eaf0;">{sel_camp}</div>
             <div style="font-size:.9rem;color:#a0aec0;margin-top:4px;">🏆 追加候補KW &nbsp;
@@ -521,13 +538,89 @@ with tab_kw:
             </div>
         </div>""", unsafe_allow_html=True)
 
-        st.markdown("&nbsp;")
-        st.markdown("""<div style="font-size:.78rem;color:#8b93a7;text-transform:uppercase;
-            letter-spacing:.08em;margin-bottom:4px;">KW一覧（右上コピーボタン ＋ st.code組み込み）</div>""",
-            unsafe_allow_html=True)
+        # ③④ KW一覧(st.code) — 右上コピーボタン付き
+        st.markdown('<div style="font-size:.78rem;color:#8b93a7;text-transform:uppercase;letter-spacing:.08em;margin:12px 0 4px;">KW一覧（右上コピーボタン）</div>', unsafe_allow_html=True)
         st.code(kw_text, language=None)
+
+        # ⑤ 詳細テーブル
+        with st.expander("📊 詳細テーブル", expanded=False):
+            _add_dcols = [c for c in ["keyword","ROAS","sales","cost","orders"] if c in sel_df.columns]
+            _add_disp  = sel_df[_add_dcols].sort_values("ROAS", ascending=False).reset_index(drop=True)
+            _add_disp.index = _add_disp.index + 1
+            _add_disp  = _add_disp.rename(columns={"keyword":"検索語句","cost":"広告費","sales":"売上","orders":"注文数"})
+            if "売上"   in _add_disp.columns: _add_disp["売上"]   = _add_disp["売上"].apply(lambda x: f"¥{x:,.0f}")
+            if "広告費" in _add_disp.columns: _add_disp["広告費"] = _add_disp["広告費"].apply(lambda x: f"¥{x:,.0f}")
+            if "ROAS"   in _add_disp.columns: _add_disp["ROAS"]   = _add_disp["ROAS"].round(2)
+            st.dataframe(_add_disp, use_container_width=True)
+
 # ===================================================
-# TAB③: ダウンロード
+# TAB③: Amazon削除用KW
+# ===================================================
+with tab_del:
+    st.markdown("")
+    st.markdown("""<div style="margin-bottom:8px;">
+        <span style="font-size:1.25rem;font-weight:700;color:#e8eaf0;">🚫 Amazon削除用KW</span>
+        <span style="font-size:.85rem;color:#8b93a7;margin-left:12px;">ネガティブ完全一致登録専用</span>
+    </div>""", unsafe_allow_html=True)
+
+    del_camps_info = [(c, dd[dd["campaign_theme"]==c]) for c in CAMPAIGNS if not dd[dd["campaign_theme"]==c].empty] if not dd.empty else []
+    if not del_camps_info:
+        st.markdown("""<div style="text-align:center;padding:60px 20px;color:#4a5568;">
+            <div style="font-size:2.5rem;">🔍</div>
+            <p style="font-size:1rem;margin-top:12px;color:#e8eaf0;">削除候補KWがありません</p>
+            <p style="color:#6b7280;font-size:.875rem;">広告費 ≥ 商品売価 × 2 かつ ROAS ≤ 0.5 のKWが対象です。</p>
+        </div>""", unsafe_allow_html=True)
+    else:
+        del_camp_labels = [f"{c}（{len(df_c)}件）" for c, df_c in del_camps_info]
+        del_kw_col, _ = st.columns([3, 2])
+        with del_kw_col:
+            del_sel_label = st.selectbox(
+                "キャンペーンを選択（削除用）",
+                del_camp_labels, index=0,
+                label_visibility="collapsed",
+                placeholder="キャンペーンを選択してください",
+                key="del_camp_select",
+            )
+        del_sel_idx  = del_camp_labels.index(del_sel_label)
+        del_sel_camp, del_sel_df = del_camps_info[del_sel_idx]
+        del_kw_sorted = del_sel_df.sort_values("cost", ascending=False)["keyword"].tolist()
+        del_kw_text   = "\n".join(del_kw_sorted)
+
+        # ② 件数カード
+        st.markdown(f"""<div style="background:#1e2130;border-radius:12px;
+            padding:20px 24px;margin:12px 0 8px;border-left:4px solid #e53e3e;">
+            <div style="font-size:.78rem;color:#8b93a7;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">選択中キャンペーン</div>
+            <div style="font-size:1.4rem;font-weight:700;color:#e8eaf0;">{del_sel_camp}</div>
+            <div style="font-size:.9rem;color:#a0aec0;margin-top:4px;">🚫 削除候補KW &nbsp;
+                <span style="font-size:1.3rem;font-weight:700;color:#e53e3e;">{len(del_kw_sorted)}</span>
+                <span style="color:#8b93a7;"> 件</span>
+                <span style="font-size:.78rem;color:#6b7280;margin-left:12px;">広告費 ≥ 商品売価 × 2 かつ ROAS ≤ 0.5</span>
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+        # ③④ KW一覧(st.code) — 右上コピーボタン付き
+        st.markdown('<div style="font-size:.78rem;color:#8b93a7;text-transform:uppercase;letter-spacing:.08em;margin:12px 0 4px;">ネガティブ完全一致 KW一覧（右上コピーボタン）</div>', unsafe_allow_html=True)
+        st.code(del_kw_text, language=None)
+
+        # ⑤ 詳細テーブル
+        with st.expander("📊 詳細テーブル", expanded=False):
+            del_dcols = [c for c in ["keyword","ROAS","cost","sales"] if c in del_sel_df.columns]
+            _del_disp = del_sel_df[del_dcols].sort_values("cost", ascending=False).reset_index(drop=True)
+            _del_disp.index = _del_disp.index + 1
+            _del_disp = _del_disp.rename(columns={"keyword":"検索語句","cost":"広告費","sales":"売上"})
+            if "売上"   in _del_disp.columns: _del_disp["売上"]   = _del_disp["売上"].apply(lambda x: f"¥{x:,.0f}")
+            if "広告費" in _del_disp.columns: _del_disp["広告費"] = _del_disp["広告費"].apply(lambda x: f"¥{x:,.0f}")
+            if "ROAS"   in _del_disp.columns: _del_disp["ROAS"]   = _del_disp["ROAS"].round(2)
+            st.dataframe(_del_disp, use_container_width=True)
+
+        dz_bytes = del_camp_zip(dd)
+        st.download_button(
+            "📦 削除KW_キャンペーン別.zip をダウンロード",
+            data=dz_bytes, file_name="削除KW_キャンペーン別.zip", mime="application/zip",
+        )
+
+# ===================================================
+# TAB④: ダウンロード
 # ===================================================
 with tab_dl:
     st.markdown("#### 📥 ダウンロード")
