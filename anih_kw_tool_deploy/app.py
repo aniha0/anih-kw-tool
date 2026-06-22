@@ -5,6 +5,13 @@ from typing import Optional
 import pandas as pd
 import streamlit as st
 
+# DataDive分析モジュール（新規追加 / 既存コード一切変更なし）
+try:
+    from modules.datadive.dd_ui import render_datadive_page as _ddv_render
+    _DDV_OK = True
+except ImportError:
+    _DDV_OK = False
+
 # ===================================================
 # 定数
 # ===================================================
@@ -1007,6 +1014,11 @@ def page_cpc():
 
 
 def page_datedive():
+    # ── DataDive分析モジュール（新規追加）──────────────────────────
+    if _DDV_OK:
+        _ddv_render()
+        return
+    # modules/datadive/ が見つからない場合は元のプレースホルダーを表示
     st.markdown("### 🔍 DateDive市場分析")
     st.markdown("---")
     k1, k2, k3 = st.columns(3)
@@ -1014,9 +1026,7 @@ def page_datedive():
     kpi(k2, "📊", "競合分析",  "Coming Soon", "キャンペーン比較", "#EAF7EF", "#2F855A")
     kpi(k3, "📈", "トレンド",  "Coming Soon", "検索ボリューム推移", "#F3ECFF", "#9F5ACB")
     st.markdown("")
-    st.info("🚧 **DateDive市場分析は準備中です。**\n\n将来のアップデートで以下の機能を追加予定です：\n- DateDiveデータ連携による市場規模分析\n- 競合キャンペーン比較\n- 検索ボリュームトレンド\n- 市場シェア分析")
-
-
+    st.error("⚠️ modules/datadive/ が見つかりません。app.py と同じディレクトリに配置してください。")
 def page_download():
     st.markdown("### 📥 ダウンロード")
     c1, c2 = st.columns(2)
