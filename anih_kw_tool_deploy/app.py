@@ -11,6 +11,13 @@ try:
     _DDV_OK = True
 except ImportError:
     _DDV_OK = False
+# DataDive分析モジュール v2 — 売れる予測KW（新規追加 / 既存コード一切変更なし）
+try:
+    from modules.datadive_analysis.ui import render_da_page as _da_render
+    _DA_OK = True
+except ImportError:
+    _DA_OK = False
+
 
 # ===================================================
 # 定数
@@ -412,6 +419,7 @@ with st.sidebar:
         "🔍 DateDive市場分析",
         "📥 ダウンロード",
         "📖 取扱説明書",
+        "📊 DataDive分析",
     ]
     current_page = st.radio("ページ選択", NAV_PAGES, label_visibility="collapsed")
     st.markdown("---")
@@ -1174,6 +1182,15 @@ def page_manual():
         st.json(dbg)
 
 
+# ─── DataDive分析ページ（新規追加 / 既存コード一切変更なし）──────────────
+def page_da():
+    if _DA_OK:
+        _da_render()
+    else:
+        st.markdown("### 📊 DataDive分析")
+        st.error("⚠️ modules/datadive_analysis/ が見つかりません。app.py と同じディレクトリに配置してください。")
+
+
 # ─── Page Router ─────────────────────────────────────
 _PAGE_FUNCS = {
     "📋 Amazon追加用KW":  page_add_kw,
@@ -1182,5 +1199,6 @@ _PAGE_FUNCS = {
     "🔍 DateDive市場分析": page_datedive,
     "📥 ダウンロード":     page_download,
     "📖 取扱説明書":       page_manual,
+    "📊 DataDive分析":     page_da,
 }
 _PAGE_FUNCS[current_page]()
