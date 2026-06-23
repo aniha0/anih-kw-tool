@@ -5,20 +5,6 @@ from typing import Optional
 import pandas as pd
 import streamlit as st
 
-# DataDive分析モジュール（新規追加 / 既存コード一切変更なし）
-try:
-    from modules.datadive.dd_ui import render_datadive_page as _ddv_render
-    _DDV_OK = True
-except ImportError:
-    _DDV_OK = False
-# DataDive分析モジュール v2 — 売れる予測KW（新規追加 / 既存コード一切変更なし）
-try:
-    from modules.datadive_analysis.ui import render_da_page as _da_render
-    _DA_OK = True
-except ImportError:
-    _DA_OK = False
-
-
 # ===================================================
 # 定数
 # ===================================================
@@ -417,9 +403,9 @@ with st.sidebar:
         "🚫 Amazon削除用KW",
         "📈 CPC調整表",
         "🔍 DateDive市場分析",
+        "🔍 DateDive売れる予測KW",
         "📥 ダウンロード",
         "📖 取扱説明書",
-        "📊 DataDive分析",
     ]
     current_page = st.radio("ページ選択", NAV_PAGES, label_visibility="collapsed")
     st.markdown("---")
@@ -459,6 +445,21 @@ with _u1:
 with _u2:
     st.markdown("**　**")
     run = st.button("🔍 抽出実行", type="primary", use_container_width=True)
+st.markdown("---")
+
+# ─── DateDive CSV Upload ──────────────────────────────────
+_du1, _du2 = st.columns([7, 2])
+with _du1:
+    st.markdown("""<div style="font-size:.88rem;font-weight:600;color:#4A5568;margin-bottom:4px;">
+        📊 DateDive CSV
+        <span style="font-weight:400;color:#718096;">※ keywords.csv をアップロードしてください</span>
+    </div>""", unsafe_allow_html=True)
+    ddf = st.file_uploader("DateDive CSV", type=["csv"], key="ddf",
+                           label_visibility="collapsed")
+    if ddf: st.success(f"✓ {ddf.name}")
+with _du2:
+    st.markdown("**　**")
+    st.markdown("**　**")
 st.markdown("---")
 
 # ─── Processing ─────────────────────────────────────
@@ -1021,12 +1022,291 @@ def page_cpc():
         file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv")
 
 
-def page_datedive():
-    # ── DataDive分析モジュール（新規追加）──────────────────────────
-    if _DDV_OK:
-        _ddv_render()
+# ===========================================================
+# DD_PRODUCTS — 4商品固定マスタ
+# ===========================================================
+DD_PRODUCTS = {
+    "犬用乳酸菌サプリ":   {"asin": "B0DJ8Q95XZ",  "camp_kw": "乳酸菌犬"},
+    "関節サポートサプリ":  {"asin": "B0DJ8QVCG1",  "camp_kw": "関節"},
+    "アイケアサプリ":     {"asin": "B0DSP22H5G",  "camp_kw": "アイケア"},
+    "アミノ酸シャンプー":  {"asin": "B0GGGTYZTR",  "camp_kw": "シャンプー"},
+}
+
+# ===========================================================
+# _dd_ ヘルパー群（DateDive売れる予測KW専用・既存と完全独立）
+# ===========================================================
+
+def _dd_norm(kw):
+    t = unicodedata.normalize("NFKC", str(kw)).lower()
+    return re.sub(r"\s+", "", t)
+
+
+def _dd_is_dup(candidate, existing_norm):
+    c = _dd_norm(candidate)
+    if not c:
+        return False
+    for e in existing_norm:
+        if not e:
+            continue
+        if e in c or c in e:
+            return True
+    return False
+
+
+def _dd_load_csv(file_obj):
+    try:
+        raw = file_obj.read(); file_obj.seek(0)
+        df = None
+        for enc in ("utf-8-sig", "utf-8", "cp932"):
+            try:
+                df = pd.read_csv(io.BytesIO(raw), encoding=enc); break
+            except Exception:
+                pass
+        if df is None:
+            return None, {}, "CSVの読み込みに失敗しました（文字コードをご確認ください）"
+        df.columns = [str(c).strip() for c in df.columns]
+        kw_col = next(
+            (c for c in df.columns if re.sub(r"[\s_\-]","",c).lower() in
+             ("searchterms","searchterm","keyword","keywords")),
+            df.columns[0]
+        )
+        sv_col = next(
+            (c for c in df.columns if re.sub(r"[\s_\-]","",c).lower() in
+             ("sv","searchvolume")),
+            None
+        )
+        relev_col = next(
+            (c for c in df.columns if re.sub(r"[\s_\-\.\.]","",c).lower() in
+             ("relev","relevance","relevancy","関連度")),
+            None
+        )
+        asin_cols = [c for c in df.columns if re.match(r"^B0[A-Z0-9]{8}$", str(c), re.I)]
+        result = pd.DataFrame()
+        result["keyword"] = df[kw_col].astype(str).str.strip()
+        result["sv"] = (
+            pd.to_numeric(df[sv_col], errors="coerce").fillna(0).astype(int)
+            if sv_col else 0
+        )
+        result["relev"] = (
+            pd.to_numeric(df[relev_col], errors="coerce").fillna(0.5)
+            if relev_col else 0.5
+        )
+        for ac in asin_cols:
+            result[ac] = pd.to_numeric(df[ac], errors="coerce")
+        result = result[
+            (result["keyword"].str.len() > 0) &
+            (result["keyword"].str.lower() != "nan")
+        ].reset_index(drop=True)
+        return result, {"kw_col": kw_col, "sv_col": sv_col,
+                        "relev_col": relev_col, "asin_count": len(asin_cols)}, None
+    except Exception as e:
+        return None, {}, f"DataDive CSV読み込みエラー: {e}"
+
+
+def _dd_existing_kws(sf):
+    if sf is None:
+        return []
+    try:
+        sf.seek(0); raw = sf.read(); sf.seek(0)
+        df = None
+        for enc in ("utf-8-sig", "utf-8", "cp932"):
+            try:
+                df = pd.read_csv(io.BytesIO(raw), encoding=enc); break
+            except Exception:
+                pass
+        if df is None:
+            return []
+        df.columns = [str(c).strip() for c in df.columns]
+        kws = set()
+        for col in ["ターゲティング", "検索用語", "検索語句"]:
+            if col in df.columns:
+                vals = df[col].dropna().astype(str).str.strip().tolist()
+                kws.update(
+                    v for v in vals
+                    if v and not re.match(
+                        r"^(substitutes|loose-match|close-match|complements|broad-match"
+                        r"|asin=|category=|keyword-group=)",
+                        v, re.I
+                    )
+                )
+        return list(kws)
+    except Exception:
+        return []
+
+
+def _dd_minmax(s):
+    mn, mx = s.min(), s.max()
+    if mx == mn:
+        return pd.Series([0.5] * len(s), index=s.index)
+    return (s - mn) / (mx - mn)
+
+
+def _dd_score_df(df, prod_asin):
+    asin_cols = [c for c in df.columns if re.match(r"^B0[A-Z0-9]{8}$", str(c), re.I)]
+    sv_n    = _dd_minmax(pd.to_numeric(df["sv"],    errors="coerce").fillna(0))
+    relev_n = _dd_minmax(pd.to_numeric(df["relev"], errors="coerce").fillna(0.5))
+    if asin_cols:
+        ranked_count = df[asin_cols].notna().sum(axis=1)
+        comp_n = 1 - _dd_minmax(ranked_count.astype(float))
+    else:
+        comp_n = pd.Series([0.5] * len(df), index=df.index)
+    df = df.copy()
+    df["_sv_n"]    = sv_n.values
+    df["_relev_n"] = relev_n.values
+    df["_comp_n"]  = comp_n.values
+    df["売れる予測スコア"] = (sv_n * 0.4 + relev_n * 0.3 + comp_n * 0.3).round(3)
+    if prod_asin and prod_asin in df.columns:
+        df["検索順位"] = df[prod_asin].apply(lambda x: int(x) if pd.notna(x) else "—")
+    else:
+        df["検索順位"] = "—"
+    df["成長率"] = "—"
+    return df
+
+
+def _dd_reason(row):
+    sv    = int(row.get("sv", 0))
+    comp  = float(row.get("_comp_n", 0.5))
+    relev = float(row.get("_relev_n", 0.5))
+    parts = []
+    if sv >= 1000:
+        parts.append("高検索需要")
+    elif sv >= 500:
+        parts.append("中程度の検索需要")
+    else:
+        parts.append("ニッチ検索需要")
+    if comp >= 0.7:
+        parts.append("競合少なくブルーオーシャン")
+    elif comp >= 0.4:
+        parts.append("競合中程度・参入余地あり")
+    else:
+        parts.append("競合多いが検索実績あり")
+    if relev >= 0.7:
+        parts.append("商品関連度が高い")
+    return "・".join(parts)
+
+
+# ===========================================================
+# page_dd_predict() — DateDive売れる予測KW ページ
+# Amazon追加KW候補と同一UIデザイン・別ロジック・別データ
+# ===========================================================
+
+def page_dd_predict():
+    st.markdown("### 🔍 DateDive売れる予測KW")
+    st.markdown("---")
+
+    prod_name = st.selectbox(
+        "対象商品を選択してください",
+        list(DD_PRODUCTS.keys()),
+        key="dd_prod_sel"
+    )
+    prod_info = DD_PRODUCTS[prod_name]
+    st.caption(f"ASIN: {prod_info['asin']}")
+    st.markdown("")
+
+    if ddf is None:
+        st.error(
+            "❌ DateDive CSV がアップロードされていません。"
+            "上部の「DateDive CSV」欄から keywords.csv をアップロードしてください。"
+        )
         return
-    # modules/datadive/ が見つからない場合は元のプレースホルダーを表示
+    if sf is None:
+        st.error(
+            "❌ Amazon検索語句CSV がアップロードされていません。"
+            "上部の「検索用語レポート」欄からCSVをアップロードしてください。"
+        )
+        return
+
+    col_btn, _, _ = st.columns([2, 3, 3])
+    with col_btn:
+        dd_run = st.button(
+            "🔍 売れる予測KW抽出", type="primary",
+            use_container_width=True, key="dd_run_btn"
+        )
+    if not dd_run:
+        return
+
+    # DataDive CSV 読み込み
+    with st.spinner("DataDive CSV 読み込み中..."):
+        ddf.seek(0)
+        dd_df, meta, err = _dd_load_csv(ddf)
+    if err:
+        st.error(f"❌ {err}"); return
+    if dd_df is None or dd_df.empty:
+        st.error("❌ DataDive CSVにキーワードデータが見つかりませんでした。"); return
+    n_total = len(dd_df)
+
+    # 現在出稿中KW取得（Amazon CSV ターゲティング列）
+    # ※ Amazon CSVは重複チェック専用。スコアには使わない
+    existing_kws  = _dd_existing_kws(sf)
+    existing_norm = [_dd_norm(k) for k in existing_kws]
+
+    # 部分一致スクリーニング（重複除外）
+    with st.spinner("現在出稿中KWと照合中..."):
+        keep = [not _dd_is_dup(kw, existing_norm) for kw in dd_df["keyword"]]
+    dd_df["_keep"] = keep
+    exc_df   = dd_df[~dd_df["_keep"]].copy()
+    cands_df = dd_df[dd_df["_keep"]].copy().reset_index(drop=True)
+    n_dup = len(exc_df)
+
+    if cands_df.empty:
+        st.warning("⚠️ 全DataDive KWが現在出稿中KWと重複しています。新規候補がありません。")
+        return
+
+    # スコアリング（DataDive CSV のみ使用）
+    with st.spinner("売れる予測スコアを計算中..."):
+        scored = _dd_score_df(cands_df, prod_info["asin"])
+    scored["推奨理由"] = scored.apply(_dd_reason, axis=1)
+    scored = scored.sort_values("売れる予測スコア", ascending=False).reset_index(drop=True)
+
+    # KPIカード（Amazon追加KW候補と同一デザイン）
+    k1, k2, k3, k4 = st.columns(4)
+    kpi(k1, "📊", "DataDive KW",  f"{n_total}件",         "総KW数",             "#EAF2FF", "#3B82F6")
+    kpi(k2, "🚫", "重複除外",      f"{n_dup}件",           "現在出稿中と重複",    "#FEF2F2", "#C53030")
+    kpi(k3, "🔍", "売れる予測KW",  f"{len(scored)}件",     "未出稿・新規候補",    "#EAF7EF", "#2F855A")
+    top_score = scored["売れる予測スコア"].max() if not scored.empty else 0
+    kpi(k4, "🏆", "最高スコア",    f"{top_score:.3f}",     "予測スコア上位KW",   "#FFF9E8", "#F59E0B")
+    st.markdown("")
+
+    st.markdown(
+        f'<div class="count-badge">'
+        f'売れる予測KW: <b style="font-size:1.1rem;">{len(scored)}件</b>'
+        f'　<span style="color:#718096;font-size:.8rem;">'
+        f'{prod_name} / ASIN: {prod_info["asin"]}'
+        f' / DataDive総数: {n_total}件 / 重複除外: {n_dup}件'
+        f'</span></div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown("**📋 DateDive売れる予測KW一覧**（右上のコピーボタンでコピー）")
+    st.code("\n".join(scored["keyword"].tolist()), language=None)
+
+    st.markdown("##### 売れる予測KW詳細テーブル")
+    disp_cols = ["keyword", "売れる予測スコア", "sv", "検索順位", "成長率", "推奨理由"]
+    rename_map = {"keyword": "KW", "sv": "検索ボリューム"}
+    disp = scored[disp_cols].rename(columns=rename_map).copy()
+    disp.index = range(1, len(disp) + 1)
+    st.dataframe(disp, use_container_width=True)
+
+    # CSVダウンロード（出力列: KW / 売れる予測スコア / 検索ボリューム / 検索順位 / 成長率 / 推奨理由）
+    dl_df = disp.copy()
+    dl_csv = dl_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+    st.download_button(
+        "📥 DateDive売れる予測KW.csv", data=dl_csv,
+        file_name="DateDive売れる予測KW.csv", mime="text/csv",
+        use_container_width=True
+    )
+
+    # 除外KW折りたたみ
+    if not exc_df.empty:
+        with st.expander(f"🚫 重複除外されたKW（{n_dup}件）", expanded=False):
+            et = exc_df[["keyword", "sv"]].rename(
+                columns={"keyword": "KW（除外）", "sv": "検索ボリューム"}
+            ).reset_index(drop=True)
+            et.index = et.index + 1
+            st.dataframe(et, use_container_width=True)
+
+
+def page_datedive():
     st.markdown("### 🔍 DateDive市場分析")
     st.markdown("---")
     k1, k2, k3 = st.columns(3)
@@ -1034,7 +1314,9 @@ def page_datedive():
     kpi(k2, "📊", "競合分析",  "Coming Soon", "キャンペーン比較", "#EAF7EF", "#2F855A")
     kpi(k3, "📈", "トレンド",  "Coming Soon", "検索ボリューム推移", "#F3ECFF", "#9F5ACB")
     st.markdown("")
-    st.error("⚠️ modules/datadive/ が見つかりません。app.py と同じディレクトリに配置してください。")
+    st.info("🚧 **DateDive市場分析は準備中です。**\n\n将来のアップデートで以下の機能を追加予定です：\n- DateDiveデータ連携による市場規模分析\n- 競合キャンペーン比較\n- 検索ボリュームトレンド\n- 市場シェア分析")
+
+
 def page_download():
     st.markdown("### 📥 ダウンロード")
     c1, c2 = st.columns(2)
@@ -1182,23 +1464,14 @@ def page_manual():
         st.json(dbg)
 
 
-# ─── DataDive分析ページ（新規追加 / 既存コード一切変更なし）──────────────
-def page_da():
-    if _DA_OK:
-        _da_render()
-    else:
-        st.markdown("### 📊 DataDive分析")
-        st.error("⚠️ modules/datadive_analysis/ が見つかりません。app.py と同じディレクトリに配置してください。")
-
-
 # ─── Page Router ─────────────────────────────────────
 _PAGE_FUNCS = {
     "📋 Amazon追加用KW":  page_add_kw,
     "🚫 Amazon削除用KW":  page_del_kw,
     "📈 CPC調整表":        page_cpc,
     "🔍 DateDive市場分析": page_datedive,
+    "🔍 DateDive売れる予測KW": page_dd_predict,
     "📥 ダウンロード":     page_download,
     "📖 取扱説明書":       page_manual,
-    "📊 DataDive分析":     page_da,
 }
 _PAGE_FUNCS[current_page]()
