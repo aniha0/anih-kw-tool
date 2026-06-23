@@ -400,10 +400,9 @@ min_cost = 300
 with st.sidebar:
     NAV_PAGES = [
         "📋 Amazon追加用KW",
+        "📊 DateDive売れる予測KW",
         "🚫 Amazon削除用KW",
         "📈 CPC調整表",
-        "🔍 DateDive市場分析",
-        "🔍 DateDive売れる予測KW",
         "📥 ダウンロード",
         "📖 取扱説明書",
     ]
@@ -586,10 +585,6 @@ _LOGIC_BOX_STYLE = (
     "border-radius:8px;padding:16px 20px;line-height:1.7;"
 )
 def render_logic_section(title: str, content_html: str):
-    """📖 判定ロジックを見る — 各ページ共通の折りたたみ式ロジック表示エリア。
-    title        : 表示タイトル（例: "📋 Amazon追加用KW判定ロジック"）
-    content_html : ロジック本文（HTML文字列）
-    """
     with st.expander("📖 判定ロジックを見る", expanded=False):
         st.markdown(
             f'''<div style="{_LOGIC_BOX_STYLE}">
@@ -604,7 +599,6 @@ def render_logic_section(title: str, content_html: str):
 # ===================================================
 
 def page_add_kw():
-    # ① KPIカード（5枚）
     k1, k2, k3, k4, k5 = st.columns(5)
     kpi(k1, "🏆", "Aランク",  f"{na}件",            "高優先度追加候補",  "#EAF7EF", "#2F855A")
     kpi(k2, "🚀", "B+ランク", f"{nbp}件",            "追加検討候補",      "#EAF2FF", "#3B82F6")
@@ -613,7 +607,6 @@ def page_add_kw():
     kpi(k5, "🎯", "抽出後",   f"{sv['nf']}件",       "同一意図KW統合後",  "#F3ECFF", "#9F5ACB")
     st.markdown("")
 
-    # 分析フロー詳細（折りたたみ）
     with st.expander("📊 分析フロー詳細", expanded=False):
         st.markdown(f"""
 | ステップ | 内容 | 件数 |
@@ -692,7 +685,6 @@ def page_add_kw():
 </p>''',
     )
     st.markdown("")
-    # ② キャンペーン選択
     _c1, _c2, _c3 = st.columns([3, 3, 2])
     with _c1:
         kw_camp = st.selectbox(
@@ -701,7 +693,6 @@ def page_add_kw():
             label_visibility="visible",
             key="add_camp_sel",
         )
-    # ③ ランク選択
     with _c2:
         rank_options = {
             "全表示 (A+B++B)": "ALL",
@@ -717,7 +708,6 @@ def page_add_kw():
         )
     sel_rk = rank_options[sel_rank_label]
 
-    # 絞込みデータ生成
     if sel_rk == "ALL":
         sel_df = dw.copy()
     elif sel_rk == RA:
@@ -732,7 +722,6 @@ def page_add_kw():
 
     n_sel = len(sel_df)
 
-    # 件数表示
     st.markdown(
         f'<div class="count-badge">該当件数: <b style="font-size:1.1rem;">{n_sel}件</b>'
         f'　<span style="color:#718096;font-size:.8rem;">キャンペーン: {kw_camp} ／ ランク: {sel_rank_label}</span></div>',
@@ -743,12 +732,10 @@ def page_add_kw():
         st.info("条件に合うキーワードはありません。")
         return
 
-    # ④ コピー用KW一覧
     kw_list = "\n".join(sel_df.sort_values("ROAS", ascending=False)["keyword"].tolist())
     st.markdown("**📋 Amazon広告登録用KW一覧**（右上のコピーボタンでコピー）")
     st.code(kw_list, language=None)
 
-    # ⑤ 詳細テーブル
     st.markdown("##### KW詳細テーブル")
     _dd = sel_df[bcols(sel_df)].copy().sort_values("ROAS", ascending=False).reset_index(drop=True)
     _dd.index = _dd.index + 1
@@ -1007,376 +994,599 @@ def page_cpc():
         file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv")
 
 
-# ============================================================
-# DD_PRODUCTS — 対象4商品マスタ
-# ============================================================
-DD_PRODUCTS = {
-    "犬用乳酸菌サプリ":   {"asin": "B0DJ8Q95XZ"},
-    "関節サポートサプリ":  {"asin": "B0DJ8QVCG1"},
-    "アイケアサプリ":     {"asin": "B0DSP22H5G"},
-    "アミノ酸シャンプー":  {"asin": "B0GGGTYZTR"},
+# ===================================================
+# DateDive 売れる予測KW  (_ddv4_ プレフィックス)
+# 既存コードは一切変更していない。追加のみ。
+# competitors.csv = Keyword 単位参照
+# ===================================================
+
+_DDV4_PRODUCTS = {
+    "犬用乳酸菌 (B0DJ8Q95XZ)": [
+        "乳酸菌","腸活","腸内","善玉菌","便","便秘","軟便","免疫","お腹","消化"],
+    "関節サポート (B0DJ8QVCG1)": [
+        "関節","グルコサミン","コンドロイチン","msm","足腰","シニア犬","歩行"],
+    "アイケア (B0DSP22H5G)": [
+        "涙やけ","目","ルテイン","ブルーベリー","白内障","視力"],
+    "アミノ酸シャンプー (B0GGGTYZTR)": [
+        "シャンプー","敏感肌","低刺激","保湿","かゆみ","皮膚","アミノ酸"],
 }
 
-# ============================================================
-# _dd_ ヘルパー群 — DateDive売れる予測KW専用
-# 既存 norm() / kpi() / canonical_keyword() と完全独立
-# ============================================================
+_DDV4_PURCHASE_INTENT_WORDS = ["おすすめ","人気","ランキング","比較","口コミ"]
 
-def _dd_norm(kw):
-    """NFKC正規化 + 小文字 + スペース全除去"""
-    t = unicodedata.normalize("NFKC", str(kw)).lower()
-    return re.sub(r"\s+", "", t)
-
-
-def _dd_strip(s):
-    """助詞・接続詞除去（用/の/や/と/で/に/へ/を/が/は/も）
-    ファジー重複判定用: 犬乳酸菌 ≒ 犬用乳酸菌 を同一視するため"""
-    return re.sub(r"[用のやとでにへをがはも]", "", s)
+_DDV4_STRENGTH_TABLE = {
+    "very weak":   100,
+    "weak":         80,
+    "medium":       60,
+    "strong":       30,
+    "very strong":  10,
+}
 
 
-def _dd_is_dup(candidate, existing_norm):
-    """3段階重複判定（かなり厳しめ）
-    [a] 通常部分一致: existing ⊆ cand or cand ⊆ existing
-    [b] 助詞除去後部分一致: strip(existing) ⊆ strip(cand) or vice versa
-    """
-    c  = _dd_norm(candidate)
-    cs = _dd_strip(c)
-    if not c:
-        return False
-    for e in existing_norm:
-        if not e:
-            continue
-        # [a] 通常部分一致
-        if e in c or c in e:
+def _ddv4_norm_kw(x: str) -> str:
+    if x is None or (isinstance(x, float) and x != x):
+        return ""
+    import unicodedata as _ud
+    t = _ud.normalize("NFKC", str(x)).lower().strip()
+    t = "".join(chr(ord(c) - 0x60) if "ァ" <= c <= "ヶ" else c for c in t)
+    import re as _re
+    return _re.sub(r"\s+", " ", t).strip()
+
+
+def _ddv4_compact_kw(kw: str) -> str:
+    import re as _re
+    return _re.sub(r"\s+", "", _ddv4_norm_kw(kw))
+
+
+def _ddv4_strip_particles(kw: str) -> str:
+    import re as _re
+    t = _ddv4_norm_kw(kw)
+    t = _re.sub(r"\s*(の|用|向け|専用|対応|ための?|への?|にも?|での?)\s*", " ", t)
+    return _re.sub(r"\s+", " ", t).strip()
+
+
+def _ddv4_is_excluded(kw: str, existing_set: set) -> bool:
+    kn = _ddv4_norm_kw(kw)
+    kc = _ddv4_compact_kw(kw)
+    ks = _ddv4_strip_particles(kw)
+    for ex in existing_set:
+        en = _ddv4_norm_kw(ex)
+        ec = _ddv4_compact_kw(ex)
+        es = _ddv4_strip_particles(ex)
+        if kn == en:
             return True
-        # [b] 助詞除去後部分一致
-        es = _dd_strip(e)
-        if es and cs and (es in cs or cs in es):
+        if kc and ec and (kc in ec or ec in kc):
+            return True
+        if ks and es and (ks in es or es in ks):
             return True
     return False
 
 
-def _dd_detect_cols(df):
-    """DataDive CSV の列を自動検出して dict で返す。
-    固定列名に依存しない動的認識。"""
-    cols = {}
-    for c in df.columns:
-        cn = re.sub(r"[\s_\-\.]", "", str(c)).lower()
-        if "searchterm" in cn or cn in ("keyword", "keywords"):
-            cols.setdefault("kw", c)
-        elif cn in ("sv", "searchvolume") or cn.startswith("sv"):
-            cols.setdefault("sv", c)
-        elif "relev" in cn or cn == "relevance":
-            cols.setdefault("relev", c)
-        elif "30dsale" in cn or ("sale" in cn and "30" in cn):
-            cols.setdefault("sales30", c)
-        elif "sale" in cn or "revenue" in cn or "売上" in cn:
-            cols.setdefault("sales", c)
-        elif "adshare" in cn or "広告比率" in cn or "sponsored" in cn:
-            cols.setdefault("ad_ratio", c)
-    if "kw" not in cols and len(df.columns) > 0:
-        cols["kw"] = df.columns[0]
-    cols["asin_cols"] = [
-        c for c in df.columns
-        if re.match(r"^B0[A-Z0-9]{8}$", str(c), re.I)
-    ]
-    return cols
+def _ddv4_read_csv_bytes(raw: bytes):
+    import io as _io
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        try:
+            return pd.read_csv(_io.BytesIO(raw), encoding="utf-16", sep="\t")
+        except Exception:
+            pass
+    for enc in ("utf-8-sig", "utf-8", "cp932"):
+        try:
+            return pd.read_csv(_io.BytesIO(raw), encoding=enc)
+        except Exception:
+            continue
+    raise ValueError("CSVの読み込みに失敗しました（エンコーディング不明）")
 
 
-def _dd_load_dd_csv(file_obj):
-    """DataDive keywords.csv を読み込む。
-    Returns: (DataFrame, detected_cols_dict, error_str)"""
+def _ddv4_find_col(df, cands: list):
+    import re as _re
+    clean = {_re.sub(r"[\s_\-]", "", c).lower(): c for c in df.columns}
+    for cand in cands:
+        key = _re.sub(r"[\s_\-]", "", cand).lower()
+        if key in clean:
+            return clean[key]
+    return None
+
+
+def _ddv4_to_float(v):
+    if v is None:
+        return None
+    if isinstance(v, float) and v != v:
+        return None
     try:
-        raw = file_obj.read(); file_obj.seek(0)
-        df = None
-        for enc in ("utf-8-sig", "utf-8", "cp932"):
-            try:
-                df = pd.read_csv(io.BytesIO(raw), encoding=enc); break
-            except Exception:
-                pass
-        if df is None:
-            return None, {}, "CSVの読み込みに失敗しました（文字コード不明）"
+        return float(str(v).replace(",", "").strip())
+    except (ValueError, TypeError):
+        return None
+
+
+def _ddv4_load_keywords_csv(kw_file):
+    if kw_file is None:
+        return None, None, None, "keywords.csv が未投入です"
+    try:
+        kw_file.seek(0)
+        raw = kw_file.read(); kw_file.seek(0)
+        df = _ddv4_read_csv_bytes(raw)
         df.columns = [str(c).strip() for c in df.columns]
-        cols = _dd_detect_cols(df)
-        if "kw" not in cols:
-            return None, {}, "キーワード列が見つかりません"
-        return df, cols, None
+        kw_col = _ddv4_find_col(df, [
+            "Keyword", "Search Terms", "SearchTerms", "SearchTerm", "キーワード"])
+        if kw_col is None:
+            kw_col = df.columns[0]
+        sv_col = _ddv4_find_col(df, [
+            "Search Volume", "SearchVolume", "SV", "検索ボリューム"])
+        df["_kw"] = df[kw_col].astype(str).str.strip()
+        df = df[(df["_kw"].str.len() > 0) &
+                (df["_kw"].str.lower() != "nan")].reset_index(drop=True)
+        return df, kw_col, sv_col, None
     except Exception as e:
-        return None, {}, f"DataDive CSV読み込みエラー: {e}"
+        return None, None, None, f"keywords.csv 読み込みエラー: {e}"
 
 
-def _dd_load_amz_kws(file_obj):
-    """Amazon検索用語CSVのターゲティング列から現在運用中KWを取得する。
-    substitutes / asin= / category= 等のノイズは除外。
-    Returns: list of str"""
-    if file_obj is None:
-        return []
+def _ddv4_load_amazon_search_csv(sf_file) -> set:
+    if sf_file is None:
+        return set()
     try:
-        file_obj.seek(0); raw = file_obj.read(); file_obj.seek(0)
-        df = None
-        for enc in ("utf-8-sig", "utf-8", "cp932"):
-            try:
-                df = pd.read_csv(io.BytesIO(raw), encoding=enc); break
-            except Exception:
-                pass
-        if df is None:
-            return []
+        sf_file.seek(0)
+        raw = sf_file.read(); sf_file.seek(0)
+        df = _ddv4_read_csv_bytes(raw)
         df.columns = [str(c).strip() for c in df.columns]
-        kws = set()
-        for col in ["ターゲティング", "検索用語", "検索語句", "targeting"]:
+        for col in ["ターゲティング", "検索用語", "検索語句",
+                    "Targeting", "targeting", "Keyword", "keyword"]:
             if col in df.columns:
-                vals = df[col].dropna().astype(str).str.strip().tolist()
-                kws.update(
+                import re as _re
+                vals = df[col].dropna().astype(str).str.strip()
+                return set(
                     v for v in vals
-                    if v and not re.match(
-                        r"^(substitutes|loose-match|close-match|complements"
-                        r"|broad-match|asin=|category=|keyword-group=)",
-                        v, re.I
-                    )
+                    if v and not _re.match(r'^b0[a-z0-9]{8}$', v, _re.I)
                 )
-        return list(kws)
+        return set()
     except Exception:
-        return []
+        return set()
 
 
-def _dd_minmax(s):
-    mn, mx = s.min(), s.max()
-    if mx == mn:
-        return pd.Series([0.5] * len(s), index=s.index)
-    return (s - mn) / (mx - mn)
-
-
-def _dd_score(df, cols):
-    """0〜100点スコアを算出して df に追加する。
-    score = (SV×0.4 + 競合少なさ×0.3 + 関連度×0.2) × 90 + 10 (ベース)
+def _ddv4_build_competitor_kw_dict(comp_file) -> dict:
     """
-    sv_raw = pd.to_numeric(df[cols["sv"]], errors="coerce").fillna(0) if "sv" in cols else pd.Series([0]*len(df), index=df.index)
-    rv_raw = pd.to_numeric(df[cols["relev"]], errors="coerce").fillna(0.5) if "relev" in cols else pd.Series([0.5]*len(df), index=df.index)
-    sv_n   = _dd_minmax(sv_raw)
-    rv_n   = _dd_minmax(rv_raw)
-    if cols.get("asin_cols"):
-        comp_cnt = df[cols["asin_cols"]].notna().sum(axis=1).astype(float)
-        comp_n   = 1 - _dd_minmax(comp_cnt)   # 少ないほど高スコア
-    else:
-        comp_n = pd.Series([0.5] * len(df), index=df.index)
-    df = df.copy()
-    df["_sv_n"]   = sv_n.values
-    df["_comp_n"] = comp_n.values
-    df["_rv_n"]   = rv_n.values
-    raw = sv_n * 0.4 + comp_n * 0.3 + rv_n * 0.2
-    df["売れる予測スコア"] = (raw * 90 + 10).round(0).astype(int).clip(0, 100)
-    df["_sv_raw"]   = sv_raw.values
-    df["_comp_cnt"] = (df[cols["asin_cols"]].notna().sum(axis=1).values
-                       if cols.get("asin_cols") else [0]*len(df))
-    return df
+    competitors.csv を読み込み、Keyword 単位の競合指標辞書を返す。
+    (A) 縦持ち: Keyword列あり → per-keyword dict
+    (B) 横持ち: 1列目=指標名 → {"_format": "wide_no_keyword"}
+    """
+    if comp_file is None:
+        return {}
+    try:
+        comp_file.seek(0)
+        raw = comp_file.read(); comp_file.seek(0)
+        df = _ddv4_read_csv_bytes(raw)
+        df.columns = [str(c).strip() for c in df.columns]
+
+        import re as _re
+
+        first_col_vals = (df.iloc[:, 0].astype(str)
+                            .str.lower()
+                            .str.replace(r"[\s_]", "", regex=True))
+        is_wide = any(kw in " ".join(first_col_vals.tolist())
+                      for kw in ["strength", "kwsonp1", "svonp1",
+                                 "advertisedkws", "reviewcount"])
+        if is_wide:
+            return {"_format": "wide_no_keyword"}
+
+        kw_col = _ddv4_find_col(df, [
+            "Keyword", "Search Terms", "SearchTerms", "SearchTerm",
+            "キーワード", "検索語句", "検索用語"])
+        if kw_col is None:
+            return {}
+
+        str_col  = _ddv4_find_col(df, ["Strength", "strength"])
+        kp1_col  = _ddv4_find_col(df, ["KWs on P1", "KWs_on_P1", "KWsonP1", "kwsonp1"])
+        svp1_col = _ddv4_find_col(df, ["SV on P1",  "SV_on_P1",  "SVonP1",  "svonp1"])
+        adv_col  = _ddv4_find_col(df, ["Advertised KWs", "Advertised_KWs", "AdvertisedKWs", "advertisedkws"])
+        rev_col  = _ddv4_find_col(df, ["Review Count", "ReviewCount", "レビュー数", "reviewcount"])
+
+        result = {}
+        for _, row in df.iterrows():
+            raw_kw = str(row[kw_col]).strip()
+            if not raw_kw or raw_kw.lower() == "nan":
+                continue
+            norm_key = _ddv4_norm_kw(raw_kw)
+            if not norm_key:
+                continue
+
+            strength_raw = row[str_col] if str_col else None
+            strength_val = None
+            if (strength_raw is not None
+                    and str(strength_raw).lower() not in ("nan", "")):
+                strength_val = str(strength_raw).strip()
+
+            result[norm_key] = {
+                "strength":     strength_val,
+                "kws_on_p1":    _ddv4_to_float(row[kp1_col])  if kp1_col  else None,
+                "sv_on_p1":     _ddv4_to_float(row[svp1_col]) if svp1_col else None,
+                "adv_kws":      _ddv4_to_float(row[adv_col])  if adv_col  else None,
+                "review_count": _ddv4_to_float(row[rev_col])  if rev_col  else None,
+            }
+
+        return result
+
+    except Exception as e:
+        return {"_error": str(e)}
 
 
-def _dd_sv_label(sv):
-    if sv >= 1000: return f"高（{sv:,}）"
-    if sv >= 300:  return f"中（{sv:,}）"
-    return f"低（{sv:,}）"
+def _ddv4_sv_score(sv) -> int:
+    try:
+        v = float(str(sv).replace(",", ""))
+    except (ValueError, TypeError):
+        return 30
+    if v >= 10000: return 100
+    if v >= 5000:  return 85
+    if v >= 1000:  return 70
+    if v >= 300:   return 50
+    if v >= 100:   return 30
+    return 10
 
 
-def _dd_reason(row, cols):
-    """推奨理由テキストを自動生成する"""
+def _ddv4_strength_score(strength_val) -> int:
+    """STEP3: Strength → 0-100。NULL → 50（中立値）"""
+    if strength_val is None or (isinstance(strength_val, float)
+                                 and strength_val != strength_val):
+        return 50
+    key = str(strength_val).strip().lower()
+    return _DDV4_STRENGTH_TABLE.get(key, 50)
+
+
+def _ddv4_kwsp1_score(v) -> int:
+    n = _ddv4_to_float(v)
+    if n is None: return 50
+    if n < 30:  return 100
+    if n < 70:  return 75
+    if n < 150: return 50
+    if n < 300: return 25
+    return 10
+
+
+def _ddv4_svp1_score(v) -> int:
+    n = _ddv4_to_float(v)
+    if n is None: return 50
+    if n < 5000:   return 100
+    if n < 20000:  return 75
+    if n < 50000:  return 50
+    if n < 100000: return 25
+    return 10
+
+
+def _ddv4_step4_score(kws_on_p1_val, sv_on_p1_val) -> int:
+    """STEP4: 市場支配力（0-100）。両NULL→50、片側→存在する方のみ使用"""
+    has_a = kws_on_p1_val is not None
+    has_b = sv_on_p1_val  is not None
+    if not has_a and not has_b:
+        return 50
+    scores = []
+    if has_a: scores.append(_ddv4_kwsp1_score(kws_on_p1_val))
+    if has_b: scores.append(_ddv4_svp1_score(sv_on_p1_val))
+    return int(sum(scores) / len(scores))
+
+
+def _ddv4_adv_score(v) -> int:
+    """STEP5: Advertised KWs → 0-100。NULL → 50（中立値）"""
+    n = _ddv4_to_float(v)
+    if n is None: return 50
+    if n <= 20:  return 100
+    if n <= 50:  return 70
+    if n <= 100: return 40
+    return 10
+
+
+def _ddv4_purchase_intent_bonus(kw: str) -> int:
+    kn = _ddv4_norm_kw(kw)
+    for word in _DDV4_PURCHASE_INTENT_WORDS:
+        if word in kn:
+            return 15
+    return 0
+
+
+def _ddv4_relevance_bonus(kw: str, product_label: str) -> int:
+    kn = _ddv4_norm_kw(kw)
+    for word in _DDV4_PRODUCTS.get(product_label, []):
+        if _ddv4_norm_kw(word) in kn:
+            return 10
+    return 0
+
+
+def _ddv4_longtail_bonus(kw: str) -> int:
+    n = len(str(kw).strip().split())
+    if n >= 5: return 15
+    if n >= 4: return 10
+    if n >= 3: return 5
+    return 0
+
+
+def _ddv4_calc_rank(score: int) -> str:
+    if score >= 90: return "S"
+    if score >= 80: return "A"
+    if score >= 70: return "B"
+    if score >= 60: return "C"
+    return "除外"
+
+
+def _ddv4_make_reason(step2_s, step3_s, step4_s, s6, s7, s8) -> str:
     parts = []
-    sv   = int(row.get("_sv_raw",   0))
-    comp = float(row.get("_comp_n", 0.5))
-    rv   = float(row.get("_rv_n",   0.5))
-    if sv >= 1000: parts.append("検索需要が高い")
-    elif sv >= 300: parts.append("検索需要が中程度")
-    else:           parts.append("ニッチな検索需要")
-    if comp >= 0.7: parts.append("競合が少ないブルーオーシャン")
-    elif comp >= 0.4: parts.append("競合が中程度・参入余地あり")
-    else:             parts.append("競合は多いが検索実績あり")
-    if rv >= 0.7: parts.append("商品関連度が高い")
-    parts.append("既存運用KWと重複なし")
-    return "・".join(parts)
+    if step3_s >= 80:   parts.append("競合弱（Strength良好）")
+    elif step3_s >= 60: parts.append("競合中程度")
+    elif step3_s > 50:  parts.append("競合やや強")
+    else:               parts.append("競合強（要注意）")
+    if step2_s >= 85:   parts.append("需要非常に高")
+    elif step2_s >= 70: parts.append("需要高")
+    elif step2_s >= 50: parts.append("需要中")
+    if step4_s >= 75:   parts.append("市場参入余地あり")
+    if s6 > 0:          parts.append("購買意図語含む")
+    if s7 > 0:          parts.append("商品関連性高")
+    if s8 >= 10:        parts.append("ロングテール")
+    return " / ".join(parts) if parts else "総合評価"
 
 
-# ============================================================
-# page_dd_predict() — DateDive売れる予測KW メインページ
-# 全アップローダー・ロジック・UIを自己完結型で実装
-# 既存 page_add_kw / page_del_kw / page_cpc とは完全独立
-# ============================================================
+def _ddv4_calculate_sellable_keywords(
+        cands_df, sv_col, product_label, comp_kw_dict: dict) -> pd.DataFrame:
+    """
+    Keyword単位でcomp_kw_dictを参照しスコア計算。
+    一致しない場合は各項目を中立値50で計算。
+    RAW(0-125) ÷ 1.25 → 最終スコア(0-100)。clip禁止。
+    """
+    df = cands_df.copy()
+    results = []
 
-def page_dd_predict():
-    st.markdown("### 🔍 DateDive売れる予測KW")
+    for _, row in df.iterrows():
+        kw_raw = str(row["_kw"])
+        norm   = _ddv4_norm_kw(kw_raw)
+
+        comp = comp_kw_dict.get(norm, None)
+        if comp is None:
+            compact = _ddv4_compact_kw(kw_raw)
+            comp = next(
+                (v for k, v in comp_kw_dict.items()
+                 if not k.startswith("_")
+                 and _ddv4_compact_kw(k) == compact),
+                None
+            )
+        matched = (comp is not None
+                   and not any(k.startswith("_") for k in comp))
+
+        strength_val  = comp.get("strength")     if matched else None
+        kws_on_p1_val = comp.get("kws_on_p1")   if matched else None
+        sv_on_p1_val  = comp.get("sv_on_p1")    if matched else None
+        adv_kws_val   = comp.get("adv_kws")     if matched else None
+        review_val    = comp.get("review_count") if matched else None
+
+        if sv_col and sv_col in df.columns:
+            step2_s = _ddv4_sv_score(row.get(sv_col, 0))
+            sv_raw  = row.get(sv_col, 0)
+        else:
+            step2_s = 30
+            sv_raw  = 0
+
+        step3_s = _ddv4_strength_score(strength_val)
+        step4_s = _ddv4_step4_score(kws_on_p1_val, sv_on_p1_val)
+        step5_s = _ddv4_adv_score(adv_kws_val)
+
+        s6 = _ddv4_purchase_intent_bonus(kw_raw)
+        s7 = _ddv4_relevance_bonus(kw_raw, product_label)
+        s8 = _ddv4_longtail_bonus(kw_raw)
+
+        raw   = (step2_s * 0.30 + step3_s * 0.25 + step4_s * 0.20
+                 + step5_s * 0.10 + s6 + s7 + s8)
+        final = round(raw / 1.25)
+        rank  = _ddv4_calc_rank(final)
+
+        results.append({
+            "_kw":            kw_raw,
+            "_sv_raw":        sv_raw,
+            "_step2_s":       step2_s,
+            "_step3_s":       step3_s,
+            "_step4_s":       step4_s,
+            "_step5_s":       step5_s,
+            "_s6":            s6,
+            "_s7":            s7,
+            "_s8":            s8,
+            "_raw":           round(raw, 2),
+            "_comp_matched":  matched,
+            "_strength_val":  strength_val  if strength_val  is not None else "—(NULL→50)",
+            "_kws_on_p1_val": kws_on_p1_val if kws_on_p1_val is not None else "—(NULL→50)",
+            "_sv_on_p1_val":  sv_on_p1_val  if sv_on_p1_val  is not None else "—(NULL→50)",
+            "_adv_kws_val":   adv_kws_val   if adv_kws_val   is not None else "—(NULL→50)",
+            "_review_val":    review_val     if review_val    is not None else "—",
+            "売れる予測スコア": final,
+            "ランク":          rank,
+            "採用理由":        _ddv4_make_reason(step2_s, step3_s, step4_s, s6, s7, s8),
+        })
+
+    return pd.DataFrame(results)
+
+
+def _ddv4_render_sellable_keywords():
+    st.markdown("### 📊 DateDive 売れる予測KW")
     st.markdown("---")
 
-    # ─── ① 分析対象商品選択 ────────────────────────────────
-    st.markdown("##### ① 分析対象商品選択")
-    prod_options = ["─ 選択してください ─"] + list(DD_PRODUCTS.keys())
-    prod_name = st.selectbox(
-        "分析する商品を選択してください（必須）",
-        prod_options, key="dd_prod_sel", label_visibility="collapsed"
+    st.markdown("##### 📌 ① 分析対象商品を選択")
+    prod_options = ["─ 選択してください ─"] + list(_DDV4_PRODUCTS.keys())
+    prod_label = st.selectbox(
+        "商品選択", prod_options, key="ddv4_prod", label_visibility="collapsed"
     )
-    if prod_name == "─ 選択してください ─":
+    if prod_label == "─ 選択してください ─":
         st.info("📌 分析対象商品を選択してください。")
         return
-    prod_info = DD_PRODUCTS[prod_name]
-    st.success(f"✅ 対象商品: **{prod_name}**　ASIN: `{prod_info['asin']}`")
+    st.success(f"✅ {prod_label}")
     st.markdown("")
 
-    # ─── ② Amazon検索用語CSV投入 ───────────────────────────
-    st.markdown("##### ② Amazon検索用語CSV投入")
-    dd_amz = st.file_uploader(
-        "Amazon検索用語CSV", type="csv", key="dd_amz_csv",
-        label_visibility="collapsed"
-    )
-    if dd_amz: st.success(f"✅ {dd_amz.name}")
-    else: st.caption("※ 既存ページで使用しているAmazon検索語句CSVと同形式")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("##### 📄 ② DateDive Keywords CSV")
+        ddv4_kw = st.file_uploader(
+            "keywords.csv", type="csv",
+            key="ddv4_kw_csv", label_visibility="collapsed")
+        if ddv4_kw: st.success(f"✅ {ddv4_kw.name}")
+        else: st.caption("Track Search Terms の keywords.csv をアップロード")
+    with c2:
+        st.markdown("##### 📄 ③ DateDive Competitors CSV")
+        ddv4_comp = st.file_uploader(
+            "competitors.csv", type="csv",
+            key="ddv4_comp_csv", label_visibility="collapsed")
+        if ddv4_comp: st.success(f"✅ {ddv4_comp.name}")
+        else: st.caption("Track Search Terms の competitors.csv をアップロード")
+
+    st.markdown("")
+    st.markdown("##### 📄 ④ Amazon検索用語 CSV（既存運用 KW 除外用）")
+    ddv4_amz = st.file_uploader(
+        "Amazon検索用語CSV", type="csv",
+        key="ddv4_amz_csv", label_visibility="collapsed")
+    if ddv4_amz: st.success(f"✅ {ddv4_amz.name}（既存運用KWを除外します）")
+    else: st.caption("※ 未投入の場合はKW除外なしで実行します")
     st.markdown("")
 
-    # ─── ③ DateDive CSV投入 ───────────────────────────────
-    st.markdown("##### ③ DateDive CSV投入")
-    dd_file = st.file_uploader(
-        "DateDive keywords.csv", type="csv", key="dd_kw_csv",
-        label_visibility="collapsed"
-    )
-    if dd_file: st.success(f"✅ {dd_file.name}")
-    else: st.caption("※ Track Search Terms の keywords.csv を投入してください")
-    st.markdown("")
-
-    # ─── ④ 抽出実行ボタン ─────────────────────────────────
-    st.markdown("##### ④ 抽出実行")
     exec_btn = st.button(
-        "🔍 売れる予測KW 抽出実行",
-        type="primary", use_container_width=True, key="dd_exec_btn"
-    )
+        "🔍 売れる予測KW抽出",
+        type="primary", use_container_width=True, key="ddv4_exec_btn")
     if not exec_btn:
         return
 
-    # ─── バリデーション ───────────────────────────────────
     errs = []
-    if dd_amz  is None: errs.append("❌ Amazon検索用語CSV が未投入です（②でアップロードしてください）")
-    if dd_file is None: errs.append("❌ DateDive CSV が未投入です（③でアップロードしてください）")
+    if ddv4_kw   is None: errs.append("❌ DateDive keywords.csv が未投入です")
+    if ddv4_comp is None: errs.append("❌ DateDive competitors.csv が未投入です")
     if errs:
         for e in errs: st.error(e)
         return
 
-    # ─── STEP1: Amazon CSV → 現在運用中KW取得 ───────────────
-    with st.spinner("STEP1: Amazon検索用語CSV から運用中KWを取得中..."):
-        existing_kws  = _dd_load_amz_kws(dd_amz)
-        existing_norm = [_dd_norm(k) for k in existing_kws]
-    st.caption(f"  → 運用中KW: {len(existing_kws)}件")
+    with st.spinner("keywords.csv 読み込み中..."):
+        kw_df, kw_col, sv_col, kw_err = _ddv4_load_keywords_csv(ddv4_kw)
+    if kw_err:
+        st.error(f"❌ {kw_err}"); return
+    n_total = len(kw_df)
 
-    # ─── STEP2: DataDive CSV → 市場KW取得 ─────────────────
-    with st.spinner("STEP2: DateDive CSV から市場KWを取得中..."):
-        dd_file.seek(0)
-        raw_df, cols, err = _dd_load_dd_csv(dd_file)
-    if err:
-        st.error(f"❌ {err}"); return
-    kw_col = cols["kw"]
-    raw_df["_keyword"] = raw_df[kw_col].astype(str).str.strip()
-    raw_df = raw_df[
-        (raw_df["_keyword"].str.len() > 0) &
-        (raw_df["_keyword"].str.lower() != "nan")
-    ].reset_index(drop=True)
-    n_total = len(raw_df)
-    st.caption(f"  → DataDive KW: {n_total}件")
-
-    # ─── STEP3: 重複除外（完全一致 + 部分一致 + 助詞除去後部分一致） ──
-    with st.spinner("STEP3: 重複KWを除外中..."):
-        keep = [not _dd_is_dup(kw, existing_norm) for kw in raw_df["_keyword"]]
-    raw_df["_keep"] = keep
-    exc_df   = raw_df[~raw_df["_keep"]].copy()
-    cands_df = raw_df[raw_df["_keep"]].copy().reset_index(drop=True)
-    n_dup    = len(exc_df)
-    st.caption(f"  → 重複除外: {n_dup}件 / 残存候補: {len(cands_df)}件")
-
+    with st.spinner("既存運用KW除外中..."):
+        existing_set = _ddv4_load_amazon_search_csv(ddv4_amz)
+        keep = ([not _ddv4_is_excluded(kw, existing_set) for kw in kw_df["_kw"]]
+                if existing_set else [True] * len(kw_df))
+    kw_df["_keep"] = keep
+    exc_df   = kw_df[~kw_df["_keep"]].copy()
+    cands_df = kw_df[kw_df["_keep"]].copy().reset_index(drop=True)
+    n_excl   = len(exc_df)
     if cands_df.empty:
-        st.warning("⚠️ 全DataDive KWが運用中KWと重複しています。新規候補がありません。")
-        return
+        st.warning("⚠️ 全KWが運用中KWと重複しています。"); return
 
-    # ─── STEP4: 売れる予測KWスコアリング ──────────────────
-    with st.spinner("STEP4: 売れる予測スコアを算出中（0〜100点）..."):
-        scored = _dd_score(cands_df, cols)
+    with st.spinner("competitors.csv 読み込み中（Keyword単位）..."):
+        comp_kw_dict = _ddv4_build_competitor_kw_dict(ddv4_comp)
 
-    # ─── STEP5: 推奨理由生成 ──────────────────────────────
-    scored["推奨理由"] = scored.apply(lambda r: _dd_reason(r, cols), axis=1)
-    scored = scored.sort_values("売れる予測スコア", ascending=False).reset_index(drop=True)
-
-    # ─── STEP6: 結果表示 ──────────────────────────────────
-    k1, k2, k3, k4 = st.columns(4)
-    kpi(k1, "📊", "DataDive KW",  f"{n_total}件",         "総KW数",          "#EAF2FF", "#3B82F6")
-    kpi(k2, "🚫", "重複除外",      f"{n_dup}件",           "運用中KWと重複",   "#FEF2F2", "#C53030")
-    kpi(k3, "🔍", "売れる予測KW",  f"{len(scored)}件",     "未出稿・新規候補", "#EAF7EF", "#2F855A")
-    top_s = scored["売れる予測スコア"].max() if not scored.empty else 0
-    kpi(k4, "🏆", "最高スコア",    f"{top_s}点",           "スコア最上位",     "#FFF9E8", "#F59E0B")
-    st.markdown("")
-
-    st.markdown(
-        f'<div class="count-badge">'
-        f'売れる予測KW: <b style="font-size:1.1rem;">{len(scored)}件</b>'
-        f'　<span style="color:#718096;font-size:.8rem;">'
-        f'{prod_name} / {prod_info["asin"]}'
-        f' | DataDive: {n_total}件 → 重複除外: {n_dup}件 → 候補: {len(scored)}件'
-        f'</span></div>',
-        unsafe_allow_html=True
-    )
-    st.markdown("")
-
-    # ─── コピー用KW一覧 ────────────────────────────────────
-    st.markdown("**📋 売れる予測KW一覧**（コピーボタンで一括コピー）")
-    st.code("\n".join(scored["_keyword"].tolist()), language=None)
-
-    # ─── 詳細テーブル ──────────────────────────────────────
-    st.markdown("##### 売れる予測KW詳細テーブル")
-    sv_col   = cols.get("sv")
-    disp = pd.DataFrame()
-    disp["順位"]           = range(1, len(scored) + 1)
-    disp["キーワード"]       = scored["_keyword"].values
-    disp["売れる予測スコア"] = scored["売れる予測スコア"].values
-    disp["検索需要"]         = scored["_sv_raw"].apply(
-        lambda x: _dd_sv_label(int(x))
-    ).values if "_sv_raw" in scored.columns else "—"
-    disp["競合数"]           = scored["_comp_cnt"].apply(
-        lambda x: int(x) if pd.notna(x) else "—"
-    ).values if "_comp_cnt" in scored.columns else "—"
-    # 売上指標（存在する場合のみ）
-    sales_col = cols.get("sales30") or cols.get("sales")
-    if sales_col and sales_col in scored.columns:
-        disp["売上指標"] = scored[sales_col].values
+    if comp_kw_dict.get("_format") == "wide_no_keyword":
+        st.warning("⚠️ competitors.csv が横持ち（ASIN列）フォーマットです。"
+                   "Keyword列が必要です。競合指標はすべてNULL（中立値50）で計算します。")
+        comp_kw_dict = {}
+    elif comp_kw_dict.get("_error"):
+        st.warning(f"⚠️ competitors.csv 読み込みエラー: {comp_kw_dict['_error']}（中立値50で続行）")
+        comp_kw_dict = {}
     else:
-        disp["売上指標"] = "—"
-    disp["推奨理由"] = scored["推奨理由"].values
-    disp = disp.set_index("順位")
-    st.dataframe(disp, use_container_width=True)
+        n_comp = len([k for k in comp_kw_dict if not k.startswith("_")])
+        st.caption(f"  → competitors.csv: {n_comp}件のKeyword競合データを読み込みました")
 
-    # ─── CSVダウンロード ───────────────────────────────────
-    dl_csv = disp.reset_index().to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    st.download_button(
-        "📥 DateDive売れる予測KW.csv", data=dl_csv,
-        file_name="DateDive売れる予測KW.csv", mime="text/csv",
-        use_container_width=True
-    )
+    with st.spinner("スコアリング中（Keyword単位）..."):
+        scored = _ddv4_calculate_sellable_keywords(
+            cands_df, sv_col, prod_label, comp_kw_dict)
 
-    # ─── 除外KW（折りたたみ）───────────────────────────────
+    scored_all    = scored.sort_values("売れる予測スコア", ascending=False).reset_index(drop=True)
+    scored_ranked = scored_all[scored_all["ランク"] != "除外"].copy().reset_index(drop=True)
+    scored_excl   = scored_all[scored_all["ランク"] == "除外"].copy().reset_index(drop=True)
+    n_matched = int(scored_all["_comp_matched"].sum())
+    n_null    = len(scored_all) - n_matched
+
+    st.markdown("---")
+    n_s = int((scored_ranked["ランク"] == "S").sum())
+    n_a = int((scored_ranked["ランク"] == "A").sum())
+    n_b = int((scored_ranked["ランク"] == "B").sum())
+    n_c = int((scored_ranked["ランク"] == "C").sum())
+    top_score = int(scored_all["売れる予測スコア"].max()) if not scored_all.empty else 0
+
+    _k1, _k2, _k3, _k4, _k5, _k6 = st.columns(6)
+    kpi(_k1, "📊", "keywords.csv", f"{n_total}件",    "総KW数",         "#EAF2FF", "#3B82F6")
+    kpi(_k2, "🚫", "除外KW",       f"{n_excl}件",     "運用中と重複",   "#FEF2F2", "#C53030")
+    kpi(_k3, "🔗", "comp一致",     f"{n_matched}件",  "個別スコア適用", "#EAF7EF", "#2F855A")
+    kpi(_k4, "⚪", "comp未一致",   f"{n_null}件",     "中立値50適用",   "#F4F6F8", "#718096")
+    kpi(_k5, "🏆", "S/Aランク",    f"{n_s+n_a}件",    "即追加/有望候補","#FFF9E8", "#F59E0B")
+    kpi(_k6, "⭐", "最高スコア",   f"{top_score}点",  "スコア最上位",   "#F3ECFF", "#9F5ACB")
+    st.markdown("")
+
+    if scored_ranked.empty:
+        st.warning("⚠️ スコア60点以上のKWが0件でした。")
+    else:
+        st.markdown("##### 📋 売れる予測KW一覧（スコア60点以上）")
+        disp = pd.DataFrame()
+        disp.index = range(1, len(scored_ranked) + 1)
+        disp["Keyword"]           = scored_ranked["_kw"].values
+        disp["Search Volume"]     = scored_ranked["_sv_raw"].values
+        disp["Strength"]          = scored_ranked["_strength_val"].values
+        disp["KWs on P1"]         = scored_ranked["_kws_on_p1_val"].values
+        disp["SV on P1"]          = scored_ranked["_sv_on_p1_val"].values
+        disp["Advertised KWs"]    = scored_ranked["_adv_kws_val"].values
+        disp["Score"]             = scored_ranked["売れる予測スコア"].values
+        disp["Rank"]              = scored_ranked["ランク"].values
+        disp["comp一致"]           = scored_ranked["_comp_matched"].apply(
+                                        lambda x: "✅" if x else "—")
+        disp["Review Count(参考)"] = scored_ranked["_review_val"].values
+        disp["Reason"]            = scored_ranked["採用理由"].values
+        st.dataframe(disp, use_container_width=True)
+
+        st.markdown("**📋 Amazon広告登録用KW一覧**（右上のコピーボタンでコピー）")
+        st.code("\n".join(scored_ranked["_kw"].tolist()), language=None)
+
+        dl_csv = (disp.reset_index(names="順位")
+                      .to_csv(index=False, encoding="utf-8-sig")
+                      .encode("utf-8-sig"))
+        st.download_button(
+            "📥 売れる予測KW.csv", data=dl_csv,
+            file_name=f"売れる予測KW_{prod_label[:10]}.csv",
+            mime="text/csv", use_container_width=True)
+
+        top20 = scored_all.head(20).copy().reset_index(drop=True)
+        with st.expander("🔍 デバッグ情報（上位20件 スコア内訳＋実参照値）", expanded=False):
+            dbg = pd.DataFrame()
+            dbg["順位"]            = range(1, len(top20) + 1)
+            dbg["Keyword"]         = top20["_kw"].values
+            dbg["comp一致"]         = top20["_comp_matched"].apply(lambda x: "✅" if x else "—")
+            dbg["参照Strength"]     = top20["_strength_val"].values
+            dbg["参照KWs on P1"]    = top20["_kws_on_p1_val"].values
+            dbg["参照SV on P1"]     = top20["_sv_on_p1_val"].values
+            dbg["参照Adv KWs"]      = top20["_adv_kws_val"].values
+            dbg["需要スコア"]        = top20["_step2_s"].values
+            dbg["需要貢献"]          = (top20["_step2_s"] * 0.30).round(1).values
+            dbg["Strengthスコア"]    = top20["_step3_s"].values
+            dbg["Strength貢献"]      = (top20["_step3_s"] * 0.25).round(1).values
+            dbg["市場支配力スコア"]   = top20["_step4_s"].values
+            dbg["市場支配力貢献"]     = (top20["_step4_s"] * 0.20).round(1).values
+            dbg["広告競争スコア"]     = top20["_step5_s"].values
+            dbg["広告競争貢献"]       = (top20["_step5_s"] * 0.10).round(1).values
+            dbg["購買意図"]           = top20["_s6"].values
+            dbg["商品関連性"]         = top20["_s7"].values
+            dbg["ロングテール"]       = top20["_s8"].values
+            dbg["RAW合計"]            = top20["_raw"].values
+            dbg["最終スコア"]         = top20["売れる予測スコア"].values
+            dbg["ランク"]             = top20["ランク"].values
+            dbg = dbg.set_index("順位")
+            st.dataframe(dbg, use_container_width=True)
+
     if not exc_df.empty:
-        with st.expander(f"🚫 重複除外されたKW（{n_dup}件）", expanded=False):
-            sv_col = cols.get("sv")
-            if sv_col and sv_col in exc_df.columns:
-                et = exc_df[["_keyword", sv_col]].rename(
-                    columns={"_keyword": "KW（除外）", sv_col: "検索ボリューム"}
-                ).reset_index(drop=True)
-            else:
-                et = exc_df[["_keyword"]].rename(
-                    columns={"_keyword": "KW（除外）"}
-                ).reset_index(drop=True)
+        with st.expander(f"🚫 既存運用KWと重複除外: {n_excl}件", expanded=False):
+            et = (exc_df[["_kw"]]
+                  .rename(columns={"_kw": "除外KW"})
+                  .reset_index(drop=True))
             et.index = et.index + 1
             st.dataframe(et, use_container_width=True)
 
+    if not scored_excl.empty:
+        with st.expander(f"📉 スコア60点未満 除外候補: {len(scored_excl)}件", expanded=False):
+            excl_disp = pd.DataFrame({
+                "Keyword":       scored_excl["_kw"].values,
+                "Search Volume": scored_excl["_sv_raw"].values,
+                "参照Strength":  scored_excl["_strength_val"].values,
+                "Score":         scored_excl["売れる予測スコア"].values,
+                "Reason":        scored_excl["採用理由"].values,
+            })
+            excl_disp.index = range(1, len(excl_disp) + 1)
+            st.dataframe(excl_disp, use_container_width=True)
 
-def page_datedive():
-    st.markdown("### 🔍 DateDive市場分析")
-    st.markdown("---")
-    k1, k2, k3 = st.columns(3)
-    kpi(k1, "🔍", "市場分析",  "Coming Soon", "DateDive連携", "#EAF2FF", "#3B82F6")
-    kpi(k2, "📊", "競合分析",  "Coming Soon", "キャンペーン比較", "#EAF7EF", "#2F855A")
-    kpi(k3, "📈", "トレンド",  "Coming Soon", "検索ボリューム推移", "#F3ECFF", "#9F5ACB")
-    st.markdown("")
-    st.info("🚧 **DateDive市場分析は準備中です。**\n\n将来のアップデートで以下の機能を追加予定です：\n- DateDiveデータ連携による市場規模分析\n- 競合キャンペーン比較\n- 検索ボリュームトレンド\n- 市場シェア分析")
+
+def page_dd_v4():
+    _ddv4_render_sellable_keywords()
 
 
 def page_download():
@@ -1440,86 +1650,7 @@ def page_manual():
 3. 期間: 任意（直近30〜90日推奨）
 4. **CSVでダウンロード** → そのまま1ファイルをアップロード
 
-> ⚠️ **ターゲティング列がないとエラーになります。** マニュアルキャンペーンの登録済KWをターゲティング列から自動除外します。
-""")
-    with st.expander("📤 STEP2: ANIHA Command Center へアップロード"):
-        st.markdown("""
-1. 画面上部の **「📊 Amazon検索用語レポート」** エリアにCSVをドロップ
-2. ファイル名が表示されたら **「🔍 抽出実行」** を押す
-3. 分析完了後、左サイドバーのページナビで各ページを確認
-
-> 💡 アップロードは **1ファイルのみ** です。検索用語とターゲティングが同一CSVに含まれている必要があります。
-""")
-    with st.expander("📊 STEP3: 分析結果の確認"):
-        st.markdown("""
-| ページ | 確認内容 |
-|---|---|
-| 📋 Amazon追加用KW | A/B+/Bランク別 勝ちKW一覧 |
-| 🚫 Amazon削除用KW | 広告費過多・低ROAS KW |
-| 📈 CPC調整表 | STEP1-4 CPC判定ランク付き一覧 |
-""")
-    with st.expander("📥 STEP4: ダウンロードとAmazon登録"):
-        st.markdown("""
-1. **📥 ダウンロード** ページからZIPをダウンロード
-2. ZIPを展開 → キャンペーン別CSVを確認
-3. Amazon広告管理画面 → **ターゲティング** へ貼り付け
-4. 削除用KWは **一時停止 or 入札削除** で対応
-""")
-    with st.expander("📊 利用条件一覧"):
-        st.markdown("""
-### 📋 Amazon追加用KW — 利用条件
-| 条件 | 内容 |
-|---|---|
-| 最小注文数 | サイドバーで設定（デフォルト3件） |
-| 最小クリック数 | サイドバーで設定（デフォルト5回） |
-| 最小広告費 | サイドバーで設定（デフォルト¥300） |
-| ROAS | ≥ 2.0（Bランク以上） |
-| 売上 | ≥ 商品売価 × 2 |
-
-### 🚫 Amazon削除用KW — 利用条件
-| 条件 | 内容 |
-|---|---|
-| 広告費 | ≥ 商品売価 × 2 |
-| ROAS | ≤ 0.5 |
-| 除外 | 勝ちKW（追加候補KW）は対象外 |
-
-### 📈 CPC調整表 — 利用条件
-| 条件 | 内容 |
-|---|---|
-| 最小クリック数 | 平均CPC算出に使用 |
-| 広告費 | ≥ ¥3,000 かつ 注文数 ≥ 3件（判断保留除外条件） |
-""")
-    with st.expander("🏆 STEP3: ランク判定基準"):
-        st.markdown("""
-| ランク | ROAS | 意味 |
-|---|---|---|
-| 🏆 Aランク | ≥ 5.0 | 高優先度追加候補 |
-| 🚀 B+ランク | ≥ 3.5 | 追加検討候補 |
-| 👀 Bランク | ≥ 2.0 | 監視候補 |
-
-勝ちKWは以下の順で絞り込まれます:
-1. オート広告キャンペーンの検索語句を抽出
-2. マニュアルキャンペーン登録済KWを除外（完全一致・部分一致）
-3. ブランドワード・商品コード・タイトル語句を除外
-4. 売上≥売価×2 かつ ROAS≥2.0 を満たすものを抽出
-5. 注文数・クリック数・広告費フィルターで信頼度確認
-6. 同一意図KWを統合して重複除去
-""")
-    with st.expander("📈 STEP4: CPC調整ロジック"):
-        st.markdown("""
-| 判定 | 条件 | アクション |
-|---|---|---|
-| 判断保留 | 広告費<¥3,000 または 注文数<3 | 変更なし |
-| SS+ | 注文≥20 かつ ROAS≥4.0 | CPC+5% |
-| SS | 注文≥20 かつ ROAS≥2.0 | 現状維持 |
-| S | ROAS≥4.0 | CPC+5% |
-| A | ROAS≥3.0 | 現状維持 |
-| B | ROAS≥2.0 | 現状維持 |
-| D | ROAS≥1.5 | CPC−5% |
-| E | ROAS<1.5 | CPC−10% |
-| 即削除 | 広告費≥閾値 かつ ROAS<0.5 | 即削除 |
-
-**即削除閾値:** 売価≤¥1,500→¥3,000 / 売価≤¥2,000→¥4,000 / 売価>¥2,000→¥5,000
+> ⚠️ **ターゲティング列がないとエラーになります。**
 """)
     with st.expander("ℹ️ デバッグ情報"):
         dbg = st.session_state.get("dbg", {})
@@ -1528,12 +1659,11 @@ def page_manual():
 
 # ─── Page Router ─────────────────────────────────────
 _PAGE_FUNCS = {
-    "📋 Amazon追加用KW":  page_add_kw,
-    "🚫 Amazon削除用KW":  page_del_kw,
-    "📈 CPC調整表":        page_cpc,
-    "🔍 DateDive市場分析": page_datedive,
-    "🔍 DateDive売れる予測KW": page_dd_predict,
-    "📥 ダウンロード":     page_download,
-    "📖 取扱説明書":       page_manual,
+    "📋 Amazon追加用KW":         page_add_kw,
+    "📊 DateDive売れる予測KW":   page_dd_v4,
+    "🚫 Amazon削除用KW":         page_del_kw,
+    "📈 CPC調整表":               page_cpc,
+    "📥 ダウンロード":            page_download,
+    "📖 取扱説明書":              page_manual,
 }
 _PAGE_FUNCS[current_page]()
