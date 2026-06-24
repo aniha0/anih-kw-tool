@@ -363,28 +363,59 @@ min_ord  = 3
 min_clk  = 5
 min_cost = 300
 
-# ─── Sidebar ───────────────────────────────────────
-with st.sidebar:
-    NAV_PAGES = [
-        "📋 Amazon追加用KW",
-        "📊 DateDive売れる予測KW",
-        "🚫 Amazon削除用KW",
-        "📈 CPC調整表",
-        "➕ 商品ターゲ追加（マニュアル）",
-        "🗑️ 商品ターゲ削除（マニュアル）",
-        "📹 商品ターゲ追加（動画）",
-        "📹 商品ターゲ削除（動画）",
-        "📥 ダウンロード",
-        "📖 取扱説明書",
-    ]
-    current_page = st.radio("ページ選択", NAV_PAGES, label_visibility="collapsed")
-    st.markdown("---")
+# ─── Sidebar ツリーナビゲーション ─────────────────────
+_VALID_PAGES = {
+    "📋 Amazon追加用KW", "📊 DateDive売れる予測KW",
+    "🚫 Amazon削除用KW", "📈 CPC調整表",
+    "➕ 商品ターゲ追加（マニュアル）", "🗑️ 商品ターゲ削除（マニュアル）",
+    "📹 商品ターゲ追加（動画）",     "📹 商品ターゲ削除（動画）",
+    "📥 ダウンロード", "📖 取扱説明書",
+}
+_ADD_PAGES = {"📋 Amazon追加用KW", "➕ 商品ターゲ追加（マニュアル）", "📹 商品ターゲ追加（動画）"}
+_DEL_PAGES = {"🚫 Amazon削除用KW", "🗑️ 商品ターゲ削除（マニュアル）", "📹 商品ターゲ削除（動画）"}
+_CPC_PAGES = {"📈 CPC調整表"}
 
+if "current_page" not in st.session_state or st.session_state["current_page"] not in _VALID_PAGES:
+    st.session_state["current_page"] = "📋 Amazon追加用KW"
+_cp = st.session_state["current_page"]
+
+def _nav_btn(label: str, page_key: str, icon: str = "") -> None:
+    is_active = st.session_state["current_page"] == page_key
+    _lbl = f"{'▶' if is_active else '　'} {icon}{label}" if icon else f"{'▶' if is_active else '　'} {label}"
+    if st.button(_lbl, key=f"_nav_{hash(page_key) & 0xFFFFFF}",
+                 use_container_width=True,
+                 type="primary" if is_active else "secondary"):
+        st.session_state["current_page"] = page_key
+
+with st.sidebar:
+    # ── 追加
+    with st.expander("➕  追加", expanded=(_cp in _ADD_PAGES)):
+        _nav_btn("キーワード",  "📋 Amazon追加用KW",               "📋 ")
+        _nav_btn("商品",        "➕ 商品ターゲ追加（マニュアル）", "🎯 ")
+        _nav_btn("動画",        "📹 商品ターゲ追加（動画）",       "📹 ")
+    # ── 削除
+    with st.expander("🚫  削除", expanded=(_cp in _DEL_PAGES)):
+        _nav_btn("キーワード",  "🚫 Amazon削除用KW",               "📋 ")
+        _nav_btn("商品",        "🗑️ 商品ターゲ削除（マニュアル）", "🎯 ")
+        _nav_btn("動画",        "📹 商品ターゲ削除（動画）",        "📹 ")
+    # ── CPC調整
+    with st.expander("📈  CPC調整", expanded=(_cp in _CPC_PAGES)):
+        _nav_btn("キーワード",  "📈 CPC調整表",                    "📋 ")
+        st.caption("　 🎯 商品　（準備中）")
+        st.caption("　 📹 動画　（準備中）")
+    # ── その他
+    st.markdown("---")
+    _nav_btn("DateDive売れる予測KW",  "📊 DateDive売れる予測KW", "📊 ")
+    _nav_btn("ダウンロード",           "📥 ダウンロード",          "📥 ")
+    _nav_btn("取扱説明書",             "📖 取扱説明書",            "📖 ")
+    st.markdown("---")
     # 💲 売価マスタ
     st.markdown('<p class="section-header">💲 売価マスタ</p>', unsafe_allow_html=True)
     for _c, _p in PRICES.items(): st.caption(f"{_c}：¥{_p:,}")
     st.markdown("---")
     st.caption("ANIHA Command Center v2.0")
+
+current_page = st.session_state["current_page"]
 
 # ─── Header ─────────────────────────────────────────
 _h_logo = _load_logo(190)
