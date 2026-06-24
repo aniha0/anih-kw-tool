@@ -211,7 +211,7 @@ def assign_cpc_rank(cost: float, orders: float, roas: float, price: float):
         rank, action, delta = "D", "CPC下げ", -5
     else:
         rank, action, delta = "E", "CPC下げ", -10
-    if cost >= del_thresh and roas < 0.5:
+    if cost >= del_thresh and roas < 0.8:
         rank, action, delta = "即削除", "即削除", 0
     return (rank, action, delta)
 
@@ -496,7 +496,7 @@ if run:
         dw = deduplicate_keyword_intent(d1)
         nf = len(dw)
         win_kws = set(dw["keyword"].tolist())
-        del_mask = (agg["cost"] >= agg["price"] * 2) & (agg["ROAS"] <= 0.5)
+        del_mask = (agg["cost"] >= agg["price"] * 2) & (agg["ROAS"] < 0.8)
         df_del_ = agg[del_mask].copy()
         df_del_ = df_del_[~df_del_["keyword"].isin(win_kws)].copy()
         df_del_.drop(columns=["price"], inplace=True, errors="ignore")
@@ -744,7 +744,7 @@ def page_add_kw():
 
 
 def page_del_kw():
-    _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "≤ 0.5"), ("勝ちKW", "除外")])
+    _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "< 0.8"), ("勝ちKW", "除外")])
     render_logic_section(
         "🚫 Amazon削除用KW判定ロジック",
         '''
@@ -769,7 +769,7 @@ def page_del_kw():
   <tr style="background:#FFF5F5;">
     <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">🚫 削除対象</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      広告費 ≥ 売価 × 2 <b>かつ</b> ROAS &lt; 0.5<br>
+      広告費 ≥ 売価 × 2 <b>かつ</b> ROAS &lt; 0.8<br>
       <span style="font-size:.8rem;color:#718096;">→ 完全一致で除外登録することを推奨</span>
     </td>
   </tr>
@@ -924,7 +924,7 @@ def page_cpc():
   <tr style="background:#FFF5F5;">
     <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#742A2A;">即削除</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      ROAS &lt; 0.5 <b>かつ</b> 広告費が閾値以上<br>
+      ROAS &lt; 0.8 <b>かつ</b> 広告費が閾値以上<br>
       <span style="font-size:.8rem;color:#718096;">
         売価 ≤¥1,500 → 広告費 ≥¥3,000 ／
         売価 ≤¥2,000 → 広告費 ≥¥4,000 ／
@@ -1562,7 +1562,7 @@ def page_download():
     c3, c4 = st.columns(2)
     with c3:
         st.markdown("**🚫 削除用KW（キャンペーン別ZIP）**")
-        st.caption(f"{len(dd)}件 — 広告費≥売価×2 かつ ROAS≤0.5")
+        st.caption(f"{len(dd)}件 — 広告費≥売価×2 かつ ROAS<0.8")
         if not dd.empty:
             st.download_button("📥 削除用KW_ZIP", data=del_camp_zip(dd),
                 file_name="del_kw.zip", mime="application/zip", use_container_width=True)
@@ -1644,7 +1644,7 @@ def page_manual():
 | 条件 | 内容 |
 |---|---|
 | 広告費 | ≥ 商品売価 × 2 |
-| ROAS | ≤ 0.5 |
+| ROAS | < 0.8 |
 | 除外 | 勝ちKW（追加候補KW）は対象外 |
 
 ### 📈 CPC調整表 — 利用条件
@@ -1681,7 +1681,7 @@ def page_manual():
 | B | ROAS≥2.0 | 現状維持 |
 | D | ROAS≥1.5 | CPC−5% |
 | E | ROAS<1.5 | CPC−10% |
-| 即削除 | 広告費≥閾値 かつ ROAS<0.5 | 即削除 |
+| 即削除 | 広告費≥閾値 かつ ROAS<0.8 | 即削除 |
 
 **即削除閾値:** 売価≤¥1,500→¥3,000 / 売価≤¥2,000→¥4,000 / 売価>¥2,000→¥5,000
 """)
