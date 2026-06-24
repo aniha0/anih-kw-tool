@@ -574,9 +574,16 @@ if run:
         _mpt_raw = _mpt_raw[_mpt_not_auto].copy()
 
         # ②ASINターゲのみ (KW/Category/Substitute/Complement/検索語ターゲ全除外)
-        # 正規表現: B0で始まる10文字英数字のみ採用
+        # 実データ形式: asin="B0XXXXXXXX" / asin-expanded="B0XXXXXXXX" / 裸の B0XXXXXXXX
+        def _extract_asin(s):
+            """asin="B0...", asin-expanded="B0...", 裸の B0... いずれからもASINを抽出"""
+            import re as _re2
+            m = _re2.search(r'B0[A-Z0-9]{8}', str(s), _re2.IGNORECASE)
+            return m.group(0).upper() if m else ""
+
         if tkc:
-            _mpt_asin_mask = _mpt_raw[tkc].astype(str).str.strip().str.upper().str.match(r"^B0[A-Z0-9]{8}$")
+            _mpt_raw["_asin_clean"] = _mpt_raw[tkc].apply(_extract_asin)
+            _mpt_asin_mask = _mpt_raw["_asin_clean"] != ""
             n_mpt_kw_ex = int((~_mpt_asin_mask).sum())
             _mpt_raw = _mpt_raw[_mpt_asin_mask].copy()
         else:
@@ -586,9 +593,9 @@ if run:
 
         # ③ASIN単位で集計
         if tkc and not _mpt_raw.empty:
-            _mpt_raw["_asin_key"] = _mpt_raw[tkc].astype(str).str.strip().str.upper()
+            _mpt_raw["_asin_key"] = _mpt_raw["_asin_clean"]  # 正規化済みASINでグループ化
             _agg_mpt_d = {
-                "asin":           (tkc, "first"),
+                "asin":           ("_asin_clean", "first"),
                 "campaign_name":  (cc,  "first"),
                 "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
                 "sales":          (sc,  "sum"),
