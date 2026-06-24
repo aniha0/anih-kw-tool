@@ -370,8 +370,10 @@ with st.sidebar:
         "📊 DateDive売れる予測KW",
         "🚫 Amazon削除用KW",
         "📈 CPC調整表",
-        "➕ 商品ターゲ追加",
-        "🗑️ 商品ターゲ削除",
+        "➕ 商品ターゲ追加（マニュアル）",
+        "🗑️ 商品ターゲ削除（マニュアル）",
+        "📹 商品ターゲ追加（動画）",
+        "📹 商品ターゲ削除（動画）",
         "📥 ダウンロード",
         "📖 取扱説明書",
     ]
@@ -562,91 +564,83 @@ if run:
             df_cpc_ = pd.DataFrame()
             n_cpc_auto = n_cpc_pt = n_cpc_empty = n_cpc_manual = 0
 
-        # ── 商品マニュアルターゲ分析: ASIN単位抽出 ──────────────────
-        # Manual ASINターゲのみ / KW・カテゴリ・Auto除外 / 重複除去なし
-        # （オート・既存KW成果もすべて商品ターゲ展開候補として利用）
-        _mpt_raw = dfs.copy()
-        _mpt_raw["ct"] = _mpt_raw[cc].apply(lambda x: official(get_theme(str(x))))
+        # ── 商品ターゲ分析: マニュアル / 動画 を分離抽出 ──────────────
+        import re as _re_asin
 
-        # ①Auto除外 (Manual campのみ)
-        _mpt_not_auto = ~_mpt_raw[cc].str.contains("オート|auto", case=False, na=False)
-        n_mpt_auto_ex = int((~_mpt_not_auto).sum())
-        _mpt_raw = _mpt_raw[_mpt_not_auto].copy()
-
-        # ②ASINターゲのみ (KW/Category/Substitute/Complement/検索語ターゲ全除外)
-        # 実データ形式: asin="B0XXXXXXXX" / asin-expanded="B0XXXXXXXX" / 裸の B0XXXXXXXX
         def _extract_asin(s):
-            """asin="B0...", asin-expanded="B0...", 裸の B0... いずれからもASINを抽出"""
-            import re as _re2
-            m = _re2.search(r'B0[A-Z0-9]{8}', str(s), _re2.IGNORECASE)
+            """asin="B0...", asin-expanded="B0...", 裸の B0... からASINを抽出"""
+            m = _re_asin.search(r'B0[A-Z0-9]{8}', str(s), _re_asin.IGNORECASE)
             return m.group(0).upper() if m else ""
 
-        if tkc:
-            _mpt_raw["_asin_clean"] = _mpt_raw[tkc].apply(_extract_asin)
-            _mpt_asin_mask = _mpt_raw["_asin_clean"] != ""
-            n_mpt_kw_ex = int((~_mpt_asin_mask).sum())
-            _mpt_raw = _mpt_raw[_mpt_asin_mask].copy()
-        else:
-            n_mpt_kw_ex = 0
-        n_mpt_asin_rows = len(_mpt_raw)
-        n_mpt_dup_ex = 0  # 重複除去なし（オート・既存KW成果も展開対象）
-
-        # ③ASIN単位で集計
-        if tkc and not _mpt_raw.empty:
-            _mpt_raw["_asin_key"] = _mpt_raw["_asin_clean"]  # 正規化済みASINでグループ化
-            _agg_mpt_d = {
+        def _build_pt_dfs(camp_mask):
+            """camp_mask で絞った行から追加/削除候補DataFrameを返す"""
+            _d = _mpt_base[camp_mask].copy()
+            if _d.empty or not tkc:
+                return pd.DataFrame(), pd.DataFrame()
+            _d["_asin_clean"] = _d[tkc].apply(_extract_asin)
+            _d = _d[_d["_asin_clean"] != ""].copy()
+            if _d.empty:
+                return pd.DataFrame(), pd.DataFrame()
+            _d["_asin_key"] = _d["_asin_clean"]
+            _agg_d = {
                 "asin":           ("_asin_clean", "first"),
-                "campaign_name":  (cc,  "first"),
-                "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
-                "sales":          (sc,  "sum"),
+                "campaign_name":  (cc, "first"),
+                "campaign_theme": ("ct", lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
+                "sales":          (sc, "sum"),
                 "cost":           (oc_, "sum"),
             }
-            if od:  _agg_mpt_d["orders"]   = (od,  "sum")
-            if clk: _agg_mpt_d["clicks"]   = (clk, "sum")
-            if agn: _agg_mpt_d["ad_group"] = (agn, "first")
-            _agg_mpt = _mpt_raw.groupby("_asin_key").agg(**_agg_mpt_d).reset_index(drop=True)
-            _agg_mpt["ROAS"]  = _agg_mpt.apply(
+            if od:  _agg_d["orders"]   = (od,  "sum")
+            if clk: _agg_d["clicks"]   = (clk, "sum")
+            if agn: _agg_d["ad_group"] = (agn, "first")
+            _agg = _d.groupby("_asin_key").agg(**_agg_d).reset_index(drop=True)
+            _agg["ROAS"]  = _agg.apply(
                 lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
-            _agg_mpt["price"] = _agg_mpt["campaign_theme"].map(PRICES)
-            _agg_mpt = _agg_mpt[_agg_mpt["price"].notna()].copy()
+            _agg["price"] = _agg["campaign_theme"].map(PRICES)
+            _agg = _agg[_agg["price"].notna()].copy()
+            # 追加: 信頼度フィルター + 条件
+            _tr = _agg.copy()
+            if "orders" in _tr.columns: _tr = _tr[_tr["orders"] >= 3]
+            if "clicks" in _tr.columns: _tr = _tr[_tr["clicks"] >= 5]
+            _tr = _tr[_tr["cost"] >= 300].copy()
+            _add = _tr[(_tr["sales"] >= _tr["price"] * 2) & (_tr["ROAS"] >= 2.0)].copy()
+            _sc2 = [c for c in ["ROAS","sales","orders"] if c in _add.columns]
+            _add = _add.sort_values(_sc2, ascending=[False]*len(_sc2)).reset_index(drop=True)
+            # 削除: 条件
+            _del = _agg[(_agg["cost"] >= _agg["price"] * 2) & (_agg["ROAS"] < 0.8)].copy()
+            _ds2 = [c for c in ["cost","ROAS"] if c in _del.columns]
+            _del = _del.sort_values(_ds2, ascending=[False, True]).reset_index(drop=True)
+            return (_add.drop(columns=["price"], errors="ignore"),
+                    _del.drop(columns=["price"], errors="ignore"))
 
-            # ⑤信頼度フィルター
-            _mpt_trust = _agg_mpt.copy()
-            if "orders" in _mpt_trust.columns:
-                _mpt_trust = _mpt_trust[_mpt_trust["orders"] >= 3]
-            if "clicks" in _mpt_trust.columns:
-                _mpt_trust = _mpt_trust[_mpt_trust["clicks"] >= 5]
-            _mpt_trust = _mpt_trust[_mpt_trust["cost"] >= 300].copy()
+        _mpt_base = dfs.copy()
+        _mpt_base["ct"] = _mpt_base[cc].apply(lambda x: official(get_theme(str(x))))
 
-            # ⑥追加候補: 売上≥売価×2 AND ROAS≥2.0
-            _mpt_add = _mpt_trust[
-                (_mpt_trust["sales"] >= _mpt_trust["price"] * 2) &
-                (_mpt_trust["ROAS"] >= 2.0)
-            ].copy()
-            _sort_cols = [c for c in ["ROAS","sales","orders"] if c in _mpt_add.columns]
-            _mpt_add = _mpt_add.sort_values(_sort_cols, ascending=[False]*len(_sort_cols)).reset_index(drop=True)
+        # マニュアル: 「商品ターゲ」含む AND「動画」含まない AND「オート」含まない
+        _mask_m = (
+            _mpt_base[cc].str.contains("商品ターゲ", na=False) &
+            ~_mpt_base[cc].str.contains("動画", na=False) &
+            ~_mpt_base[cc].str.contains("オート|auto", case=False, na=False)
+        )
+        # 動画: 「商品ターゲ」含む AND「動画」含む
+        _mask_v = (
+            _mpt_base[cc].str.contains("商品ターゲ", na=False) &
+            _mpt_base[cc].str.contains("動画", na=False)
+        )
 
-            # ⑦削除候補: 広告費≥売価×2 AND ROAS<0.8
-            _mpt_del = _agg_mpt[
-                (_agg_mpt["cost"] >= _agg_mpt["price"] * 2) &
-                (_agg_mpt["ROAS"] < 0.8)
-            ].copy()
-            _del_sort = [c for c in ["cost","ROAS"] if c in _mpt_del.columns]
-            _mpt_del = _mpt_del.sort_values(_del_sort, ascending=[False, True]).reset_index(drop=True)
+        df_pt_add_m_, df_pt_del_m_ = _build_pt_dfs(_mask_m)
+        df_pt_add_v_, df_pt_del_v_ = _build_pt_dfs(_mask_v)
 
-            df_pt_add_ = _mpt_add.drop(columns=["price"], errors="ignore")
-            df_pt_del_ = _mpt_del.drop(columns=["price"], errors="ignore")
-        else:
-            df_pt_add_ = pd.DataFrame()
-            df_pt_del_ = pd.DataFrame()
-        n_mpt_add = len(df_pt_add_)
-        n_mpt_del = len(df_pt_del_)
+        n_mpt_add = len(df_pt_add_m_) + len(df_pt_add_v_)
+        n_mpt_del = len(df_pt_del_m_) + len(df_pt_del_v_)
+        n_mpt_auto_ex = int((~_mask_m & ~_mask_v).sum())
+        n_mpt_kw_ex = 0; n_mpt_dup_ex = 0
         # ────────────────────────────────────────────────────────────
 
         st.session_state.update({
             "has_results": True, "df_win": dw,
             "df_del": df_del_, "df_cpc": df_cpc_,
-            "df_pt_add": df_pt_add_, "df_pt_del": df_pt_del_,
+            "df_pt_add_m": df_pt_add_m_, "df_pt_del_m": df_pt_del_m_,
+            "df_pt_add_v": df_pt_add_v_, "df_pt_del_v": df_pt_del_v_,
             "stats": {
                 "n_auto":n_auto,"n_ex":n_ex,"n_pt":n_pt,"n_ar":n_ar,
                 "n_br":n_br,"n_cd":n_cd,"n_tl":n_tl,"n_ae":n_ae,
@@ -1631,236 +1625,180 @@ def _ddv4_render_sellable_top10():
 
 
 
-def page_pt_add():
-    """商品ターゲ追加 — 商品別 ROAS≥2.0 追加候補 ASINターゲ"""
-    df_all = st.session_state.get("df_pt_add", pd.DataFrame())
+def _render_pt_page(session_key, is_add, camp_label, selectbox_key):
+    """商品ターゲ追加/削除 共通レンダラー"""
+    df_all = st.session_state.get(session_key, pd.DataFrame())
 
     # ① 条件バー
-    _cond_bar([
-        ("注文数",   "≥ 3"),
-        ("クリック数", "≥ 5"),
-        ("広告費",   "≥ ¥300"),
-        ("売上",     "≥ 売価×2"),
-        ("ROAS",     "≥ 2.0"),
-        ("対象",     "Manual ASINターゲのみ"),
-    ])
-    render_logic_section(
-        "[➕] 商品ターゲ追加 判定ロジック",
-        '<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">'
-        '<thead><tr style="background:#DBEAFE;">'
-        '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>'
-        '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>'
-        '</tr></thead><tbody>'
-        '<tr style="background:#F1F5F9;">'
-        '<td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">分析対象</td></tr>'
-        '<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">対象データ</td>'
-        '<td style="padding:6px 10px;border:1px solid #BFDBFE;">Manualキャンペーン / ASINターゲ（B0始まり10桁）のみ</td></tr>'
-        '<tr style="background:#F1F5F9;">'
-        '<td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">信頼度フィルター</td></tr>'
-        '<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">最低条件</td>'
-        '<td style="padding:6px 10px;border:1px solid #BFDBFE;">注文数 ≥ 3件 / クリック数 ≥ 5回 / 広告費 ≥ ¥300</td></tr>'
-        '<tr style="background:#F1F5F9;">'
-        '<td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">採用条件</td></tr>'
-        '<tr style="background:#EAF7EF;">'
-        '<td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2F855A;">✅ 追加対象</td>'
-        '<td style="padding:6px 10px;border:1px solid #BFDBFE;">'
-        '売上 ≥ 売価 × 2 <b>かつ</b> ROAS ≥ 2.0<br>'
-        '<span style="font-size:.8rem;color:#718096;">→ 入札額を増やして露出を拡大する</span>'
-        '</td></tr>'
-        '</tbody></table>'
-        '<p style="font-size:.78rem;color:#718096;margin-top:10px;">'
-        '▶ 基本思想: 売れているASINターゲに予算を集中して利益を最大化する<br>'
-        '▶ オート広告・既存KW成果も展開対象（重複除去なし）'
-        '</p>'
-    )
+    if is_add:
+        _cond_bar([
+            ("注文数",   "≥ 3"),
+            ("クリック数", "≥ 5"),
+            ("広告費",   "≥ ¥300"),
+            ("売上",     "≥ 売価×2"),
+            ("ROAS",     "≥ 2.0"),
+            ("対象",     camp_label),
+        ])
+        render_logic_section(
+            f"[+] 商品ターゲ追加 ({camp_label}) 判定ロジック",
+            '<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">'
+            '<thead><tr style="background:#DBEAFE;">'
+            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>'
+            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>'
+            '</tr></thead><tbody>'
+            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">対象データ</td></tr>'
+            f'<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">分析対象</td>'
+            f'<td style="padding:6px 10px;border:1px solid #BFDBFE;">{camp_label} / Campaign名に「商品ターゲ」を含む</td></tr>'
+            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">信頼度フィルター</td></tr>'
+            '<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">最低条件</td>'
+            '<td style="padding:6px 10px;border:1px solid #BFDBFE;">注文数 ≥ 3件 / クリック数 ≥ 5回 / 広告費 ≥ ¥300</td></tr>'
+            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">採用条件</td></tr>'
+            '<tr style="background:#EAF7EF;"><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2F855A;">✅ 追加対象</td>'
+            '<td style="padding:6px 10px;border:1px solid #BFDBFE;">売上 ≥ 売価 × 2 <b>かつ</b> ROAS ≥ 2.0</td></tr>'
+            '</tbody></table>'
+            '<p style="font-size:.78rem;color:#718096;margin-top:10px;">▶ 売れているASINターゲに予算を集中して利益を最大化する</p>'
+        )
+    else:
+        _cond_bar([
+            ("広告費",   "≥ 売価×2"),
+            ("ROAS",     "< 0.8"),
+            ("対象",     camp_label),
+        ])
+        render_logic_section(
+            f"[x] 商品ターゲ削除 ({camp_label}) 判定ロジック",
+            '<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">'
+            '<thead><tr style="background:#DBEAFE;">'
+            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>'
+            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>'
+            '</tr></thead><tbody>'
+            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">対象データ</td></tr>'
+            f'<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">分析対象</td>'
+            f'<td style="padding:6px 10px;border:1px solid #BFDBFE;">{camp_label} / Campaign名に「商品ターゲ」を含む</td></tr>'
+            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">削除条件</td></tr>'
+            '<tr style="background:#FFF5F5;"><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">[x] 削除対象</td>'
+            '<td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 ≥ 売価 × 2 <b>かつ</b> ROAS &lt; 0.8</td></tr>'
+            '</tbody></table>'
+            '<p style="font-size:.78rem;color:#718096;margin-top:10px;">▶ 売価の2倍以上広告費を使ってもROASが低いASINターゲは利益を生まない</p>'
+        )
     st.markdown("")
 
     # ② 商品選択
-    _ca1, _ca2 = st.columns([3, 2])
-    with _ca1:
-        pt_add_sel = st.selectbox(
+    _c1, _c2 = st.columns([3, 2])
+    with _c1:
+        sel = st.selectbox(
             "商品選択",
             ["全商品"] + CAMPAIGNS,
             label_visibility="visible",
-            key="pt_add_camp_sel",
+            key=selectbox_key,
         )
     df_view = df_all.copy()
-    if pt_add_sel != "全商品" and "campaign_theme" in df_view.columns:
-        df_view = df_view[df_view["campaign_theme"] == pt_add_sel].copy()
+    if sel != "全商品" and "campaign_theme" in df_view.columns:
+        df_view = df_view[df_view["campaign_theme"] == sel].copy()
 
-    n_add   = len(df_view)
-    avg_r   = round(df_view["ROAS"].mean(),   2) if n_add > 0 and "ROAS"   in df_view.columns else 0.0
-    avg_ord = round(df_view["orders"].mean(),  1) if n_add > 0 and "orders" in df_view.columns else 0.0
-    avg_cst = round(df_view["cost"].mean(),    0) if n_add > 0 and "cost"   in df_view.columns else 0.0
+    n_rows  = len(df_view)
+    avg_r   = round(df_view["ROAS"].mean(),   2) if n_rows > 0 and "ROAS"   in df_view.columns else 0.0
+    avg_ord = round(df_view["orders"].mean(),  1) if n_rows > 0 and "orders" in df_view.columns else 0.0
+    avg_cst = round(df_view["cost"].mean(),    0) if n_rows > 0 and "cost"   in df_view.columns else 0.0
 
     # ③ KPIカード（フィルタ後）
-    k1, k2, k3, k4 = st.columns(4)
-    kpi(k1, "✅", "追加候補数",  f"{n_add}件",          "ROAS≥2.0",   "#EAF7EF", "#2F855A")
-    kpi(k2, "\U0001f4ca", "平均ROAS",   f"{avg_r}",     "追加候補",    "#EAF2FF", "#3B82F6")
-    kpi(k3, "\U0001f4e6", "平均注文数", f"{avg_ord}件",  "追加候補",    "#FFFFF0", "#D69E2E")
-    kpi(k4, "\U0001f4b8", "平均広告費", f"¥{int(avg_cst):,}", "追加候補", "#F0FFF4", "#276749")
+    if is_add:
+        k1, k2, k3, k4 = st.columns(4)
+        kpi(k1, "✅", "追加候補数",  f"{n_rows}件",          "ROAS≥2.0",   "#EAF7EF", "#2F855A")
+        kpi(k2, "\U0001f4ca", "平均ROAS",   f"{avg_r}",      "追加候補",    "#EAF2FF", "#3B82F6")
+        kpi(k3, "\U0001f4e6", "平均注文数", f"{avg_ord}件",   "追加候補",    "#FFFFF0", "#D69E2E")
+        kpi(k4, "\U0001f4b8", "平均広告費", f"¥{int(avg_cst):,}", "追加候補", "#F0FFF4", "#276749")
+    else:
+        k1, k2, k3 = st.columns(3)
+        kpi(k1, "\U0001f5d1", "削除候補数", f"{n_rows}件",          "ROAS<0.8",  "#FFF5F5", "#C53030")
+        kpi(k2, "\U0001f4ca", "平均ROAS",   f"{avg_r}",              "削除候補",  "#FEE2E2", "#C53030")
+        kpi(k3, "\U0001f4b8", "平均広告費", f"¥{int(avg_cst):,}",  "削除候補",  "#F4F6F8", "#718096")
     st.markdown("")
 
     # ④ 件数バッジ
+    badge_color = "#2F855A" if is_add else "#C53030"
+    badge_label = "追加対象件数" if is_add else "削除対象件数"
     st.markdown(
-        f'<div class="count-badge" style="border-left-color:#2F855A;">'
-        f'追加対象件数: <b style="font-size:1.1rem;color:#2F855A;">{n_add}件</b>'
-        f'　<span style="color:#718096;font-size:.8rem;">商品: {pt_add_sel}</span></div>',
+        f'<div class="count-badge" style="border-left-color:{badge_color};">'
+        f'{badge_label}: <b style="font-size:1.1rem;color:{badge_color};">{n_rows}件</b>'
+        f'　<span style="color:#718096;font-size:.8rem;">商品: {sel}</span></div>',
         unsafe_allow_html=True,
     )
 
     if df_view.empty:
-        st.info("追加候補の商品ターゲはありません。（条件: 注文≥3 / クリック≥5 / 広告費≥¥300 / 売上≥売価×2 / ROAS≥2.0）")
+        msg = ("追加候補の商品ターゲはありません。（条件: 注文≥3 / クリック≥5 / 広告費≥¥300 / 売上≥売価×2 / ROAS≥2.0）"
+               if is_add else
+               "削除候補の商品ターゲはありません。（条件: 広告費≥売価×2 かつ ROAS<0.8）")
+        st.info(msg)
         return
 
     # ⑤ 詳細テーブル
-    def _reason_add(row):
-        rs = []
-        roas   = row.get("ROAS",   0)
-        sales  = row.get("sales",  0)
-        orders = row.get("orders", 0)
-        clicks = row.get("clicks", 0)
-        if   roas >= 4.0: rs.append(f"ROASが高い({roas:.1f}倍)")
-        elif roas >= 2.0: rs.append(f"ROAS良好({roas:.1f}倍)")
-        if   sales >= 10000: rs.append(f"売上実績が十分ある(¥{int(sales):,})")
-        elif sales  > 0:     rs.append(f"売上あり(¥{int(sales):,})")
-        if   orders >= 10: rs.append(f"注文実績が十分ある({int(orders)}件)")
-        elif orders >= 3:  rs.append(f"注文実績あり({int(orders)}件)")
-        if clicks >= 20: rs.append(f"クリック多数({int(clicks)}回)")
-        rs += ["商品ターゲ展開候補", "予算追加候補"]
-        return " / ".join(rs[:4])
+    if is_add:
+        def _reason(row):
+            rs = []
+            roas = row.get("ROAS", 0); sales = row.get("sales", 0)
+            orders = row.get("orders", 0); clicks = row.get("clicks", 0)
+            if roas >= 4.0: rs.append(f"ROASが高い({roas:.1f}倍)")
+            elif roas >= 2.0: rs.append(f"ROAS良好({roas:.1f}倍)")
+            if sales >= 10000: rs.append(f"売上実績が十分ある(¥{int(sales):,})")
+            elif sales > 0: rs.append(f"売上あり(¥{int(sales):,})")
+            if orders >= 10: rs.append(f"注文実績が十分ある({int(orders)}件)")
+            elif orders >= 3: rs.append(f"注文実績あり({int(orders)}件)")
+            if clicks >= 20: rs.append(f"クリック多数({int(clicks)}回)")
+            rs += ["商品ターゲ展開候補", "予算追加候補"]
+            return " / ".join(rs[:4])
+        reason_col = "採用理由"
+        _disp_cols = ["campaign_name","ad_group","asin","orders","clicks","cost","sales","ROAS",reason_col]
+        hdr = "##### ✅ 追加商品ターゲ詳細テーブル"
+    else:
+        def _reason(row):
+            rs = []
+            cost = row.get("cost", 0); roas = row.get("ROAS", 0); orders = row.get("orders", 0)
+            if cost >= 10000: rs.append(f"広告費消化が大きい(¥{int(cost):,})")
+            else: rs.append(f"広告費≥売価×2(¥{int(cost):,})")
+            if roas < 0.3: rs.append(f"ROASが著しく低い({roas:.2f}倍)")
+            elif roas < 0.8: rs.append(f"ROASが低い({roas:.2f}倍)")
+            if orders == 0: rs.append("注文0件")
+            elif orders < 3: rs.append(f"注文{int(orders)}件のみ")
+            rs += ["費用対効果が悪い", "利益貢献がない", "削除優先度が高い"]
+            return " / ".join(rs[:4])
+        reason_col = "削除理由"
+        _disp_cols = ["campaign_name","ad_group","asin","cost","sales","ROAS",reason_col]
+        hdr = "##### \U0001f5d1 削除商品ターゲ詳細テーブル"
 
-    st.markdown("##### ✅ 追加商品ターゲ詳細テーブル")
-    _add = df_view.copy()
-    _add["採用理由"] = _add.apply(_reason_add, axis=1)
-    _disp = [c for c in ["campaign_name","ad_group","asin","orders","clicks","cost","sales","ROAS","採用理由"] if c in _add.columns]
-    _rn   = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","asin":"ASIN",
-             "clicks":"クリック数","orders":"注文数","cost":"広告費","sales":"売上"}
-    _show = _add[_disp].rename(columns=_rn).copy()
+    st.markdown(hdr)
+    _df = df_view.copy()
+    _df[reason_col] = _df.apply(_reason, axis=1)
+    _disp = [c for c in _disp_cols if c in _df.columns or c == reason_col]
+    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","asin":"ASIN",
+           "clicks":"クリック数","orders":"注文数","cost":"広告費","sales":"売上"}
+    _show = _df[[c for c in _disp if c in _df.columns]].rename(columns=_rn).copy()
     _show.index = _show.index + 1
     if "広告費" in _show.columns: _show["広告費"] = _show["広告費"].apply(lambda x: f"¥{x:,.0f}")
     if "売上"   in _show.columns: _show["売上"]   = _show["売上"].apply(lambda x: f"¥{x:,.0f}")
     if "ROAS"   in _show.columns: _show["ROAS"]   = _show["ROAS"].round(2)
     st.dataframe(_show, use_container_width=True)
 
-    # ⑥ CSVダウンロード（選択商品のみ）
-    _csv_name = f"追加商品ターゲ_{pt_add_sel}.csv"
-    _dl = _add[_disp].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    st.download_button(f"\U0001f4e5 {_csv_name}", data=_dl,
-        file_name=_csv_name, mime="text/csv", use_container_width=True)
+    # ⑥ CSV
+    _action = "追加" if is_add else "削除"
+    _ctype  = "マニュアル" if "manual" in selectbox_key else "動画"
+    _fname  = f"商品ターゲ{_action}_{_ctype}_{sel}.csv"
+    _dl = _df[[c for c in _disp if c in _df.columns]].rename(columns=_rn).to_csv(
+        index=False, encoding="utf-8-sig").encode("utf-8-sig")
+    st.download_button(f"\U0001f4e5 {_fname}", data=_dl,
+        file_name=_fname, mime="text/csv", use_container_width=True)
 
 
-def page_pt_del():
-    """商品ターゲ削除 — 商品別 ROAS<0.8 削除候補 ASINターゲ"""
-    df_all = st.session_state.get("df_pt_del", pd.DataFrame())
+def page_pt_add_manual():
+    _render_pt_page("df_pt_add_m", True,  "マニュアル商品ターゲ", "pt_add_m_sel")
 
-    # ① 条件バー
-    _cond_bar([
-        ("広告費", "≥ 売価×2"),
-        ("ROAS",   "< 0.8"),
-        ("対象",   "Manual ASINターゲのみ"),
-    ])
-    render_logic_section(
-        "\U0001f5d1 商品ターゲ削除 判定ロジック",
-        '<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">'
-        '<thead><tr style="background:#DBEAFE;">'
-        '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>'
-        '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>'
-        '</tr></thead><tbody>'
-        '<tr style="background:#F1F5F9;">'
-        '<td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">対象データ</td></tr>'
-        '<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">分析対象</td>'
-        '<td style="padding:6px 10px;border:1px solid #BFDBFE;">Manualキャンペーン / ASINターゲ（B0始まり10桁）のみ</td></tr>'
-        '<tr style="background:#F1F5F9;">'
-        '<td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">削除条件</td></tr>'
-        '<tr style="background:#FFF5F5;">'
-        '<td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">'
-        '\U0001f5d1 削除対象</td>'
-        '<td style="padding:6px 10px;border:1px solid #BFDBFE;">'
-        '広告費 ≥ 売価 × 2 <b>かつ</b> ROAS &lt; 0.8<br>'
-        '<span style="font-size:.8rem;color:#718096;">→ 入札を停止または除外登録することを推奨</span>'
-        '</td></tr>'
-        '<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#718096;">○ 対象外</td>'
-        '<td style="padding:6px 10px;border:1px solid #BFDBFE;">'
-        '上記条件を満たさない場合 → 変更なし（経過観察）'
-        '</td></tr>'
-        '</tbody></table>'
-        '<p style="font-size:.78rem;color:#718096;margin-top:10px;">'
-        '▶ 基本思想: 売価の2倍以上広告費を使ってもROASが低いASINターゲは利益を生まない<br>'
-        '▶ 信頼度フィルターなし（広告費基準で判定）'
-        '</p>'
-    )
-    st.markdown("")
+def page_pt_del_manual():
+    _render_pt_page("df_pt_del_m", False, "マニュアル商品ターゲ", "pt_del_m_sel")
 
-    # ② 商品選択
-    _cd1, _cd2 = st.columns([3, 2])
-    with _cd1:
-        pt_del_sel = st.selectbox(
-            "商品選択",
-            ["全商品"] + CAMPAIGNS,
-            label_visibility="visible",
-            key="pt_del_camp_sel",
-        )
-    df_view = df_all.copy()
-    if pt_del_sel != "全商品" and "campaign_theme" in df_view.columns:
-        df_view = df_view[df_view["campaign_theme"] == pt_del_sel].copy()
+def page_pt_add_video():
+    _render_pt_page("df_pt_add_v", True,  "動画商品ターゲ", "pt_add_v_sel")
 
-    n_del   = len(df_view)
-    avg_r   = round(df_view["ROAS"].mean(),  2) if n_del > 0 and "ROAS" in df_view.columns else 0.0
-    avg_cst = round(df_view["cost"].mean(),  0) if n_del > 0 and "cost" in df_view.columns else 0.0
-
-    # ③ KPIカード（フィルタ後）
-    k1, k2, k3 = st.columns(3)
-    kpi(k1, "\U0001f5d1", "削除候補数", f"{n_del}件",           "ROAS<0.8",  "#FFF5F5", "#C53030")
-    kpi(k2, "\U0001f4ca", "平均ROAS",   f"{avg_r}",              "削除候補",  "#FEE2E2", "#C53030")
-    kpi(k3, "\U0001f4b8", "平均広告費", f"¥{int(avg_cst):,}",  "削除候補",  "#F4F6F8", "#718096")
-    st.markdown("")
-
-    # ④ 件数バッジ
-    st.markdown(
-        f'<div class="count-badge" style="border-left-color:#E53E3E;">'
-        f'削除対象件数: <b style="font-size:1.1rem;color:#C53030;">{n_del}件</b>'
-        f'　<span style="color:#718096;font-size:.8rem;">商品: {pt_del_sel}</span></div>',
-        unsafe_allow_html=True,
-    )
-
-    if df_view.empty:
-        st.info("削除候補の商品ターゲはありません。（条件: 広告費≥売価×2 かつ ROAS<0.8）")
-        return
-
-    # ⑤ 詳細テーブル
-    def _reason_del(row):
-        rs = []
-        cost   = row.get("cost",   0)
-        roas   = row.get("ROAS",   0)
-        orders = row.get("orders", 0)
-        if   cost >= 10000: rs.append(f"広告費消化が大きい(¥{int(cost):,})")
-        else:                rs.append(f"広告費≥売価×2(¥{int(cost):,})")
-        if   roas < 0.3: rs.append(f"ROASが著しく低い({roas:.2f}倍)")
-        elif roas < 0.8: rs.append(f"ROASが低い({roas:.2f}倍)")
-        if   orders == 0: rs.append("注文0件")
-        elif orders < 3:  rs.append(f"注文{int(orders)}件のみ")
-        rs += ["費用対効果が悪い", "利益貢献がない", "削除優先度が高い"]
-        return " / ".join(rs[:4])
-
-    st.markdown("##### \U0001f5d1 削除商品ターゲ詳細テーブル")
-    _del = df_view.copy()
-    _del["削除理由"] = _del.apply(_reason_del, axis=1)
-    _disp = [c for c in ["campaign_name","ad_group","asin","cost","sales","ROAS","削除理由"] if c in _del.columns]
-    _rn   = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","asin":"ASIN",
-             "cost":"広告費","sales":"売上"}
-    _show = _del[_disp].rename(columns=_rn).copy()
-    _show.index = _show.index + 1
-    if "広告費" in _show.columns: _show["広告費"] = _show["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    if "売上"   in _show.columns: _show["売上"]   = _show["売上"].apply(lambda x: f"¥{x:,.0f}")
-    if "ROAS"   in _show.columns: _show["ROAS"]   = _show["ROAS"].round(2)
-    st.dataframe(_show, use_container_width=True)
-
-    # ⑥ CSVダウンロード（選択商品のみ）
-    _csv_name = f"削除商品ターゲ_{pt_del_sel}.csv"
-    _dl = _del[_disp].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    st.download_button(f"\U0001f4e5 {_csv_name}", data=_dl,
-        file_name=_csv_name, mime="text/csv", use_container_width=True)
+def page_pt_del_video():
+    _render_pt_page("df_pt_del_v", False, "動画商品ターゲ", "pt_del_v_sel")
 
 
 
@@ -2013,13 +1951,15 @@ def page_manual():
 
 # ─── Page Router ─────────────────────────────────────
 _PAGE_FUNCS = {
-    "📋 Amazon追加用KW":  page_add_kw,
-    "📊 DateDive売れる予測KW":  page_dd_v4,
-    "🚫 Amazon削除用KW":  page_del_kw,
-    "📈 CPC調整表":        page_cpc,
-    "➕ 商品ターゲ追加":   page_pt_add,
-    "🗑️ 商品ターゲ削除":  page_pt_del,
-    "📥 ダウンロード":     page_download,
-    "📖 取扱説明書":       page_manual,
+    "📋 Amazon追加用KW":              page_add_kw,
+    "📊 DateDive売れる予測KW":        page_dd_v4,
+    "🚫 Amazon削除用KW":              page_del_kw,
+    "📈 CPC調整表":                   page_cpc,
+    "➕ 商品ターゲ追加（マニュアル）": page_pt_add_manual,
+    "🗑️ 商品ターゲ削除（マニュアル）": page_pt_del_manual,
+    "📹 商品ターゲ追加（動画）":       page_pt_add_video,
+    "📹 商品ターゲ削除（動画）":       page_pt_del_video,
+    "📥 ダウンロード":                 page_download,
+    "📖 取扱説明書":                   page_manual,
 }
 _PAGE_FUNCS[current_page]()
