@@ -239,11 +239,11 @@ def build_cpc_df(df: pd.DataFrame) -> pd.DataFrame:
 
 def cpc_camp_zip(df_cpc: pd.DataFrame) -> bytes:
     buf = io.BytesIO()
-    cols_out = [c for c in ["keyword","campaign_theme","ROAS","cost","sales","orders",
+    cols_out = [c for c in ["campaign_name","ad_group","keyword","ROAS","cost","sales","orders",
                              "avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_cpc.columns]
-    rename_map = {"keyword":"検索語句","campaign_theme":"キャンペーン","cost":"広告費",
-                  "sales":"売上","orders":"購入数","avg_cpc":"現在CPC","cpc_rank":"判定ランク",
-                  "cpc_action":"推奨アクション","cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
+    rename_map = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","keyword":"KWテキスト",
+                  "cost":"広告費","sales":"売上","orders":"購入数","avg_cpc":"現在CPC",
+                  "cpc_rank":"判定ランク","cpc_action":"推奨アクション","cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for c in CAMPAIGNS:
             dc = df_cpc[df_cpc["campaign_theme"] == c]
@@ -427,6 +427,11 @@ if run:
         clk = fcol(dfs, ["クリック数", "クリック", "Clicks", "clicks"])
         imp = fcol(dfs, ["インプレッション数", "インプレッション", "Impressions", "impressions"])
         tkc = fcol(dfs, ["ターゲティング", "ターゲッティング", "キーワード", "Targeting", "targeting", "Keyword", "keyword"])
+        # CPC用: Keyword Text列を最優先 / なければ tkc（ターゲティング）にフォールバック
+        kwt_col = fcol(dfs, ["Keyword Text", "Keyword text", "keyword text", "キーワードテキスト"])
+        cpc_kw_col = kwt_col if kwt_col else tkc   # Keyword Text優先・Targeting フォールバック
+        agn = fcol(dfs, ["Ad Group Name", "広告グループ名", "Ad Group", "広告グループ", "ad group"])
+        ttype = fcol(dfs, ["Campaign Targeting Type", "ターゲティングタイプ", "Targeting Type", "targeting type"])
         miss = [n for v, n in [(kc,"検索用語"),(cc,"キャンペーン名"),(sc,"売上"),(oc_,"広告費")] if not v]
         if miss: st.error(f"列が見つかりません: {miss}"); st.write(list(dfs.columns)); st.stop()
         if not tkc:
@@ -495,7 +500,65 @@ if run:
         df_del_ = agg[del_mask].copy()
         df_del_ = df_del_[~df_del_["keyword"].isin(win_kws)].copy()
         df_del_.drop(columns=["price"], inplace=True, errors="ignore")
-        df_cpc_ = build_cpc_df(agg.copy())
+        # ── CPC用: Manual KWのみ抽出（Customer Search Termではなく Keyword Text単位）
+        import re as _re
+        _cpc_raw = dfs.copy()
+        _cpc_raw["ct"] = _cpc_raw[cc].apply(lambda x: official(get_theme(str(x))))
+
+        # ①Auto除外
+        _auto_mask = _cpc_raw[cc].str.contains("オート|auto", case=False, na=False)
+        if ttype:
+            _auto_mask = _auto_mask | _cpc_raw[ttype].str.contains("auto", case=False, na=False)
+        n_cpc_auto = int(_auto_mask.sum())
+        _cpc_raw = _cpc_raw[~_auto_mask].copy()
+
+        # ②Product Targeting除外 (ASIN/category/asin:/complement/substitute)
+        def _is_pt(s):
+            s = str(s).strip()
+            return (bool(_re.match(r"^[Bb]0[A-Za-z0-9]{8}", s))
+                    or s.lower().startswith("category:")
+                    or s.lower().startswith("asin:")
+                    or "complement" in s.lower()
+                    or "substitute" in s.lower())
+        if cpc_kw_col:
+            _pt_mask = _cpc_raw[cpc_kw_col].apply(_is_pt)
+        else:
+            _pt_mask = pd.Series(False, index=_cpc_raw.index)
+        n_cpc_pt = int(_pt_mask.sum())
+        _cpc_raw = _cpc_raw[~_pt_mask].copy()
+
+        # ③Keyword Text空欄除外
+        if cpc_kw_col:
+            _empty_mask = _cpc_raw[cpc_kw_col].isna() | (_cpc_raw[cpc_kw_col].astype(str).str.strip() == "")
+        else:
+            _empty_mask = pd.Series(True, index=_cpc_raw.index)
+        n_cpc_empty = int(_empty_mask.sum())
+        _cpc_raw = _cpc_raw[~_empty_mask].copy()
+
+        n_cpc_manual = len(_cpc_raw)
+
+        # Keyword Text単位で集計 (Keyword Text優先 / Targeting フォールバック)
+        if cpc_kw_col and not _cpc_raw.empty:
+            _cpc_raw["_kw_norm"] = _cpc_raw[cpc_kw_col].apply(norm)
+            _agg_cpc_d = {
+                "keyword":        (cpc_kw_col, "first"),
+                "campaign_name":  (cc,  "first"),
+                "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
+                "sales":          (sc,  "sum"),
+                "cost":           (oc_, "sum"),
+            }
+            if od:  _agg_cpc_d["orders"] = (od, "sum")
+            if clk: _agg_cpc_d["clicks"] = (clk, "sum")
+            if agn: _agg_cpc_d["ad_group"] = (agn, "first")
+            _agg_cpc = _cpc_raw.groupby("_kw_norm").agg(**_agg_cpc_d).reset_index(drop=True)
+            _agg_cpc["ROAS"] = _agg_cpc.apply(
+                lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+            _agg_cpc["price"] = _agg_cpc["campaign_theme"].map(PRICES)
+            _agg_cpc = _agg_cpc[_agg_cpc["price"].notna()].copy()
+            df_cpc_ = build_cpc_df(_agg_cpc)
+        else:  # cpc_kw_col が取得できなかった場合
+            df_cpc_ = pd.DataFrame()
+            n_cpc_auto = n_cpc_pt = n_cpc_empty = n_cpc_manual = 0
         st.session_state.update({
             "has_results": True, "df_win": dw,
             "df_del": df_del_, "df_cpc": df_cpc_,
@@ -506,6 +569,8 @@ if run:
                 "n_clk_f":n_clk_f,"n_cost_f":n_cost_f,
                 "n_pre":n_pre,"n_af":n_af,"nf":nf,
                 "mo":int(min_ord),"mc":int(min_clk),"mco":int(min_cost),
+                "n_cpc_auto":n_cpc_auto,"n_cpc_pt":n_cpc_pt,
+                "n_cpc_empty":n_cpc_empty,"n_cpc_manual":n_cpc_manual,
             },
             "dbg":{"kc":kc,"sc":sc,"oc_":oc_,"od":od,
                    "clk":clk,"imp":imp,"rn":len(reg),"br":brands},
@@ -899,9 +964,19 @@ def page_cpc():
             <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
     if cnt["判断保留"] > 0:
         st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 または 購入数3件未満）")
+    with st.expander("📊 CPC抽出フィルター詳細", expanded=False):
+        st.markdown(f"""
+| ステップ | 除外理由 | 除外件数 |
+|---|---|---|
+| ① Auto除外 | Campaign Targeting Type = Auto | **{sv.get('n_cpc_auto', '―'):,}件** |
+| ② Product Targeting除外 | ASIN/Category/Complement/Substitute | **{sv.get('n_cpc_pt', '―'):,}件** |
+| ③ Keyword Text空欄除外 | Keyword Textが空欄 | **{sv.get('n_cpc_empty', '―'):,}件** |
+| ✅ 抽出対象 | Manual KWのみ | **{sv.get('n_cpc_manual', '―'):,}件** |
+""")
     st.markdown("---")
-    disp_cols = [c for c in ["keyword","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
-    _rn = {"keyword":"検索語句","cost":"広告費","sales":"売上","orders":"購入数",
+    disp_cols = [c for c in ["campaign_name","ad_group","keyword","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
+    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","keyword":"KWテキスト",
+           "cost":"広告費","sales":"売上","orders":"購入数",
            "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
            "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
     cat_t = pd.CategoricalDtype(categories=_RANK_ORDER, ordered=True)
