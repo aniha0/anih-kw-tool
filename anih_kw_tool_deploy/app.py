@@ -5,6 +5,7 @@ from typing import Optional
 import pandas as pd
 import streamlit as st
 
+
 # ===================================================
 # 定数
 # ===================================================
@@ -27,10 +28,9 @@ PRICES = {
     "関節": 1880, "除菌消臭": 1980,
 }
 
-R_HIGH = "高優先度"; R_MID = "中優先度"; R_LOW = "追加候補"
 RENAME = {
     "campaign_theme": "キャンペーン名", "keyword": "検索語句",
-    "rank": "ランク", "ROAS": "ROAS", "sales": "売上",
+    "ROAS": "ROAS", "sales": "売上",
     "cost": "広告費", "orders": "注文数",
     "CVR": "CVR", "clicks": "クリック数", "impressions": "インプレ",
 }
@@ -129,9 +129,6 @@ def is_code(kw: str) -> bool:
 def is_title(kw: str) -> bool:
     return bool(re.search(r"[「」『』（）()]", kw)) or len(kw) >= 20 or kw.count(" ") >= 3
 
-def assign_rank(r: float) -> str:
-    return R_HIGH if r >= 5.0 else (R_MID if r >= 3.5 else R_LOW)
-
 def tonum(s: pd.Series) -> pd.Series:
     return pd.to_numeric(
         s.astype(str).str.replace(",", "").str.replace("¥", ""),
@@ -139,7 +136,7 @@ def tonum(s: pd.Series) -> pd.Series:
     ).fillna(0)
 
 def clear():
-    for k in ["has_results", "df_win", "df_a", "df_bp", "df_b", "df_del", "df_cpc", "stats", "dbg"]:
+    for k in ["has_results", "df_win", "df_del", "df_cpc", "stats", "dbg"]:
         st.session_state.pop(k, None)
 
 # ===================================================
@@ -159,27 +156,6 @@ def to_csv(df: pd.DataFrame, ex: list = []) -> bytes:
         d["CVR"] = d["CVR"].apply(lambda x: f"{x:.1f}%")
     return d.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
 
-def a_zip(df_a: pd.DataFrame) -> bytes:
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for c in CAMPAIGNS:
-            dc = df_a[df_a["campaign_theme"] == c]
-            if not dc.empty:
-                zf.writestr(f"{c}_A.csv", to_csv(dc, ["impressions"]))
-    return buf.getvalue()
-
-def a_camp_zip(df_a: pd.DataFrame) -> bytes:
-    """高優先度 キャンペーン別ZIP（keyword列のみ、改行区切り）"""
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for c in CAMPAIGNS:
-            dc = df_a[df_a["campaign_theme"] == c]
-            if dc.empty: continue
-            kws = dc.sort_values("ROAS", ascending=False)["keyword"].tolist()
-            csv_content = "keyword\n" + "\n".join(kws)
-            zf.writestr(f"高優先度_{c}.csv", csv_content.encode("utf-8-sig"))
-    return buf.getvalue()
-
 def all_zip(df: pd.DataFrame) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -192,10 +168,6 @@ def all_zip(df: pd.DataFrame) -> bytes:
                 .rename(columns={"keyword": "検索語句"})
                 .to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             )
-            for rk, fn in [(RA, "A"), (RBP, "Bplus"), (RB, "B")]:
-                dr = dc[dc["rank"] == rk]
-                if not dr.empty:
-                    zf.writestr(f"{c}_{fn}.csv", to_csv(dr))
     return buf.getvalue()
 
 def del_camp_zip(df_del: pd.DataFrame) -> bytes:
@@ -518,7 +490,6 @@ if run:
         d1.drop(columns=["price"], inplace=True, errors="ignore")
         dw = deduplicate_keyword_intent(d1)
         nf = len(dw)
-        dw["rank"] = dw["ROAS"].apply(assign_rank)
         win_kws = set(dw["keyword"].tolist())
         del_mask = (agg["cost"] >= agg["price"] * 2) & (agg["ROAS"] <= 0.5)
         df_del_ = agg[del_mask].copy()
@@ -527,9 +498,6 @@ if run:
         df_cpc_ = build_cpc_df(agg.copy())
         st.session_state.update({
             "has_results": True, "df_win": dw,
-            "df_a": dw[dw["rank"]==RA].copy(),
-            "df_bp": dw[dw["rank"]==RBP].copy(),
-            "df_b": dw[dw["rank"]==RB].copy(),
             "df_del": df_del_, "df_cpc": df_cpc_,
             "stats": {
                 "n_auto":n_auto,"n_ex":n_ex,"n_pt":n_pt,"n_ar":n_ar,
@@ -555,13 +523,10 @@ if not st.session_state.get("has_results"):
 
 # ─── Retrieve session data ───────────────────────────
 dw:  pd.DataFrame = st.session_state["df_win"]
-da:  pd.DataFrame = st.session_state["df_a"]
-dbp: pd.DataFrame = st.session_state["df_bp"]
-db:  pd.DataFrame = st.session_state["df_b"]
 dd:  pd.DataFrame = st.session_state.get("df_del", pd.DataFrame())
 dc_cpc: pd.DataFrame = st.session_state.get("df_cpc", pd.DataFrame())
 sv = st.session_state["stats"]
-na = len(da); nbp = len(dbp); nb = len(db)
+nw = len(dw)
 
 # ─── KPIカード ヘルパー ──────────────────────────────
 def kpi(col, icon: str, label: str, value: str, sub: str = "",
@@ -599,10 +564,7 @@ def render_logic_section(title: str, content_html: str):
 
 def page_add_kw():
     # ① KPIカード（5枚）
-    k1, k2, k3, k4, k5 = st.columns(5)
-    kpi(k1, "🏆", "高優先度", f"{na}件",            "ROAS≥5.0",          "#EAF7EF", "#2F855A")
-    kpi(k2, "🚀", "中優先度", f"{nbp}件",            "ROAS≥3.5",          "#EAF2FF", "#3B82F6")
-    kpi(k3, "👀", "追加候補", f"{nb}件",             "ROAS≥2.0",          "#FFF9E8", "#F59E0B")
+    k4, k5 = st.columns(2)
     kpi(k4, "📦", "抽出前",   f"{sv['n_pre']}件",    "フィルター適用前",  "#F4F6F8", "#718096")
     kpi(k5, "🎯", "抽出後",   f"{sv['nf']}件",       "同一意図KW統合後",  "#F3ECFF", "#9F5ACB")
     st.markdown("")
@@ -663,21 +625,6 @@ def page_add_kw():
     <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">採用条件</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">売上 ≥ 売価 × 2 <b>かつ</b> ROAS ≥ 2.0</td>
   </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【ランク分類】</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2F855A;">🏆 高優先度</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS ≥ 5.0 ／ 最優先追加候補</td>
-  </tr>
-  <tr style="background:#EAF2FF;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#3B82F6;">🚀 中優先度</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">3.5 ≤ ROAS &lt; 5.0 ／ 追加推奨候補</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#F59E0B;">👀 追加候補</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">2.0 ≤ ROAS &lt; 3.5 ／ 監視候補</td>
-  </tr>
 </tbody>
 </table>
 <p style="font-size:.78rem;color:#718096;margin-top:10px;">
@@ -687,7 +634,7 @@ def page_add_kw():
     )
     st.markdown("")
     # ② キャンペーン選択
-    _c1, _c2, _c3 = st.columns([3, 3, 2])
+    _c1, _c3 = st.columns([3, 2])
     with _c1:
         kw_camp = st.selectbox(
             "キャンペーン",
@@ -695,31 +642,7 @@ def page_add_kw():
             label_visibility="visible",
             key="add_camp_sel",
         )
-    # ③ ランク選択
-    with _c2:
-        rank_options = {
-            "全表示": "ALL",
-            "🏆 高優先度 (ROAS≥5.0)": R_HIGH,
-            "🚀 中優先度 (ROAS≥3.5)": R_MID,
-            "👀 追加候補 (ROAS≥2.0)": R_LOW,
-        }
-        sel_rank_label = st.selectbox(
-            "ランク絞込",
-            list(rank_options.keys()),
-            label_visibility="visible",
-            key="add_rank_sel",
-        )
-    sel_rk = rank_options[sel_rank_label]
-
-    # 絞込みデータ生成
-    if sel_rk == "ALL":
-        sel_df = dw.copy()
-    elif sel_rk == RA:
-        sel_df = da.copy()
-    elif sel_rk == RBP:
-        sel_df = dbp.copy()
-    else:
-        sel_df = db.copy()
+    sel_df = dw.copy()
 
     if kw_camp != "全キャンペーン":
         sel_df = sel_df[sel_df["campaign_theme"] == kw_camp].copy()
@@ -729,7 +652,7 @@ def page_add_kw():
     # 件数表示
     st.markdown(
         f'<div class="count-badge">該当件数: <b style="font-size:1.1rem;">{n_sel}件</b>'
-        f'　<span style="color:#718096;font-size:.8rem;">キャンペーン: {kw_camp} ／ ランク: {sel_rank_label}</span></div>',
+        f'　<span style="color:#718096;font-size:.8rem;">キャンペーン: {kw_camp}</span></div>',
         unsafe_allow_html=True,
     )
 
@@ -1553,17 +1476,13 @@ def page_download():
     st.markdown("### 📥 ダウンロード")
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("**🏆 高優先度 勝ちKW（キャンペーン別ZIP）**")
-        st.caption(f"{na}件 — ROAS≥5.0")
-        if not da.empty:
-            st.download_button("📥 高優先度_ZIP", data=a_camp_zip(da),
-                file_name="A_win_kw.zip", mime="application/zip", use_container_width=True)
-    with c2:
         st.markdown("**📦 全候補 勝ちKW（一括ZIP）**")
-        st.caption(f"高優先度{na}件 + 中優先度{nbp}件 + 追加候補{nb}件")
+        st.caption(f"{nw}件 — ROAS≥2.0")
         if not dw.empty:
             st.download_button("📥 全候補_ZIP", data=all_zip(dw),
                 file_name="all_win_kw.zip", mime="application/zip", use_container_width=True)
+    with c2:
+        st.empty()
     st.markdown("")
     c3, c4 = st.columns(2)
     with c3:
