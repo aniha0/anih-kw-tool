@@ -541,6 +541,15 @@ if run:
         _cpc_raw = dfs.copy()
         _cpc_raw["ct"] = _cpc_raw[cc].apply(lambda x: official(get_theme(str(x))))
 
+        # ⓪ SP広告(マニュアル) KWキャンペーンのみ抽出
+        # 対象: SP広告(マニュアル) のみ
+        # 除外: SB広告(動画) / SP広告(動画) / 商品ターゲ / 動画ターゲ / その他
+        _sp_manual_mask = (
+            _cpc_raw[cc].str.contains("SP広告.*マニュアル|SP.*manual", case=False, na=False)
+            & ~_cpc_raw[cc].str.contains("商品ターゲ|動画ターゲ", case=False, na=False)
+        )
+        _cpc_raw = _cpc_raw[_sp_manual_mask].copy()
+
         # ①Auto除外
         _auto_mask = _cpc_raw[cc].str.contains("オート|auto", case=False, na=False)
         if ttype:
