@@ -366,18 +366,18 @@ min_cost = 300
 
 # ─── Sidebar ツリーナビゲーション ─────────────────────
 _VALID_PAGES = {
-    "📋 Amazon追加用KW", "📊 DateDive売れる予測KW",
-    "🚫 Amazon削除用KW", "📈 CPC調整表", "🎯 商品CPC調整", "📹 動画CPC調整",
+    "📋 キーワード追加", "📊 DateDive売れる予測KW",
+    "🚫 キーワード削除", "📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整",
     "➕ 商品追加", "🗑️ 商品削除",
     "📹 動画追加",     "📹 動画削除",
     "📥 ダウンロード", "📖 取扱説明書",
 }
-_ADD_PAGES = {"📋 Amazon追加用KW", "➕ 商品追加", "📹 動画追加"}
-_DEL_PAGES = {"🚫 Amazon削除用KW", "🗑️ 商品削除", "📹 動画削除"}
-_CPC_PAGES = {"📈 CPC調整表", "🎯 商品CPC調整", "📹 動画CPC調整"}
+_ADD_PAGES = {"📋 キーワード追加", "➕ 商品追加", "📹 動画追加"}
+_DEL_PAGES = {"🚫 キーワード削除", "🗑️ 商品削除", "📹 動画削除"}
+_CPC_PAGES = {"📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整"}
 
 if "current_page" not in st.session_state or st.session_state["current_page"] not in _VALID_PAGES:
-    st.session_state["current_page"] = "📋 Amazon追加用KW"
+    st.session_state["current_page"] = "📋 キーワード追加"
 _cp = st.session_state["current_page"]
 
 def _nav_btn(label: str, page_key: str, icon: str = "") -> None:
@@ -391,17 +391,17 @@ def _nav_btn(label: str, page_key: str, icon: str = "") -> None:
 with st.sidebar:
     # ── 追加
     with st.expander("➕  追加", expanded=(_cp in _ADD_PAGES)):
-        _nav_btn("キーワード",  "📋 Amazon追加用KW",               "📋 ")
+        _nav_btn("キーワード",  "📋 キーワード追加",               "📋 ")
         _nav_btn("商品",        "➕ 商品追加", "🎯 ")
         _nav_btn("動画",        "📹 動画追加",       "📹 ")
     # ── 削除
     with st.expander("🚫  削除", expanded=(_cp in _DEL_PAGES)):
-        _nav_btn("キーワード",  "🚫 Amazon削除用KW",               "📋 ")
+        _nav_btn("キーワード",  "🚫 キーワード削除",               "📋 ")
         _nav_btn("商品",        "🗑️ 商品削除", "🎯 ")
         _nav_btn("動画",        "📹 動画削除",        "📹 ")
     # ── CPC調整
     with st.expander("📈  CPC調整", expanded=(_cp in _CPC_PAGES)):
-        _nav_btn("キーワード",  "📈 CPC調整表",   "📋 ")
+        _nav_btn("キーワード",  "📈 キーワードCPC調整",   "📋 ")
         _nav_btn("商品",        "🎯 商品CPC調整", "🎯 ")
         _nav_btn("動画",        "📹 動画CPC調整", "📹 ")
     # ── その他
@@ -758,7 +758,7 @@ _LOGIC_BOX_STYLE = (
 )
 def render_logic_section(title: str, content_html: str):
     """📖 判定ロジックを見る — 各ページ共通の折りたたみ式ロジック表示エリア。
-    title        : 表示タイトル（例: "📋 Amazon追加用KW判定ロジック"）
+    title        : 表示タイトル（例: "📋 キーワード追加 判定ロジック"）
     content_html : ロジック本文（HTML文字列）
     """
     with st.expander("📖 判定ロジックを見る", expanded=False):
@@ -804,7 +804,7 @@ def page_add_kw():
     ])
 
     render_logic_section(
-        "📋 Amazon追加用KW判定ロジック",
+        "📋 キーワード追加 判定ロジック",
         '''
 <table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
 <thead>
@@ -893,7 +893,7 @@ def page_add_kw():
 def page_del_kw():
     _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "< 0.8"), ("勝ちKW", "除外")])
     render_logic_section(
-        "🚫 Amazon削除用KW判定ロジック",
+        "🚫 キーワード削除 判定ロジック",
         '''
 <table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
 <thead>
@@ -1007,7 +1007,7 @@ def page_cpc():
   </tr>
   <tr>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#4A5568;">判断保留</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>または</b> 購入数 &lt; 3件</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>かつ</b> 購入数 &lt; 4件</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">変更なし</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
   </tr>
@@ -1059,7 +1059,7 @@ def page_cpc():
   </tr>
   <tr style="background:#FFF5F5;">
     <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">E</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">0.5 ≤ ROAS &lt; 1.5</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS &lt; 1.5</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
   </tr>
@@ -1175,7 +1175,7 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
   </tr>
   <tr>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#4A5568;">判断保留</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>または</b> 購入数 &lt; 3件</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>かつ</b> 購入数 &lt; 4件</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">変更なし</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
   </tr>
@@ -1227,7 +1227,7 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
   </tr>
   <tr style="background:#FFF5F5;">
     <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">E</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">0.5 ≤ ROAS &lt; 1.5</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS &lt; 1.5</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
   </tr>
@@ -2026,7 +2026,7 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key):
 
     # ⑥ CSV
     _action = "追加" if is_add else "削除"
-    _ctype  = "商品" if "manual" in selectbox_key else "動画"
+    _ctype  = "商品" if "_m_" in selectbox_key else "動画"
     _fname  = f"{_ctype}{_action}_{sel}.csv"
     _dl = _df[[c for c in _disp if c in _df.columns]].rename(columns=_rn).to_csv(
         index=False, encoding="utf-8-sig").encode("utf-8-sig")
@@ -2072,15 +2072,15 @@ def page_download():
             st.download_button("📥 削除用KW_ZIP", data=del_camp_zip(dd),
                 file_name="del_kw.zip", mime="application/zip", use_container_width=True)
     with c4:
-        st.markdown("**📈 CPC調整表（全キャンペーン ZIP）**")
+        st.markdown("**📈 キーワードCPC調整（全キャンペーン ZIP）**")
         st.caption("STEP1-4 判定ランク付きCSV")
         if not dc_cpc.empty:
-            st.download_button("📥 CPC調整表_ZIP", data=cpc_camp_zip(dc_cpc),
+            st.download_button("📥 キーワードCPC調整_ZIP", data=cpc_camp_zip(dc_cpc),
                 file_name="cpc_adjust.zip", mime="application/zip", use_container_width=True)
 
 
 def page_manual():
-    st.markdown("### 📖 ANIHA Amazon広告分析ツール — 取扱説明書 Ver.67")
+    st.markdown("### 📖 ANIHA Amazon広告分析ツール — 取扱説明書 Ver.71")
 
     # ── 概要 ──────────────────────────────────────────────────────────
     with st.expander("📌 概要", expanded=True):
@@ -2090,9 +2090,9 @@ def page_manual():
 
 | 機能 | 内容 |
 |---|---|
-| 📋 Amazon追加用KW | 成果KWを抽出しマニュアル広告追加候補を表示 |
-| 🚫 Amazon削除用KW | 利益毀損KWを停止候補として抽出 |
-| 📈 CPC調整（キーワード） | 既存マニュアルKWの入札最適化 |
+| 📋 キーワード追加 | 成果KWを抽出しマニュアル広告追加候補を表示 |
+| 🚫 キーワード削除 | 利益毀損KWを停止候補として抽出 |
+| 📈 キーワードCPC調整 | 既存マニュアルKWの入札最適化 |
 | ➕ 商品追加 | 成果ASINを商品広告へ追加候補として抽出 |
 | 🗑️ 商品削除 | 成果の出ていない商品を停止候補として抽出 |
 | 📹 動画追加 | 成果ASINを動画広告へ追加候補として抽出 |
@@ -2107,17 +2107,17 @@ def page_manual():
         st.markdown("""
 ```
 追加
-├ キーワード   → Amazon追加用KW
+├ キーワード   → キーワード追加
 ├ 商品         → 商品追加
 └ 動画         → 動画追加
 
 削除
-├ キーワード   → Amazon削除用KW
+├ キーワード   → キーワード削除
 ├ 商品         → 商品削除
 └ 動画         → 動画削除
 
 CPC調整
-├ キーワード   → CPC調整表
+├ キーワード   → キーワードCPC調整
 ├ 商品         → 商品CPC調整
 └ 動画         → 動画CPC調整
 
@@ -2127,8 +2127,8 @@ DateDive売れる予測KW
 ```
 """)
 
-    # ── Amazon追加用KW ────────────────────────────────────────────────
-    with st.expander("📋 Amazon追加用KW"):
+    # ── キーワード追加 ────────────────────────────────────────────────
+    with st.expander("📋 キーワード追加"):
         st.markdown("""
 **目的**
 オート広告の検索語句から成果KWを抽出し、マニュアル広告への追加候補を表示します。
@@ -2159,8 +2159,8 @@ DateDive売れる予測KW
 | 重複検索語 | 同一キャンペーン内での重複を除外 |
 """)
 
-    # ── Amazon削除用KW ────────────────────────────────────────────────
-    with st.expander("🚫 Amazon削除用KW"):
+    # ── キーワード削除 ────────────────────────────────────────────────
+    with st.expander("🚫 キーワード削除"):
         st.markdown("""
 **目的**
 利益を毀損している検索語を抽出し、停止候補として表示します。
@@ -2175,8 +2175,8 @@ DateDive売れる予測KW
 | ROAS | < 0.8 |
 """)
 
-    # ── CPC調整（キーワード）─────────────────────────────────────────
-    with st.expander("📈 CPC調整（キーワード）"):
+    # ── キーワードCPC調整─────────────────────────────────────────
+    with st.expander("📈 キーワードCPC調整"):
         st.markdown("""
 **目的** — 既存マニュアルKWの入札額を最適化します。
 
@@ -2220,10 +2220,7 @@ DateDive売れる予測KW
 | 表示エリア | 表示内容 |
 |---|---|
 | SS〜E 件数カード | **全件数**を表示（変更なし・判断保留を含む） |
-| 詳細テーブル | **変更幅 ≠ 0円のみ**表示（CPC上げ・CPC下げのみ） |
-| 非表示 | 変更なし（SS / A / B）・判断保留 |
-
-> ⚠️ 件数カードの合計とテーブルの件数は一致しない場合があります。これは正常動作です。
+| 詳細テーブル | **全件表示**（変更なし・判断保留を含む） |
 """)
 
     # ── 商品追加 ──────────────────────────────────────────────────────
@@ -2472,19 +2469,27 @@ DateDive売れる予測KW
         st.markdown("""
 各分析結果はCSVでダウンロード可能です。
 
+**各ページ内のCSVダウンロードボタン**
+
 | 機能 | CSVファイル名 |
 |---|---|
-| Amazon追加用KW | 追加KW_{商品名}.csv |
-| Amazon削除用KW | 削除KW_{商品名}.csv |
 | 商品追加 | 商品追加_{商品名}.csv |
 | 商品削除 | 商品削除_{商品名}.csv |
 | 動画追加 | 動画追加_{商品名}.csv |
 | 動画削除 | 動画削除_{商品名}.csv |
-| CPC調整（KW） | {キャンペーン名}_CPC調整表.csv |
+| キーワードCPC調整 | {キャンペーン名}_CPC調整表.csv |
 | 商品CPC調整 | {キャンペーン名}_商品CPC調整_CPC調整表.csv |
 | 動画CPC調整 | {キャンペーン名}_動画CPC調整_CPC調整表.csv |
 
-> ⚠️ CSVは全件出力です（詳細テーブルで非表示の±0円行も含みます）。
+**ダウンロードページ（ZIPファイル）**
+
+| ZIP名 | 内容 |
+|---|---|
+| 全候補 勝ちKW ZIP | キーワード追加 — 追加KW_{商品名}.csv |
+| 削除用KW ZIP | キーワード削除 — 削除KW_{商品名}.csv |
+| キーワードCPC調整 ZIP | キーワードCPC調整 — {キャンペーン名}_CPC調整表.csv |
+
+> ⚠️ CSVは全件出力です（KW CPC調整テーブルの±0円行も含みます）。
 """)
 
     # ── ASIN抽出 ──────────────────────────────────────────────────────
@@ -2508,13 +2513,13 @@ DateDive売れる予測KW
 
 ---
 
-**【追加】キーワード（Amazon追加用KW）**
+**【追加】キーワード追加**
 ```
-[条件バー: ROAS≥2.0 / 売上≥売価×2 / 注文≥3 / クリック≥5]
+[条件バー: 最小注文数 / 最小クリック数 / 最小広告費]
 [商品選択プルダウン]
-[KPIカード: 追加候補数 / 平均ROAS / 平均売上]
-[一覧テーブル: keyword / campaign / ROAS / cost / orders / 優先度]
-[CSVダウンロードボタン]
+[KPIカード: 抽出前件数 / 抽出後件数（同一意図KW統合後）]
+[一覧テーブル: keyword / キャンペーン名 / ROAS / 広告費 / 売上 / 注文数 / クリック数]
+※ CSVはダウンロードページの「全候補 勝ちKW ZIP」から取得
 ```
 
 ---
@@ -2523,9 +2528,9 @@ DateDive売れる予測KW
 ```
 [条件バー: 売上≥売価×2 / ROAS≥2.0 / 商品]
 [商品選択プルダウン]
-[KPIカード: 追加候補数 / 平均ROAS / 平均売上]
-[一覧テーブル: ASIN / campaign / ROAS / cost / orders]
-[CSVダウンロードボタン]
+[KPIカード: 追加候補数 / 平均ROAS / 平均注文数 / 平均広告費]
+[一覧テーブル: キャンペーン名 / 広告グループ / ASIN / 注文数 / クリック数 / 広告費 / 売上 / ROAS / 採用理由]
+[CSVダウンロードボタン: 商品追加_{商品名}.csv]
 ```
 
 ---
@@ -2534,20 +2539,20 @@ DateDive売れる予測KW
 ```
 [条件バー: 売上≥売価×2 / ROAS≥2.0 / 動画]
 [商品選択プルダウン]
-[KPIカード: 追加候補数 / 平均ROAS / 平均売上]
-[一覧テーブル: ASIN / campaign / ROAS / cost / orders]
-[CSVダウンロードボタン]
+[KPIカード: 追加候補数 / 平均ROAS / 平均注文数 / 平均広告費]
+[一覧テーブル: キャンペーン名 / 広告グループ / ASIN / 注文数 / クリック数 / 広告費 / 売上 / ROAS / 採用理由]
+[CSVダウンロードボタン: 動画追加_{商品名}.csv]
 ```
 
 ---
 
-**【削除】キーワード（Amazon削除用KW）**
+**【削除】キーワード削除**
 ```
-[条件バー: 広告費≥売価×2 / ROAS<0.8]
+[条件バー: 広告費≥売価×2 / ROAS<0.8 / 勝ちKW除外]
 [商品選択プルダウン]
-[KPIカード: 削除候補数 / 平均ROAS / 平均広告費]
-[一覧テーブル: keyword / campaign / ROAS / cost / 削除理由]
-[CSVダウンロードボタン]
+[件数バッジ: 削除対象件数: N件]
+[一覧テーブル: keyword / キャンペーン名 / ROAS / 広告費 / 売上]
+※ CSVはダウンロードページの「削除用KW ZIP」から取得
 ```
 
 ---
@@ -2574,20 +2579,20 @@ DateDive売れる予測KW
 
 ---
 
-**【CPC調整】キーワード**
+**【CPC調整】キーワードCPC調整**
 ```
 [条件バー: CPC調整ルール適用]
 [ロジックテーブル expander]
 [キャンペーン選択プルダウン]
 [件数カード: SS+ / SS / S / A / B / D / E / 即削除]  ← 全件表示
 [一覧テーブル: keyword / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
-                                                      ← 変更幅≠0のみ
+                                                      ← 全件表示（±0含む）
 [CSVダウンロードボタン]
 ```
 
 ---
 
-**【CPC調整】商品（商品CPC調整）**
+**【CPC調整】商品CPC調整**
 ```
 [条件バー: CPC調整ルール適用 / 商品]
 [ロジックテーブル expander]
@@ -2600,7 +2605,7 @@ DateDive売れる予測KW
 
 ---
 
-**【CPC調整】動画（動画CPC調整）**
+**【CPC調整】動画CPC調整**
 ```
 [条件バー: CPC調整ルール適用 / 動画]
 [ロジックテーブル expander]
@@ -2636,9 +2641,10 @@ campaign_theme が PRICES のキーと一致しているか確認してくださ
 ---
 
 **Q. CPC調整（商品/動画）のテーブルが空になる**
-→ 「変更幅 ≠ 0円」のみ表示する仕様です。
+→ 商品CPC / 動画CPCの詳細テーブルは「変更幅 ≠ 0円」のみ表示する仕様です。
 SS / A / B（現状維持）と判断保留は表示されません。
 件数カードで各ランクの件数を確認してください。
+なお、キーワードCPC調整の詳細テーブルは**全件表示**です。
 
 ---
 
@@ -2664,10 +2670,10 @@ CSVは空ファイルになる場合があります。
 
 # ─── Page Router ─────────────────────────────────────
 _PAGE_FUNCS = {
-    "📋 Amazon追加用KW":              page_add_kw,
+    "📋 キーワード追加":              page_add_kw,
     "📊 DateDive売れる予測KW":        page_dd_v4,
-    "🚫 Amazon削除用KW":              page_del_kw,
-    "📈 CPC調整表":                   page_cpc,
+    "🚫 キーワード削除":              page_del_kw,
+    "📈 キーワードCPC調整":                   page_cpc,
     "🎯 商品CPC調整":                  page_cpc_product,
     "📹 動画CPC調整":                  page_cpc_video,
     "➕ 商品追加":                     page_pt_add_manual,
