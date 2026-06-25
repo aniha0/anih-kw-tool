@@ -1091,11 +1091,14 @@ def page_cpc():
     if dc_cpc.empty:
         st.info("分析を実行してください。")
         return
-    cpc_camps = [c for c in CAMPAIGNS if not dc_cpc[dc_cpc["campaign_theme"] == c].empty]
+    sel_options = ["全商品"] + [c for c in CAMPAIGNS if not dc_cpc[dc_cpc["campaign_theme"] == c].empty]
     _sc, _ = st.columns([3, 2])
     with _sc:
-        cpc_camp = st.selectbox("キャンペーン（CPC）", cpc_camps, label_visibility="visible", key="cpc_camp_sel")
-    df_c = dc_cpc[dc_cpc["campaign_theme"] == cpc_camp].copy()
+        cpc_camp = st.selectbox("商品選択（キーワードCPC調整）", sel_options, label_visibility="visible", key="cpc_camp_sel")
+    if cpc_camp == "全商品":
+        df_c = dc_cpc.copy()
+    else:
+        df_c = dc_cpc[dc_cpc["campaign_theme"] == cpc_camp].copy()
     cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
     st.markdown("---")
     kpi_rks = ["SS+", "SS", "S", "A", "B", "D", "E", "即削除"]
