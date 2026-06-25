@@ -1120,6 +1120,25 @@ def page_cpc():
 | ③ Keyword Text空欄除外 | Keyword Textが空欄 | **{sv.get('n_cpc_empty', '―'):,}件** |
 | ✅ 抽出対象 | Manual KWのみ | **{sv.get('n_cpc_manual', '―'):,}件** |
 """)
+    # ── 本日調整対象ブロック ──────────────────────────────────
+    _n_up   = int((df_c["cpc_delta"] > 0).sum())
+    _n_down = int((df_c["cpc_delta"] < 0).sum())
+    _n_adj  = _n_up + _n_down
+    st.markdown("---")
+    st.caption("📅 本日調整対象")
+    _bc1, _bc2, _bc3 = st.columns(3)
+    _bc1.markdown(f'''<div class="kpi-card" style="background:#E6FFFA;border-top:3px solid #276749;">
+        <div class="kpi-label">🔺 CPC上げ</div>
+        <div class="kpi-value" style="color:#276749;font-size:1.5rem;">{_n_up}</div>
+        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+    _bc2.markdown(f'''<div class="kpi-card" style="background:#FFF5F5;border-top:3px solid #C53030;">
+        <div class="kpi-label">🔻 CPC下げ</div>
+        <div class="kpi-value" style="color:#C53030;font-size:1.5rem;">{_n_down}</div>
+        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+    _bc3.markdown(f'''<div class="kpi-card" style="background:#EBF8FF;border-top:3px solid #2B6CB0;">
+        <div class="kpi-label">📊 変更対象合計</div>
+        <div class="kpi-value" style="color:#2B6CB0;font-size:1.5rem;">{_n_adj}</div>
+        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
     st.markdown("---")
     disp_cols = [c for c in ["campaign_name","ad_group","keyword","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
     _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","keyword":"KWテキスト",
@@ -1130,7 +1149,10 @@ def page_cpc():
     df_c["_r"] = df_c["cpc_rank"].astype(cat_t)
     df_c = df_c.sort_values(["_r","ROAS"], ascending=[True, False]).drop(columns=["_r"]).reset_index(drop=True)
     df_c.index = df_c.index + 1
-    _d = df_c[disp_cols].rename(columns=_rn).copy()
+    # ③ 変更対象のみ表示（cpc_delta != 0）
+    df_disp = df_c[df_c["cpc_delta"] != 0].copy()
+    df_disp.index = range(1, len(df_disp) + 1)
+    _d = df_disp[disp_cols].rename(columns=_rn).copy()
     if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
     if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
     if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
@@ -1140,10 +1162,20 @@ def page_cpc():
     def _cr(row):
         c = _RC.get(row.get("判定ランク", ""), "")
         return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
-    st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
-    _dl_csv = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv,
-        file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv")
+    if df_disp.empty:
+        st.info("変更幅が発生するキーワードはありません（全件 現状維持 または 判断保留）。")
+    else:
+        st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
+    # ④ CSV: 実行用（変更対象のみ）+ 全件
+    _c1, _c2 = st.columns(2)
+    with _c1:
+        _dl_csv_adj = df_disp[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+        st.download_button(f"📥 {cpc_camp}_CPC調整_実行用.csv", data=_dl_csv_adj,
+            file_name=f"{cpc_camp}_CPC調整_実行用.csv", mime="text/csv", use_container_width=True)
+    with _c2:
+        _dl_csv_all = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+        st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
+            file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
 
 
 def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
