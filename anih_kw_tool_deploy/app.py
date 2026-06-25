@@ -196,7 +196,7 @@ def assign_cpc_rank(cost: float, orders: float, roas: float, price: float):
         del_thresh = 4000
     else:
         del_thresh = 5000
-    if cost < 3000 or orders < 3:
+    if cost < 3000 and orders < 4:
         return ("判断保留", "変更なし", 0)
     if orders >= 20 and roas >= 4.0:
         rank, action, delta = "SS+", "CPC上げ", 5
@@ -1110,7 +1110,7 @@ def page_cpc():
             <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{cnt[rk]}</div>
             <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
     if cnt["判断保留"] > 0:
-        st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 または 購入数3件未満）")
+        st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
     with st.expander("📊 CPC抽出フィルター詳細", expanded=False):
         st.markdown(f"""
 | ステップ | 除外理由 | 除外件数 |
@@ -1279,7 +1279,7 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
             <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{cnt[rk]}</div>
             <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
     if cnt["判断保留"] > 0:
-        st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 または 購入数3件未満）")
+        st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
     st.markdown("---")
     disp_cols = [c for c in ["campaign_name","ad_group","asin","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
     _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","asin":"ASIN",
@@ -2144,7 +2144,7 @@ def page_manual():
 | 条件 | 内容 |
 |---|---|
 | 最小クリック数 | 平均CPC算出に使用 |
-| 広告費 | ≥ ¥3,000 かつ 注文数 ≥ 3件（判断保留除外条件） |
+| 広告費 | ≥ ¥3,000 または 注文数 ≥ 4件（判断保留除外条件） |
 """)
     with st.expander("🏆 STEP3: 優先度判定基準"):
         st.markdown("""
@@ -2166,7 +2166,7 @@ def page_manual():
         st.markdown("""
 | 判定 | 条件 | アクション |
 |---|---|---|
-| 判断保留 | 広告費<¥3,000 または 注文数<3 | 変更なし |
+| 判断保留 | 広告費<¥3,000 かつ 注文数<4 | 変更なし |
 | SS+ | 注文≥20 かつ ROAS≥4.0 | CPC+5% |
 | SS | 注文≥20 かつ ROAS≥2.0 | 現状維持 |
 | S | ROAS≥4.0 | CPC+5% |
