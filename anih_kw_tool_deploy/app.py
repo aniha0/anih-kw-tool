@@ -595,7 +595,7 @@ if run:
             if od:  _agg_cpc_d["orders"] = (od, "sum")
             if clk: _agg_cpc_d["clicks"] = (clk, "sum")
             if agn: _agg_cpc_d["ad_group"] = (agn, "first")
-            _agg_cpc = _cpc_raw.groupby("_kw_norm").agg(**_agg_cpc_d).reset_index(drop=True)
+            _agg_cpc = _cpc_raw.groupby(["ct", "_kw_norm"]).agg(**_agg_cpc_d).reset_index(drop=True)
             _agg_cpc["ROAS"] = _agg_cpc.apply(
                 lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
             _agg_cpc["price"] = _agg_cpc["campaign_theme"].map(PRICES)
