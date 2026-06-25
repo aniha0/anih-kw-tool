@@ -1259,12 +1259,16 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
     if dc_pt.empty:
         st.info("分析を実行してください。")
         return
-    cpc_camps = [c for c in CAMPAIGNS if not dc_pt[dc_pt["campaign_theme"] == c].empty]
+    # ② 商品選択プルダウン（全商品 + データあり商品一覧）
+    sel_options = ["全商品"] + [c for c in CAMPAIGNS if not dc_pt[dc_pt["campaign_theme"] == c].empty]
     _sc, _ = st.columns([3, 2])
     with _sc:
-        cpc_camp = st.selectbox(f"キャンペーン（{page_title}）", cpc_camps,
+        cpc_camp = st.selectbox(f"商品選択（{page_title}）", sel_options,
                                 label_visibility="visible", key=sel_key)
-    df_c = dc_pt[dc_pt["campaign_theme"] == cpc_camp].copy()
+    if cpc_camp == "全商品":
+        df_c = dc_pt.copy()
+    else:
+        df_c = dc_pt[dc_pt["campaign_theme"] == cpc_camp].copy()
     cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
     st.markdown("---")
     kpi_rks = ["SS+", "SS", "S", "A", "B", "D", "E", "即削除"]
@@ -1290,7 +1294,10 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
     df_c["_r"] = df_c["cpc_rank"].astype(cat_t)
     df_c = df_c.sort_values(["_r","ROAS"], ascending=[True, False]).drop(columns=["_r"]).reset_index(drop=True)
     df_c.index = df_c.index + 1
-    _d = df_c[disp_cols].rename(columns=_rn).copy()
+    # ① 一覧テーブルは変更幅≠0（CPC上げ・CPC下げ）のみ表示
+    df_disp = df_c[df_c["cpc_delta"] != 0].copy()
+    df_disp.index = range(1, len(df_disp) + 1)
+    _d = df_disp[disp_cols].rename(columns=_rn).copy()
     if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
     if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
     if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
@@ -1300,10 +1307,15 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
     def _cr(row):
         c = _RC.get(row.get("判定ランク", ""), "")
         return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
-    st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
+    if df_disp.empty:
+        st.info("変更幅が発生するASINはありません（全件 現状維持 または 判断保留）。")
+    else:
+        st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
+    # CSV は全件出力（±0含む）
+    _dl_fname = f"{cpc_camp}_{page_title}_CPC調整表.csv"
     _dl_csv = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    st.download_button(f"📥 {cpc_camp}_{page_title}_CPC調整表.csv", data=_dl_csv,
-        file_name=f"{cpc_camp}_{page_title}_CPC調整表.csv", mime="text/csv")
+    st.download_button(f"📥 {_dl_fname}", data=_dl_csv,
+        file_name=_dl_fname, mime="text/csv")
 
 
 def page_cpc_product():
