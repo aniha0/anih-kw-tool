@@ -1325,6 +1325,25 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
             <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
     if cnt["判断保留"] > 0:
         st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
+    # ── 本日調整対象ブロック ──────────────────────────────────
+    _n_up   = int((df_c["cpc_delta"] > 0).sum())
+    _n_down = int((df_c["cpc_delta"] < 0).sum())
+    _n_adj  = _n_up + _n_down
+    st.markdown("---")
+    st.caption("📅 本日調整対象")
+    _bc1, _bc2, _bc3 = st.columns(3)
+    _bc1.markdown(f'''<div class="kpi-card" style="background:#E6FFFA;border-top:3px solid #276749;">
+        <div class="kpi-label">🔺 CPC上げ</div>
+        <div class="kpi-value" style="color:#276749;font-size:1.5rem;">{_n_up}</div>
+        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+    _bc2.markdown(f'''<div class="kpi-card" style="background:#FFF5F5;border-top:3px solid #C53030;">
+        <div class="kpi-label">🔻 CPC下げ</div>
+        <div class="kpi-value" style="color:#C53030;font-size:1.5rem;">{_n_down}</div>
+        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+    _bc3.markdown(f'''<div class="kpi-card" style="background:#EBF8FF;border-top:3px solid #2B6CB0;">
+        <div class="kpi-label">📊 変更対象合計</div>
+        <div class="kpi-value" style="color:#2B6CB0;font-size:1.5rem;">{_n_adj}</div>
+        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
     st.markdown("---")
     disp_cols = [c for c in ["campaign_name","ad_group","asin","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
     _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","asin":"ASIN",
