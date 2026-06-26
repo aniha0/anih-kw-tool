@@ -1044,13 +1044,13 @@ def page_cpc():
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
   </tr>
   <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">D</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">C</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 2.0</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
   </tr>
   <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">E</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">D</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS &lt; 1.5</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
@@ -1238,13 +1238,13 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
   </tr>
   <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">D</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">C</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 2.0</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
   </tr>
   <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">E</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">D</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS &lt; 1.5</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
