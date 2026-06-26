@@ -1120,15 +1120,6 @@ def page_cpc():
             <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
     if cnt["判断保留"] > 0:
         st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
-    with st.expander("📊 CPC抽出フィルター詳細", expanded=False):
-        st.markdown(f"""
-| ステップ | 除外理由 | 除外件数 |
-|---|---|---|
-| ① Auto除外 | Campaign Targeting Type = Auto | **{sv.get('n_cpc_auto', '―'):,}件** |
-| ② Product Targeting除外 | ASIN/Category/Complement/Substitute | **{sv.get('n_cpc_pt', '―'):,}件** |
-| ③ Keyword Text空欄除外 | Keyword Textが空欄 | **{sv.get('n_cpc_empty', '―'):,}件** |
-| ✅ 抽出対象 | Manual KWのみ | **{sv.get('n_cpc_manual', '―'):,}件** |
-""")
     # ── 本日調整対象ブロック ──────────────────────────────────
     _n_up   = int((df_c["cpc_delta"] > 0).sum())
     _n_down = int((df_c["cpc_delta"] < 0).sum())
