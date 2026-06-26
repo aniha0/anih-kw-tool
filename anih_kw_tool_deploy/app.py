@@ -792,7 +792,6 @@ def render_logic_section(title: str, content_html: str):
 # ===================================================
 
 def page_add_kw():
-    st.markdown("---")
     _cond_bar([
         ("最小注文数",  f'{sv["mo"]}件'),
         ("最小クリック数", f'{sv["mc"]}回'),
