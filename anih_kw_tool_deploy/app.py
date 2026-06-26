@@ -137,7 +137,8 @@ def tonum(s: pd.Series) -> pd.Series:
 
 def clear():
     for k in ["has_results", "df_win", "df_del", "df_cpc", "df_cpc_product", "df_cpc_video",
-              "df_pt_add", "df_pt_del", "stats", "dbg"]:
+              "df_pt_add", "df_pt_del", "stats", "dbg",
+              "df_auto_del_kw", "df_auto_del_product", "df_auto_del_video"]:
         st.session_state.pop(k, None)
 
 # ===================================================
@@ -721,6 +722,80 @@ if run:
 
         df_cpc_product_ = _build_pt_cpc_df(_mask_m)
         df_cpc_video_   = _build_pt_cpc_df(_mask_v)
+
+        # ── オート除外KW用 DataFrame ───────────────────────────────
+        # キーワード: オートKW中、マニュアルKWと重複しない出血KW
+        if kc and tkc:
+            _auto_kw_base = dfs[dfs[cc].str.contains("オート|auto", case=False, na=False)].copy()
+            _auto_kw_base["ct"] = _auto_kw_base[cc].apply(lambda x: official(get_theme(str(x))))
+            _auto_kw_base["kn"] = _auto_kw_base[kc].apply(norm)
+            _manual_mask_kw = ~dfs[cc].str.contains("オート|auto", case=False, na=False)
+            _manual_reg_kw = set(dfs[_manual_mask_kw][tkc].apply(norm)); _manual_reg_kw.discard("")
+            _dup_kw = (_auto_kw_base["kn"].isin(_manual_reg_kw) |
+                       _auto_kw_base["kn"].apply(lambda k: covered(k, _manual_reg_kw)))
+            _auto_kw_base = _auto_kw_base[~_dup_kw].copy()
+            _agg_akw_d = {
+                "keyword":        (kc,    "first"),
+                "campaign_theme": ("ct",  lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
+                "sales":          (sc,    "sum"),
+                "cost":           (oc_,   "sum"),
+            }
+            if od:  _agg_akw_d["orders"]   = (od,  "sum")
+            if agn: _agg_akw_d["ad_group"] = (agn, "first")
+            _agg_akw = _auto_kw_base.groupby("kn").agg(**_agg_akw_d).reset_index(drop=True)
+            _agg_akw["ROAS"]  = _agg_akw.apply(
+                lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+            _agg_akw["price"] = _agg_akw["campaign_theme"].map(PRICES)
+            _agg_akw = _agg_akw[_agg_akw["price"].notna()].copy()
+            df_auto_del_kw_ = _agg_akw[
+                (_agg_akw["cost"] >= _agg_akw["price"] * 2) & (_agg_akw["ROAS"] <= 0.5)
+            ].copy()
+            df_auto_del_kw_.drop(columns=["price"], errors="ignore", inplace=True)
+        else:
+            df_auto_del_kw_ = pd.DataFrame()
+
+        # 商品/動画: オートASIN中、マニュアルASINと重複しない出血ASIN
+        def _build_auto_asin_del(camp_mask, manual_mask):
+            _d = _mpt_base[camp_mask].copy()
+            if _d.empty or not tkc: return pd.DataFrame()
+            _d["_asin_clean"] = _d[tkc].apply(_extract_asin)
+            _d = _d[_d["_asin_clean"] != ""].copy()
+            if _d.empty: return pd.DataFrame()
+            _manual_asins = set(_mpt_base[manual_mask][tkc].apply(_extract_asin)); _manual_asins.discard("")
+            _d = _d[~_d["_asin_clean"].isin(_manual_asins)].copy()
+            if _d.empty: return pd.DataFrame()
+            _d["_asin_key"] = _d["_asin_clean"]
+            _agg_d3 = {
+                "asin":           ("_asin_clean", "first"),
+                "campaign_name":  (cc,            "first"),
+                "campaign_theme": ("ct",           lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
+                "sales":          (sc,             "sum"),
+                "cost":           (oc_,            "sum"),
+            }
+            if od:  _agg_d3["orders"]   = (od,  "sum")
+            if agn: _agg_d3["ad_group"] = (agn, "first")
+            _agg3 = _d.groupby("_asin_key").agg(**_agg_d3).reset_index(drop=True)
+            _agg3["ROAS"]  = _agg3.apply(
+                lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+            _agg3["price"] = _agg3["campaign_theme"].map(PRICES)
+            _agg3 = _agg3[_agg3["price"].notna()].copy()
+            _result = _agg3[
+                (_agg3["cost"] >= _agg3["price"] * 2) & (_agg3["ROAS"] <= 0.5)
+            ].copy()
+            _result.drop(columns=["price"], errors="ignore", inplace=True)
+            return _result
+
+        _mask_auto_pt_del = (
+            _mpt_base[cc].str.contains("商品ターゲ", na=False) &
+            _mpt_base[cc].str.contains("オート|auto", case=False, na=False) &
+            ~_mpt_base[cc].str.contains("動画", na=False)
+        )
+        _mask_auto_vid_del = (
+            _mpt_base[cc].str.contains("動画", na=False) &
+            _mpt_base[cc].str.contains("オート|auto", case=False, na=False)
+        )
+        df_auto_del_product_ = _build_auto_asin_del(_mask_auto_pt_del, _mask_m)
+        df_auto_del_video_   = _build_auto_asin_del(_mask_auto_vid_del, _mask_v)
         # ────────────────────────────────────────────────────────────
 
         st.session_state.update({
@@ -729,6 +804,9 @@ if run:
             "df_pt_add_m": df_pt_add_m_, "df_pt_del_m": df_pt_del_m_,
             "df_pt_add_v": df_pt_add_v_, "df_pt_del_v": df_pt_del_v_,
             "df_cpc_product": df_cpc_product_, "df_cpc_video": df_cpc_video_,
+            "df_auto_del_kw": df_auto_del_kw_,
+            "df_auto_del_product": df_auto_del_product_,
+            "df_auto_del_video": df_auto_del_video_,
             "stats": {
                 "n_auto":n_auto,"n_ex":n_ex,"n_pt":n_pt,"n_ar":n_ar,
                 "n_br":n_br,"n_cd":n_cd,"n_tl":n_tl,"n_ae":n_ae,
@@ -762,6 +840,9 @@ dc_cpc:         pd.DataFrame = st.session_state.get("df_cpc",         pd.DataFra
 dc_cpc_product: pd.DataFrame = st.session_state.get("df_cpc_product", pd.DataFrame())
 dc_cpc_video:   pd.DataFrame = st.session_state.get("df_cpc_video",   pd.DataFrame())
 sv = st.session_state["stats"]
+df_auto_del_kw:      pd.DataFrame = st.session_state.get("df_auto_del_kw",      pd.DataFrame())
+df_auto_del_product: pd.DataFrame = st.session_state.get("df_auto_del_product", pd.DataFrame())
+df_auto_del_video:   pd.DataFrame = st.session_state.get("df_auto_del_video",   pd.DataFrame())
 nw = len(dw)
 
 # ─── KPIカード ヘルパー ──────────────────────────────
@@ -980,13 +1061,55 @@ def page_del_kw():
 
 
 def page_auto_del_kw():
-    st.info("🚧 準備中 — キーワード オート除外KW機能は現在実装中です。")
+    df = st.session_state.get("df_auto_del_kw", pd.DataFrame())
+    if df.empty:
+        st.info("除外候補のキーワードはありません。（オートKWで出血中かつマニュアル未登録のものなし）")
+        return
+    st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.5 / マニュアルKW重複除外済み")
+    _dcols = [c for c in ["keyword","campaign_theme","cost","ROAS","sales","orders","ad_group"] if c in df.columns]
+    _rn = {"keyword":"検索語句","campaign_theme":"キャンペーン","cost":"広告費",
+           "sales":"売上","orders":"購入数","ad_group":"広告グループ"}
+    _d = df[_dcols].rename(columns=_rn).copy()
+    if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
+    if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
+    if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
+    st.dataframe(_d, use_container_width=True)
+    _csv = df[_dcols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+    st.download_button("📥 除外KW候補.csv", data=_csv, file_name="除外KW候補.csv", mime="text/csv")
 
 def page_auto_del_product():
-    st.info("🚧 準備中 — 商品 オート除外KW機能は現在実装中です。")
+    df = st.session_state.get("df_auto_del_product", pd.DataFrame())
+    if df.empty:
+        st.info("除外候補の商品ASINはありません。（オート商品広告で出血中かつマニュアル未登録のものなし）")
+        return
+    st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.5 / マニュアル商品重複除外済み")
+    _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
+    _rn = {"asin":"ASIN","campaign_theme":"キャンペーン","cost":"広告費",
+           "sales":"売上","orders":"購入数","campaign_name":"キャンペーン名","ad_group":"広告グループ"}
+    _d = df[_dcols].rename(columns=_rn).copy()
+    if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
+    if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
+    if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
+    st.dataframe(_d, use_container_width=True)
+    _csv = df[_dcols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+    st.download_button("📥 除外商品ASIN候補.csv", data=_csv, file_name="除外商品ASIN候補.csv", mime="text/csv")
 
 def page_auto_del_video():
-    st.info("🚧 準備中 — 動画 オート除外KW機能は現在実装中です。")
+    df = st.session_state.get("df_auto_del_video", pd.DataFrame())
+    if df.empty:
+        st.info("除外候補の動画ASINはありません。（オート動画広告で出血中かつマニュアル未登録のものなし）")
+        return
+    st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.5 / マニュアル動画重複除外済み")
+    _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
+    _rn = {"asin":"ASIN","campaign_theme":"キャンペーン","cost":"広告費",
+           "sales":"売上","orders":"購入数","campaign_name":"キャンペーン名","ad_group":"広告グループ"}
+    _d = df[_dcols].rename(columns=_rn).copy()
+    if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
+    if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
+    if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
+    st.dataframe(_d, use_container_width=True)
+    _csv = df[_dcols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+    st.download_button("📥 除外動画ASIN候補.csv", data=_csv, file_name="除外動画ASIN候補.csv", mime="text/csv")
 
 def page_cpc():
     _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
