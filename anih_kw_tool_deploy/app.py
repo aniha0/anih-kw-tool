@@ -580,6 +580,14 @@ if run:
         n_cpc_empty = int(_empty_mask.sum())
         _cpc_raw = _cpc_raw[~_empty_mask].copy()
 
+        # ④ ブランドKW除外（アニハ・あには・アニは を含む語を除外）
+        _BRAND_KW = ["アニハ", "あには", "アニは"]
+        if cpc_kw_col:
+            _brand_mask = _cpc_raw[cpc_kw_col].astype(str).str.contains(
+                "|".join(_BRAND_KW), na=False
+            )
+            _cpc_raw = _cpc_raw[~_brand_mask].copy()
+
         n_cpc_manual = len(_cpc_raw)
 
         # Keyword Text単位で集計 (Keyword Text優先 / Targeting フォールバック)
