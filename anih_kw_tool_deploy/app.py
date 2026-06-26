@@ -953,9 +953,7 @@ def page_del_kw():
 </p>''',
     )
     st.markdown("")
-    _del_camps = ["全キャンペーン"]
-    if not dd.empty and "campaign_theme" in dd.columns:
-        _del_camps += [c for c in CAMPAIGNS if c in dd["campaign_theme"].values]
+    _del_camps = ["全キャンペーン"] + CAMPAIGNS
     _sc4, _ = st.columns([3, 2])
     with _sc4:
         del_camp = st.selectbox("キャンペーン（削除用KW）",
