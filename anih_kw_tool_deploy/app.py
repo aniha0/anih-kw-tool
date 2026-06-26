@@ -828,8 +828,7 @@ def page_add_kw():
   </tr>
   <tr>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;" colspan="2">
-      売上実績のある検索語句から、Amazonへ追加すべき <b>勝ちKW</b> を抽出します。<br>
-      <span style="font-size:.8rem;color:#718096;">オート広告で成果が出た語句を手動・フレーズ・完全一致へ昇格するための候補抽出です。</span>
+      オート広告で成果が出た検索語句を、手動広告（部分一致）のマニュアルキーワードへ追加する候補を抽出します。
     </td>
   </tr>
   <tr style="background:#F1F5F9;">
@@ -2175,7 +2174,7 @@ DateDive売れる予測KW
     with st.expander("📋 キーワード追加"):
         st.markdown("""
 **目的**
-オート広告の検索語句から成果KWを抽出し、マニュアル広告への追加候補を表示します。
+オート広告で成果が確認できた検索語句を、手動広告（部分一致）へ追加するための候補抽出です。
 
 ---
 
