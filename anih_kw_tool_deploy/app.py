@@ -185,7 +185,7 @@ def del_camp_zip(df_del: pd.DataFrame) -> bytes:
 # ===================================================
 # CPC調整ロジック
 # ===================================================
-CPC_RANK_ORDER = ["SS+", "SS", "S", "A", "B", "D", "E", "即削除", "判断保留"]
+CPC_RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
 
 def assign_cpc_rank(cost: float, orders: float, roas: float, price: float):
     """STEP1→STEP2→STEP3→STEP4 の順で CPC ランクを返す。(rank, action, delta)"""
@@ -209,9 +209,9 @@ def assign_cpc_rank(cost: float, orders: float, roas: float, price: float):
     elif roas >= 2.0:
         rank, action, delta = "B", "現状維持", 0
     elif roas >= 1.5:
-        rank, action, delta = "D", "CPC下げ", -5
+        rank, action, delta = "C", "CPC下げ", -5
     else:
-        rank, action, delta = "E", "CPC下げ", -10
+        rank, action, delta = "D", "CPC下げ", -10
     if cost >= del_thresh and roas < 0.8:
         rank, action, delta = "即削除", "即削除", 0
     return (rank, action, delta)
@@ -972,11 +972,11 @@ def page_del_kw():
 
 
 def page_cpc():
-    _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "D", "E", "即削除", "判断保留"]
+    _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
     _RC = {
         "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
-        "A":   "#2C7A7B", "B": "#2B6CB0", "D": "#C05621",
-        "E":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
+        "A":   "#2C7A7B", "B": "#2B6CB0", "C": "#C05621",
+        "D":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
     }
     _cond_bar([("CPC調整ルール", "適用"), ("最小クリック数", f"{sv['mc']}回")])
     render_logic_section(
@@ -1093,12 +1093,12 @@ def page_cpc():
         df_c = dc_cpc[dc_cpc["campaign_theme"] == cpc_camp].copy()
     cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
     st.markdown("---")
-    kpi_rks = ["SS+", "SS", "S", "A", "B", "D", "E", "即削除"]
+    kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
     kc_ = st.columns(len(kpi_rks))
     for _col, rk in zip(kc_, kpi_rks):
         bg_map = {
             "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
-            "B":"#BEE3F8","D":"#FEEBC8","E":"#FED7D7","即削除":"#FED7D7",
+            "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
         }
         _col.markdown(f'''<div class="kpi-card" style="background:{bg_map.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
             <div class="kpi-label">{rk}</div>
@@ -1166,11 +1166,11 @@ def page_cpc():
 
 def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
     """商品ターゲ CPC調整ページ共通レンダラー（page_cpc()と同一ロジック・UI）"""
-    _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "D", "E", "即削除", "判断保留"]
+    _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
     _RC = {
         "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
-        "A":   "#2C7A7B", "B": "#2B6CB0", "D": "#C05621",
-        "E":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
+        "A":   "#2C7A7B", "B": "#2B6CB0", "C": "#C05621",
+        "D":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
     }
     _cond_bar([("CPC調整ルール", "適用"), ("対象", page_title)])
     render_logic_section(
@@ -1289,12 +1289,12 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
         df_c = dc_pt[dc_pt["campaign_theme"] == cpc_camp].copy()
     cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
     st.markdown("---")
-    kpi_rks = ["SS+", "SS", "S", "A", "B", "D", "E", "即削除"]
+    kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
     kc_ = st.columns(len(kpi_rks))
     for _col, rk in zip(kc_, kpi_rks):
         bg_map = {
             "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
-            "B":"#BEE3F8","D":"#FEEBC8","E":"#FED7D7","即削除":"#FED7D7",
+            "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
         }
         _col.markdown(f'''<div class="kpi-card" style="background:{bg_map.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
             <div class="kpi-label">{rk}</div>
@@ -2244,8 +2244,8 @@ DateDive売れる予測KW
 | S | ROAS ≥ 4.0 | CPC上げ | +5円 |
 | A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
 | B | ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| D | ROAS ≥ 1.5 | CPC下げ | −5円 |
-| E | ROAS < 1.5 | CPC下げ | −10円 |
+| C | ROAS ≥ 1.5 | CPC下げ | −5円 |
+| D | ROAS < 1.5 | CPC下げ | −10円 |
 | 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
 
 **即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
@@ -2386,8 +2386,8 @@ DateDive売れる予測KW
 | S | ROAS ≥ 4.0 | CPC上げ | +5円 |
 | A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
 | B | ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| D | ROAS ≥ 1.5 | CPC下げ | −5円 |
-| E | ROAS < 1.5 | CPC下げ | −10円 |
+| C | ROAS ≥ 1.5 | CPC下げ | −5円 |
+| D | ROAS < 1.5 | CPC下げ | −10円 |
 | 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
 
 **即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
@@ -2448,8 +2448,8 @@ DateDive売れる予測KW
 | S | ROAS ≥ 4.0 | CPC上げ | +5円 |
 | A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
 | B | ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| D | ROAS ≥ 1.5 | CPC下げ | −5円 |
-| E | ROAS < 1.5 | CPC下げ | −10円 |
+| C | ROAS ≥ 1.5 | CPC下げ | −5円 |
+| D | ROAS < 1.5 | CPC下げ | −10円 |
 | 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
 
 **即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
@@ -2620,7 +2620,7 @@ DateDive売れる予測KW
 [条件バー: CPC調整ルール適用]
 [ロジックテーブル expander]
 [キャンペーン選択プルダウン]
-[件数カード: SS+ / SS / S / A / B / D / E / 即削除]  ← 全件表示
+[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
 [一覧テーブル: keyword / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
                                                       ← 全件表示（±0含む）
 [CSVダウンロードボタン]
@@ -2633,7 +2633,7 @@ DateDive売れる予測KW
 [条件バー: CPC調整ルール適用 / 商品]
 [ロジックテーブル expander]
 [商品選択プルダウン: 全商品 / 液体 / 涙やけ / ...]  ← 全商品が初期値
-[件数カード: SS+ / SS / S / A / B / D / E / 即削除]  ← 全件表示
+[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
 [一覧テーブル: ASIN / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
                                                        ← 変更幅≠0のみ
 [CSVダウンロードボタン]
@@ -2646,7 +2646,7 @@ DateDive売れる予測KW
 [条件バー: CPC調整ルール適用 / 動画]
 [ロジックテーブル expander]
 [商品選択プルダウン: 全商品 / 液体 / 涙やけ / ...]  ← 全商品が初期値
-[件数カード: SS+ / SS / S / A / B / D / E / 即削除]  ← 全件表示
+[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
 [一覧テーブル: ASIN / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
                                                        ← 変更幅≠0のみ
 [CSVダウンロードボタン]
