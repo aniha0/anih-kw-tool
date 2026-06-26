@@ -731,8 +731,7 @@ if run:
             _auto_kw_base["kn"] = _auto_kw_base[kc].apply(norm)
             _manual_mask_kw = ~dfs[cc].str.contains("オート|auto", case=False, na=False)
             _manual_reg_kw = set(dfs[_manual_mask_kw][tkc].apply(norm)); _manual_reg_kw.discard("")
-            _dup_kw = (_auto_kw_base["kn"].isin(_manual_reg_kw) |
-                       _auto_kw_base["kn"].apply(lambda k: covered(k, _manual_reg_kw)))
+            _dup_kw = _auto_kw_base["kn"].isin(_manual_reg_kw)
             _auto_kw_base = _auto_kw_base[~_dup_kw].copy()
             _agg_akw_d = {
                 "keyword":        (kc,    "first"),
