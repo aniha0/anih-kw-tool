@@ -370,10 +370,12 @@ _VALID_PAGES = {
     "🚫 キーワード削除", "📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整",
     "➕ 商品追加", "🗑️ 商品削除",
     "📹 動画追加",     "📹 動画削除",
+    "📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除",
     "📥 ダウンロード", "📖 取扱説明書",
 }
 _ADD_PAGES = {"📋 キーワード追加", "➕ 商品追加", "📹 動画追加"}
 _DEL_PAGES = {"🚫 キーワード削除", "🗑️ 商品削除", "📹 動画削除"}
+_AUTO_DEL_PAGES = {"📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除"}
 _CPC_PAGES = {"📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整"}
 
 if "current_page" not in st.session_state or st.session_state["current_page"] not in _VALID_PAGES:
@@ -390,12 +392,12 @@ def _nav_btn(label: str, page_key: str, icon: str = "") -> None:
 
 with st.sidebar:
     # ── 追加
-    with st.expander("➕  追加", expanded=(_cp in _ADD_PAGES)):
+    with st.expander("➕  キーワード追加", expanded=(_cp in _ADD_PAGES)):
         _nav_btn("キーワード",  "📋 キーワード追加",               "📋 ")
         _nav_btn("商品",        "➕ 商品追加", "🎯 ")
         _nav_btn("動画",        "📹 動画追加",       "📹 ")
     # ── 削除
-    with st.expander("🚫  削除", expanded=(_cp in _DEL_PAGES)):
+    with st.expander("🚫  キーワード削除", expanded=(_cp in _DEL_PAGES)):
         _nav_btn("キーワード",  "🚫 キーワード削除",               "📋 ")
         _nav_btn("商品",        "🗑️ 商品削除", "🎯 ")
         _nav_btn("動画",        "📹 動画削除",        "📹 ")
@@ -404,6 +406,11 @@ with st.sidebar:
         _nav_btn("キーワード",  "📈 キーワードCPC調整",   "📋 ")
         _nav_btn("商品",        "🎯 商品CPC調整", "🎯 ")
         _nav_btn("動画",        "📹 動画CPC調整", "📹 ")
+    # ── オート広告削除
+    with st.expander("🚫  オート広告削除", expanded=(_cp in _AUTO_DEL_PAGES)):
+        _nav_btn("キーワード",  "📄 オートKW削除",    "📄 ")
+        _nav_btn("商品",        "🎯 オート商品削除",  "🎯 ")
+        _nav_btn("動画",        "🎥 オート動画削除",  "🎥 ")
     # ── その他
     st.markdown("---")
     _nav_btn("DateDive売れる予測KW",  "📊 DateDive売れる予測KW", "📊 ")
@@ -970,6 +977,16 @@ def page_del_kw():
     else:
         st.info("削除対象キーワードはありません。")
 
+
+
+def page_auto_del_kw():
+    st.info("🚧 準備中 — キーワード オート広告削除機能は現在実装中です。")
+
+def page_auto_del_product():
+    st.info("🚧 準備中 — 商品 オート広告削除機能は現在実装中です。")
+
+def page_auto_del_video():
+    st.info("🚧 準備中 — 動画 オート広告削除機能は現在実装中です。")
 
 def page_cpc():
     _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
@@ -2716,6 +2733,9 @@ _PAGE_FUNCS = {
     "🗑️ 商品削除":                    page_pt_del_manual,
     "📹 動画追加":                     page_pt_add_video,
     "📹 動画削除":                     page_pt_del_video,
+    "📄 オートKW削除":               page_auto_del_kw,
+    "🎯 オート商品削除":             page_auto_del_product,
+    "🎥 オート動画削除":             page_auto_del_video,
     "📥 ダウンロード":                 page_download,
     "📖 取扱説明書":                   page_manual,
 }
