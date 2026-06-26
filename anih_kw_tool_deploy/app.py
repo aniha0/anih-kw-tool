@@ -406,8 +406,8 @@ with st.sidebar:
         _nav_btn("キーワード",  "📈 キーワードCPC調整",   "📋 ")
         _nav_btn("商品",        "🎯 商品CPC調整", "🎯 ")
         _nav_btn("動画",        "📹 動画CPC調整", "📹 ")
-    # ── オート広告削除
-    with st.expander("🚫  オート広告削除", expanded=(_cp in _AUTO_DEL_PAGES)):
+    # ── オート除外KW
+    with st.expander("🧹  オート除外KW", expanded=(_cp in _AUTO_DEL_PAGES)):
         _nav_btn("キーワード",  "📄 オートKW削除",    "📄 ")
         _nav_btn("商品",        "🎯 オート商品削除",  "🎯 ")
         _nav_btn("動画",        "🎥 オート動画削除",  "🎥 ")
@@ -980,13 +980,13 @@ def page_del_kw():
 
 
 def page_auto_del_kw():
-    st.info("🚧 準備中 — キーワード オート広告削除機能は現在実装中です。")
+    st.info("🚧 準備中 — キーワード オート除外KW機能は現在実装中です。")
 
 def page_auto_del_product():
-    st.info("🚧 準備中 — 商品 オート広告削除機能は現在実装中です。")
+    st.info("🚧 準備中 — 商品 オート除外KW機能は現在実装中です。")
 
 def page_auto_del_video():
-    st.info("🚧 準備中 — 動画 オート広告削除機能は現在実装中です。")
+    st.info("🚧 準備中 — 動画 オート除外KW機能は現在実装中です。")
 
 def page_cpc():
     _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
