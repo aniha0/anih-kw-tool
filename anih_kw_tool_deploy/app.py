@@ -792,12 +792,6 @@ def render_logic_section(title: str, content_html: str):
 # ===================================================
 
 def page_add_kw():
-    # ① KPIカード（5枚）
-    k4, k5 = st.columns(2)
-    kpi(k4, "📦", "抽出前",   f"{sv['n_pre']}件",    "フィルター適用前",  "#F4F6F8", "#718096")
-    kpi(k5, "🎯", "抽出後",   f"{sv['nf']}件",       "同一意図KW統合後",  "#F3ECFF", "#9F5ACB")
-    st.markdown("")
-
     st.markdown("---")
     _cond_bar([
         ("最小注文数",  f'{sv["mo"]}件'),
