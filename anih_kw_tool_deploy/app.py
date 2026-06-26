@@ -206,7 +206,7 @@ def assign_cpc_rank(cost: float, orders: float, roas: float, price: float):
         rank, action, delta = "S", "CPC上げ", 5
     elif roas >= 3.0:
         rank, action, delta = "A", "現状維持", 0
-    elif roas >= 2.0:
+    elif roas >= 1.8:
         rank, action, delta = "B", "現状維持", 0
     elif roas >= 1.5:
         rank, action, delta = "C", "CPC下げ", -5
@@ -1056,13 +1056,13 @@ def page_cpc():
   </tr>
   <tr>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2B6CB0;">B</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">2.0 ≤ ROAS &lt; 3.0</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.8 ≤ ROAS &lt; 3.0</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
   </tr>
   <tr style="background:#FFF5F5;">
     <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">C</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 2.0</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 1.8</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
   </tr>
@@ -1250,13 +1250,13 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
   </tr>
   <tr>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2B6CB0;">B</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">2.0 ≤ ROAS &lt; 3.0</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.8 ≤ ROAS &lt; 3.0</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
   </tr>
   <tr style="background:#FFF5F5;">
     <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">C</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 2.0</td>
+    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 1.8</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
     <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
   </tr>
@@ -2260,8 +2260,8 @@ DateDive売れる予測KW
 | SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
 | S | ROAS ≥ 4.0 | CPC上げ | +5円 |
 | A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
-| B | ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| C | ROAS ≥ 1.5 | CPC下げ | −5円 |
+| B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
+| C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
 | D | ROAS < 1.5 | CPC下げ | −10円 |
 | 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
 
@@ -2402,8 +2402,8 @@ DateDive売れる予測KW
 | SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
 | S | ROAS ≥ 4.0 | CPC上げ | +5円 |
 | A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
-| B | ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| C | ROAS ≥ 1.5 | CPC下げ | −5円 |
+| B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
+| C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
 | D | ROAS < 1.5 | CPC下げ | −10円 |
 | 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
 
@@ -2464,8 +2464,8 @@ DateDive売れる予測KW
 | SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
 | S | ROAS ≥ 4.0 | CPC上げ | +5円 |
 | A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
-| B | ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| C | ROAS ≥ 1.5 | CPC下げ | −5円 |
+| B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
+| C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
 | D | ROAS < 1.5 | CPC下げ | −10円 |
 | 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
 
