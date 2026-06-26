@@ -798,21 +798,6 @@ def page_add_kw():
     kpi(k5, "🎯", "抽出後",   f"{sv['nf']}件",       "同一意図KW統合後",  "#F3ECFF", "#9F5ACB")
     st.markdown("")
 
-    # 分析フロー詳細（折りたたみ）
-    with st.expander("📊 分析フロー詳細", expanded=False):
-        st.markdown(f"""
-| ステップ | 内容 | 件数 |
-|---|---|---|
-| オート広告 | 全検索語句 | **{sv["n_auto"]:,}件** |
-| 登録済KW除外 | 完全一致−{sv["n_ex"]}・部分一致−{sv["n_pt"]} | **{sv["n_ar"]:,}件** |
-| ブランド除外 | −{sv["n_br"]}件 | |
-| コード・Title除外 | −{sv["n_cd"]+sv["n_tl"]}件 | **{sv["n_ae"]:,}件** |
-| 売上条件（売価×2） | −{sv["n_pre"]-sv["n_sl"]}件 | **{sv["n_sl"]:,}件** |
-| ROAS≥2.0 | −{sv["n_sl"]-sv["n_ro"]}件 | **{sv["n_ro"]:,}件** |
-| 注文≥{sv["mo"]}・クリック≥{sv["mc"]}・広告費≥¥{sv["mco"]} | 信頼度フィルター | **{sv["n_af"]:,}件** |
-| 同一意図KW統合 | 類似KW集約 | **{sv["nf"]:,}件** |
-""")
-
     st.markdown("---")
     _cond_bar([
         ("最小注文数",  f'{sv["mo"]}件'),
