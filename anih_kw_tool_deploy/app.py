@@ -1207,10 +1207,11 @@ def _render_del_kw_block(df, badge_label, list_label, table_label,
 
     page_del_kw() の描画コードを共通関数として抽出したもの。
     page_auto_del_kw() の各セクション（キーワード/商品/動画）がこの関数を呼び出す。
+    この関数は渡された df を表示するだけで、分類は一切行わない。
 
     Parameters
     ----------
-    df          : pd.DataFrame  表示対象 DataFrame
+    df          : pd.DataFrame  表示対象 DataFrame（呼び出し側で分類済みのものを渡すこと）
     badge_label : str  カウントバッジのラベル
     list_label  : str  コードブロックのヘッダー
     table_label : str  詳細テーブルのヘッダー
@@ -1220,11 +1221,6 @@ def _render_del_kw_block(df, badge_label, list_label, table_label,
     csv_fname   : str  CSVファイル名（None なら DL ボタンなし）
     dl_key      : str  download_button の key
     """
-    st.write(
-        badge_label,
-        len(df),
-        df.head(10)
-    )
     _rn = {"keyword": "KW", "campaign_theme": "キャンペーン",
            "cost": "広告費", "sales": "売上"}
     _del_camps = ["全キャンペーン"] + CAMPAIGNS
@@ -1293,35 +1289,43 @@ def page_auto_del_kw():
     df_auto_del_kw_product = st.session_state.get("df_auto_del_kw_product", pd.DataFrame())
     df_auto_del_kw_video   = st.session_state.get("df_auto_del_kw_video",   pd.DataFrame())
 
-    # ── 表示直前の強制分類（keyword列のみを正規表現で判定）──
-    _RE_KW  = r"^(B0[A-Z0-9]{8}|asin:|category:)"
-    _RE_PT  = r"^(B0[A-Z0-9]{8}|asin:)"
-    _RE_VID = r"^category:"
+    # ── session_stateの分類結果は信用せず、3つを統合してkeyword列だけで再分類する ──
+    _all_auto_kw = pd.concat(
+        [df_auto_del_kw_keyword, df_auto_del_kw_product, df_auto_del_kw_video],
+        ignore_index=True
+    )
 
-    if not df_auto_del_kw_keyword.empty and "keyword" in df_auto_del_kw_keyword.columns:
-        df_auto_del_kw_keyword = df_auto_del_kw_keyword[
-            ~df_auto_del_kw_keyword["keyword"].astype(str).str.contains(
-                _RE_KW, case=False, regex=True, na=False
-            )
-        ].copy()
+    if not _all_auto_kw.empty and "keyword" in _all_auto_kw.columns:
+        kw = (
+            _all_auto_kw["keyword"]
+            .astype(str)
+            .map(lambda s: unicodedata.normalize("NFKC", s))
+            .str.replace("\u200b", "", regex=False)
+            .str.replace("\ufeff", "", regex=False)
+            .str.replace("\u3000", "", regex=False)
+            .str.replace("\r", "", regex=False)
+            .str.replace("\n", "", regex=False)
+            .str.strip()
+            .str.lower()
+        )
+        is_product = (
+            kw.str.startswith("b0")
+            | kw.str.startswith("asin:")
+            | kw.str.contains("asin=", regex=False)
+        )
+        is_video = (
+            kw.str.startswith("category:")
+            | kw.str.contains("category=", regex=False)
+        )
 
-    if not df_auto_del_kw_product.empty and "keyword" in df_auto_del_kw_product.columns:
-        df_auto_del_kw_product = df_auto_del_kw_product[
-            df_auto_del_kw_product["keyword"].astype(str).str.contains(
-                _RE_PT, case=False, regex=True, na=False
-            )
-        ].copy()
+        df_auto_del_kw_keyword = _all_auto_kw[~(is_product | is_video)].copy()
+        df_auto_del_kw_product = _all_auto_kw[is_product].copy()
+        df_auto_del_kw_video   = _all_auto_kw[is_video].copy()
+    else:
+        df_auto_del_kw_keyword = pd.DataFrame()
+        df_auto_del_kw_product = pd.DataFrame()
+        df_auto_del_kw_video   = pd.DataFrame()
 
-    if not df_auto_del_kw_video.empty and "keyword" in df_auto_del_kw_video.columns:
-        df_auto_del_kw_video = df_auto_del_kw_video[
-            df_auto_del_kw_video["keyword"].astype(str).str.contains(
-                _RE_VID, case=False, regex=True, na=False
-            )
-        ].copy()
-
-    st.write("keyword rows", len(df_auto_del_kw_keyword))
-    st.write("product rows", len(df_auto_del_kw_product))
-    st.write("video rows", len(df_auto_del_kw_video))
     if (
         df_auto_del_kw_keyword.empty
         and df_auto_del_kw_product.empty
