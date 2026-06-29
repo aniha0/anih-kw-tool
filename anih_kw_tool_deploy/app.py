@@ -727,12 +727,21 @@ if run:
         # キーワード: オートKW中、マニュアルKWと重複しない出血KW
         if kc and tkc:
             _auto_kw_base = dfs[dfs[cc].str.contains("オート|auto", case=False, na=False)].copy()
-            _auto_kw_base["ct"] = _auto_kw_base[cc].apply(lambda x: official(get_theme(str(x))))
+            _n_akw1 = len(_auto_kw_base)                                       # ① オート広告抽出（行数）
+            def _ct_auto(name):
+                s = str(name)
+                r = official(get_theme(s))
+                if r != "未分類": return r
+                for c in CAMPAIGNS:
+                    if c in s: return c
+                return "未分類"
+            _auto_kw_base["ct"] = _auto_kw_base[cc].apply(_ct_auto)
             _auto_kw_base["kn"] = _auto_kw_base[kc].apply(norm)
             _manual_mask_kw = ~dfs[cc].str.contains("オート|auto", case=False, na=False)
             _manual_reg_kw = set(dfs[_manual_mask_kw][tkc].apply(norm)); _manual_reg_kw.discard("")
             _dup_kw = _auto_kw_base["kn"].isin(_manual_reg_kw)
             _auto_kw_base = _auto_kw_base[~_dup_kw].copy()
+            _n_akw2 = len(_auto_kw_base)                                       # ② マニュアル重複除外後（行数）
             _agg_akw_d = {
                 "keyword":        (kc,    "first"),
                 "campaign_theme": ("ct",  lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
@@ -742,27 +751,38 @@ if run:
             if od:  _agg_akw_d["orders"]   = (od,  "sum")
             if agn: _agg_akw_d["ad_group"] = (agn, "first")
             _agg_akw = _auto_kw_base.groupby("kn").agg(**_agg_akw_d).reset_index(drop=True)
+            _n_akw3 = len(_agg_akw)                                            # ③ groupby後KW数
             _agg_akw["ROAS"]  = _agg_akw.apply(
                 lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
             _agg_akw["price"] = _agg_akw["campaign_theme"].map(PRICES)
             _agg_akw = _agg_akw[_agg_akw["price"].notna()].copy()
+            _n_akw4 = len(_agg_akw)                                            # ④ price取得成功数
+            _n_akw5 = int((_agg_akw["cost"] >= _agg_akw["price"] * 2).sum())  # ⑤ 広告費条件通過
+            _n_akw6 = int((_agg_akw["ROAS"] <= 0.5).sum())                    # ⑥ ROAS条件通過
             df_auto_del_kw_ = _agg_akw[
                 (_agg_akw["cost"] >= _agg_akw["price"] * 2) & (_agg_akw["ROAS"] <= 0.5)
             ].copy()
             df_auto_del_kw_.drop(columns=["price"], errors="ignore", inplace=True)
+            _n_akw7 = len(df_auto_del_kw_)                                    # ⑦ 最終表示件数
+            _dbg_auto_kw_ = {"n1":_n_akw1,"n2":_n_akw2,"n3":_n_akw3,"n4":_n_akw4,
+                             "n5":_n_akw5,"n6":_n_akw6,"n7":_n_akw7}
         else:
             df_auto_del_kw_ = pd.DataFrame()
+            _dbg_auto_kw_ = {"n1":0,"n2":0,"n3":0,"n4":0,"n5":0,"n6":0,"n7":0}
 
         # 商品/動画: オートASIN中、マニュアルASINと重複しない出血ASIN
         def _build_auto_asin_del(camp_mask, manual_mask):
+            _zero = {"n1":0,"n2":0,"n3":0,"n4":0,"n5":0,"n6":0,"n7":0}
             _d = _mpt_base[camp_mask].copy()
-            if _d.empty or not tkc: return pd.DataFrame()
+            if _d.empty or not tkc: return pd.DataFrame(), _zero
             _d["_asin_clean"] = _d[tkc].apply(_extract_asin)
             _d = _d[_d["_asin_clean"] != ""].copy()
-            if _d.empty: return pd.DataFrame()
+            _c1 = len(_d)                                                          # ① オート抽出（ASIN有効行数）
+            if _d.empty: return pd.DataFrame(), {**_zero, "n1":_c1}
             _manual_asins = set(_mpt_base[manual_mask][tkc].apply(_extract_asin)); _manual_asins.discard("")
             _d = _d[~_d["_asin_clean"].isin(_manual_asins)].copy()
-            if _d.empty: return pd.DataFrame()
+            _c2 = len(_d)                                                          # ② マニュアル重複除外後（行数）
+            if _d.empty: return pd.DataFrame(), {**_zero, "n1":_c1, "n2":_c2}
             _d["_asin_key"] = _d["_asin_clean"]
             _agg_d3 = {
                 "asin":           ("_asin_clean", "first"),
@@ -774,15 +794,20 @@ if run:
             if od:  _agg_d3["orders"]   = (od,  "sum")
             if agn: _agg_d3["ad_group"] = (agn, "first")
             _agg3 = _d.groupby("_asin_key").agg(**_agg_d3).reset_index(drop=True)
+            _c3 = len(_agg3)                                                       # ③ groupby後ASIN数
             _agg3["ROAS"]  = _agg3.apply(
                 lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
             _agg3["price"] = _agg3["campaign_theme"].map(PRICES)
             _agg3 = _agg3[_agg3["price"].notna()].copy()
+            _c4 = len(_agg3)                                                       # ④ price取得成功数
+            _c5 = int((_agg3["cost"] >= _agg3["price"] * 2).sum())                # ⑤ 広告費条件通過
+            _c6 = int((_agg3["ROAS"] <= 0.5).sum())                               # ⑥ ROAS条件通過
             _result = _agg3[
                 (_agg3["cost"] >= _agg3["price"] * 2) & (_agg3["ROAS"] <= 0.5)
             ].copy()
             _result.drop(columns=["price"], errors="ignore", inplace=True)
-            return _result
+            _c7 = len(_result)                                                     # ⑦ 最終表示件数
+            return _result, {"n1":_c1,"n2":_c2,"n3":_c3,"n4":_c4,"n5":_c5,"n6":_c6,"n7":_c7}
 
         _mask_auto_pt_del = (
             _mpt_base[cc].str.contains("商品ターゲ", na=False) &
@@ -793,8 +818,8 @@ if run:
             _mpt_base[cc].str.contains("動画", na=False) &
             _mpt_base[cc].str.contains("オート|auto", case=False, na=False)
         )
-        df_auto_del_product_ = _build_auto_asin_del(_mask_auto_pt_del, _mask_m)
-        df_auto_del_video_   = _build_auto_asin_del(_mask_auto_vid_del, _mask_v)
+        df_auto_del_product_, _dbg_auto_pt_  = _build_auto_asin_del(_mask_auto_pt_del, _mask_m)
+        df_auto_del_video_,   _dbg_auto_vid_ = _build_auto_asin_del(_mask_auto_vid_del, _mask_v)
         # ────────────────────────────────────────────────────────────
 
         st.session_state.update({
@@ -806,6 +831,9 @@ if run:
             "df_auto_del_kw": df_auto_del_kw_,
             "df_auto_del_product": df_auto_del_product_,
             "df_auto_del_video": df_auto_del_video_,
+            "dbg_auto_kw": _dbg_auto_kw_,
+            "dbg_auto_pt": _dbg_auto_pt_,
+            "dbg_auto_vid": _dbg_auto_vid_,
             "stats": {
                 "n_auto":n_auto,"n_ex":n_ex,"n_pt":n_pt,"n_ar":n_ar,
                 "n_br":n_br,"n_cd":n_cd,"n_tl":n_tl,"n_ae":n_ae,
@@ -821,6 +849,7 @@ if run:
             "dbg":{"kc":kc,"sc":sc,"oc_":oc_,"od":od,
                    "clk":clk,"imp":imp,"rn":len(reg),"br":brands},
         })
+        st.write(st.session_state["dbg_auto_kw"])  # DEBUG
 
 # ─── No results: placeholder ─────────────────────────
 if not st.session_state.get("has_results"):
@@ -1060,6 +1089,27 @@ def page_del_kw():
 
 
 def page_auto_del_kw():
+    _dbg = st.session_state.get("dbg_auto_kw", {})
+    if _dbg:
+        n1,n2,n3,n4,n5,n6,n7 = (_dbg.get(k,0) for k in ["n1","n2","n3","n4","n5","n6","n7"])
+        st.markdown('#### 📊 件数分析（集計単位: `groupby("kn")` 検索語句単位）')
+        _r1a,_r1b,_r1c,_r1d = st.columns(4)
+        _r1a.metric("① オート広告行数",   f"{n1:,}件")
+        _r1b.metric("② 完全一致除外後",   f"{n2:,}件", delta=f"-{n1-n2:,}除外", delta_color="off")
+        _r1c.metric("③ groupby後KW数",    f"{n3:,}件")
+        _r1d.metric("④ price取得成功数",  f"{n4:,}件", delta=f"-{n3-n4:,}除外", delta_color="off")
+        _r2a,_r2b,_r2c,_r2d = st.columns(4)
+        _r2a.metric("⑤ 広告費条件通過",   f"{n5:,}件")
+        _r2b.metric("⑥ ROAS条件通過",     f"{n6:,}件")
+        _r2c.metric("⑦ 最終表示件数",     f"{n7:,}件")
+        _r2d.markdown("")
+        st.caption(
+            f"②除外: {n1-n2:,}件（完全一致） ／ "
+            f"④除外: {n3-n4:,}件（未分類キャンペーン） ／ "
+            f"⑤広告費通過: {n5:,}件 ／ ⑥ROAS通過: {n6:,}件 ／ "
+            f"⑦最終(⑤AND⑥): {n7:,}件"
+        )
+        st.divider()
     df = st.session_state.get("df_auto_del_kw", pd.DataFrame())
     if df.empty:
         st.info("除外候補のキーワードはありません。（オートKWで出血中かつマニュアル未登録のものなし）")
@@ -1077,6 +1127,27 @@ def page_auto_del_kw():
     st.download_button("📥 除外KW候補.csv", data=_csv, file_name="除外KW候補.csv", mime="text/csv")
 
 def page_auto_del_product():
+    _dbg = st.session_state.get("dbg_auto_pt", {})
+    if _dbg:
+        n1,n2,n3,n4,n5,n6,n7 = (_dbg.get(k,0) for k in ["n1","n2","n3","n4","n5","n6","n7"])
+        st.markdown('#### 📊 件数分析（集計単位: `groupby("_asin_key")` ASIN単位）')
+        _r1a,_r1b,_r1c,_r1d = st.columns(4)
+        _r1a.metric("① オート商品行数",   f"{n1:,}件")
+        _r1b.metric("② 完全一致除外後",   f"{n2:,}件", delta=f"-{n1-n2:,}除外", delta_color="off")
+        _r1c.metric("③ groupby後ASIN数",  f"{n3:,}件")
+        _r1d.metric("④ price取得成功数",  f"{n4:,}件", delta=f"-{n3-n4:,}除外", delta_color="off")
+        _r2a,_r2b,_r2c,_r2d = st.columns(4)
+        _r2a.metric("⑤ 広告費条件通過",   f"{n5:,}件")
+        _r2b.metric("⑥ ROAS条件通過",     f"{n6:,}件")
+        _r2c.metric("⑦ 最終表示件数",     f"{n7:,}件")
+        _r2d.markdown("")
+        st.caption(
+            f"②除外: {n1-n2:,}件（完全一致） ／ "
+            f"④除外: {n3-n4:,}件（未分類キャンペーン） ／ "
+            f"⑤広告費通過: {n5:,}件 ／ ⑥ROAS通過: {n6:,}件 ／ "
+            f"⑦最終(⑤AND⑥): {n7:,}件"
+        )
+        st.divider()
     df = st.session_state.get("df_auto_del_product", pd.DataFrame())
     if df.empty:
         st.info("除外候補の商品ASINはありません。（オート商品広告で出血中かつマニュアル未登録のものなし）")
@@ -1094,6 +1165,27 @@ def page_auto_del_product():
     st.download_button("📥 除外商品ASIN候補.csv", data=_csv, file_name="除外商品ASIN候補.csv", mime="text/csv")
 
 def page_auto_del_video():
+    _dbg = st.session_state.get("dbg_auto_vid", {})
+    if _dbg:
+        n1,n2,n3,n4,n5,n6,n7 = (_dbg.get(k,0) for k in ["n1","n2","n3","n4","n5","n6","n7"])
+        st.markdown('#### 📊 件数分析（集計単位: `groupby("_asin_key")` ASIN単位）')
+        _r1a,_r1b,_r1c,_r1d = st.columns(4)
+        _r1a.metric("① オート動画行数",   f"{n1:,}件")
+        _r1b.metric("② 完全一致除外後",   f"{n2:,}件", delta=f"-{n1-n2:,}除外", delta_color="off")
+        _r1c.metric("③ groupby後ASIN数",  f"{n3:,}件")
+        _r1d.metric("④ price取得成功数",  f"{n4:,}件", delta=f"-{n3-n4:,}除外", delta_color="off")
+        _r2a,_r2b,_r2c,_r2d = st.columns(4)
+        _r2a.metric("⑤ 広告費条件通過",   f"{n5:,}件")
+        _r2b.metric("⑥ ROAS条件通過",     f"{n6:,}件")
+        _r2c.metric("⑦ 最終表示件数",     f"{n7:,}件")
+        _r2d.markdown("")
+        st.caption(
+            f"②除外: {n1-n2:,}件（完全一致） ／ "
+            f"④除外: {n3-n4:,}件（未分類キャンペーン） ／ "
+            f"⑤広告費通過: {n5:,}件 ／ ⑥ROAS通過: {n6:,}件 ／ "
+            f"⑦最終(⑤AND⑥): {n7:,}件"
+        )
+        st.divider()
     df = st.session_state.get("df_auto_del_video", pd.DataFrame())
     if df.empty:
         st.info("除外候補の動画ASINはありません。（オート動画広告で出血中かつマニュアル未登録のものなし）")
