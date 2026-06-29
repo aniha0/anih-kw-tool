@@ -1168,16 +1168,29 @@ def page_auto_del_kw():
         st.info("除外候補のキーワードはありません。（オートKWで出血中かつマニュアル未登録のものなし）")
         return
 
-    # ターゲティング種別で分類（抽出済み最終DataFrameを振り分けるのみ）
+    # ターゲティング種別で完全排他的に振り分け（1件は必ず1セクションのみ）
     def _akw_type(k):
-        kn = norm(str(k))
-        if ASIN_RE.match(kn): return "商品"
-        if kn.startswith("asin:"): return "商品"
-        if kn.startswith("category:"): return "動画"
+        """keyword列の生値で種別を判定する（正規化前の原文で判定）
+
+        商品: ASIN形式 (B0XXXXXXXXXX) または "asin:" プレフィックス
+        動画: "category:" プレフィックス または "動画ターゲティング"
+        キーワード: 上記以外の通常検索語
+        """
+        ks = str(k).strip()           # 生値（大文字小文字そのまま）
+        kl = ks.lower()               # 小文字化（プレフィックス比較用）
+        # ── 商品判定 ──────────────────────────────────────────────────
+        if ASIN_RE.match(ks): return "商品"   # B0XXXXXXXXXX (大文字ASIN)
+        if ASIN_RE.match(kl): return "商品"   # b0xxxxxxxxxx (正規化済みの場合)
+        if kl.startswith("asin:"): return "商品"
+        # ── 動画判定 ──────────────────────────────────────────────────
+        if kl.startswith("category:"): return "動画"
+        if "動画ターゲティング" in ks: return "動画"
+        # ── キーワード（通常検索語）────────────────────────────────────
         return "キーワード"
 
     _df_typed = df.copy()
     _df_typed["_type"] = _df_typed["keyword"].apply(_akw_type)
+    # 完全排他的振り分け: 各行は必ずどれか1つのDFにのみ属する
     df_kw  = _df_typed[_df_typed["_type"] == "キーワード"].drop(columns=["_type"]).reset_index(drop=True)
     df_pt  = _df_typed[_df_typed["_type"] == "商品"].drop(columns=["_type"]).reset_index(drop=True)
     df_vid = _df_typed[_df_typed["_type"] == "動画"].drop(columns=["_type"]).reset_index(drop=True)
