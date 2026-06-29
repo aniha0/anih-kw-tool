@@ -902,6 +902,20 @@ if run:
         )
         df_auto_del_product_, _dbg_auto_pt_  = _build_auto_asin_del(_mask_auto_pt_del, _mask_m)
         df_auto_del_video_,   _dbg_auto_vid_ = _build_auto_asin_del(_mask_auto_vid_del, _mask_v)
+
+        # ── オートKW集計でASIN/category判定された行を、商品/動画ページ側へ合流 ──
+        # 「📄 オートKW削除」はキーワードのみを表示するため、ここで分離する。
+        if not df_auto_del_kw_product_.empty:
+            _kw_as_pt = df_auto_del_kw_product_.rename(columns={"keyword": "asin"}).copy()
+            df_auto_del_product_ = pd.concat(
+                [df_auto_del_product_, _kw_as_pt], ignore_index=True
+            )
+
+        if not df_auto_del_kw_video_.empty:
+            _kw_as_vid = df_auto_del_kw_video_.rename(columns={"keyword": "asin"}).copy()
+            df_auto_del_video_ = pd.concat(
+                [df_auto_del_video_, _kw_as_vid], ignore_index=True
+            )
         # ────────────────────────────────────────────────────────────
 
         st.session_state.update({
@@ -911,8 +925,6 @@ if run:
             "df_pt_add_v": df_pt_add_v_, "df_pt_del_v": df_pt_del_v_,
             "df_cpc_product": df_cpc_product_, "df_cpc_video": df_cpc_video_,
             "df_auto_del_kw_keyword": df_auto_del_kw_keyword_,
-            "df_auto_del_kw_product": df_auto_del_kw_product_,
-            "df_auto_del_kw_video":   df_auto_del_kw_video_,
             "df_auto_del_product": df_auto_del_product_,
             "df_auto_del_video":   df_auto_del_video_,
             "dbg_auto_kw": _dbg_auto_kw_,
@@ -1284,66 +1296,16 @@ def page_auto_del_kw():
             f"⑦最終(⑤AND⑥): {n7:,}件"
         )
         st.divider()
-    # ── session_stateから3つの独立DataFrameを直接取得 ─────────────────────
+    # ── session_stateからキーワードDataFrameを取得（商品/動画は別ページへ合流済み）──
     df_auto_del_kw_keyword = st.session_state.get("df_auto_del_kw_keyword", pd.DataFrame())
-    df_auto_del_kw_product = st.session_state.get("df_auto_del_kw_product", pd.DataFrame())
-    df_auto_del_kw_video   = st.session_state.get("df_auto_del_kw_video",   pd.DataFrame())
 
-    # ── session_stateの分類結果は信用せず、3つを統合してkeyword列だけで再分類する ──
-    _all_auto_kw = pd.concat(
-        [df_auto_del_kw_keyword, df_auto_del_kw_product, df_auto_del_kw_video],
-        ignore_index=True
-    )
-
-    if not _all_auto_kw.empty and "keyword" in _all_auto_kw.columns:
-        kw = (
-            _all_auto_kw["keyword"]
-            .astype(str)
-            .map(lambda s: unicodedata.normalize("NFKC", s))
-            .str.replace("\u200b", "", regex=False)
-            .str.replace("\ufeff", "", regex=False)
-            .str.replace("\u3000", "", regex=False)
-            .str.replace("\r", "", regex=False)
-            .str.replace("\n", "", regex=False)
-            .str.strip()
-            .str.lower()
-        )
-        is_product = (
-            kw.str.startswith("b0")
-            | kw.str.startswith("asin:")
-            | kw.str.contains("asin=", regex=False)
-        )
-        is_video = (
-            kw.str.startswith("category:")
-            | kw.str.contains("category=", regex=False)
-        )
-
-        df_auto_del_kw_keyword = _all_auto_kw[~(is_product | is_video)].copy()
-        df_auto_del_kw_product = _all_auto_kw[is_product].copy()
-        df_auto_del_kw_video   = _all_auto_kw[is_video].copy()
-    else:
-        df_auto_del_kw_keyword = pd.DataFrame()
-        df_auto_del_kw_product = pd.DataFrame()
-        df_auto_del_kw_video   = pd.DataFrame()
-
-    if (
-        df_auto_del_kw_keyword.empty
-        and df_auto_del_kw_product.empty
-        and df_auto_del_kw_video.empty
-    ):
+    if df_auto_del_kw_keyword.empty:
         st.info("除外候補のキーワードはありません。（オートKWで出血中かつマニュアル未登録のものなし）")
         return
 
     # ── 件数検証（必須）─────────────────────────────────────────────────
-    n_kw    = len(df_auto_del_kw_keyword)
-    n_pt    = len(df_auto_del_kw_product)
-    n_vid   = len(df_auto_del_kw_video)
-    n_total = n_kw + n_pt + n_vid
-    _cnt_c1, _cnt_c2, _cnt_c3, _cnt_c4 = st.columns(4)
-    _cnt_c1.metric("合計件数",           f"{n_total}件")
-    _cnt_c2.metric("📄 キーワード件数", f"{n_kw}件")
-    _cnt_c3.metric("🎯 商品件数",       f"{n_pt}件")
-    _cnt_c4.metric("🎬 動画件数",       f"{n_vid}件")
+    n_kw = len(df_auto_del_kw_keyword)
+    st.metric("📄 キーワード件数", f"{n_kw}件")
 
     # ── キーワードセクション ─────────────────────────────────────────────
     st.markdown("### 📄 キーワード")
@@ -1357,42 +1319,6 @@ def page_auto_del_kw():
         empty_msg="除外候補のキーワードはありません。",
         csv_fname="auto_negative_keyword.csv",
         dl_key="dl_akw_kw",
-    )
-
-    st.markdown("")
-    st.divider()
-    st.markdown("")
-
-    # ── 商品セクション ───────────────────────────────────────────────────
-    st.markdown("### 🎯 商品")
-    _render_del_kw_block(
-        df_auto_del_kw_product,
-        badge_label="商品除外候補",
-        list_label="除外対象商品ターゲティング一覧",
-        table_label="除外商品詳細テーブル",
-        camp_label="キャンペーン（商品）",
-        camp_key="auto_kw_camp_pt",
-        empty_msg="除外候補の商品ターゲティングはありません。",
-        csv_fname="auto_negative_product.csv",
-        dl_key="dl_akw_pt",
-    )
-
-    st.markdown("")
-    st.divider()
-    st.markdown("")
-
-    # ── 動画セクション ───────────────────────────────────────────────────
-    st.markdown("### 🎬 動画")
-    _render_del_kw_block(
-        df_auto_del_kw_video,
-        badge_label="動画除外候補",
-        list_label="除外対象動画ターゲティング一覧",
-        table_label="除外動画詳細テーブル",
-        camp_label="キャンペーン（動画）",
-        camp_key="auto_kw_camp_vid",
-        empty_msg="除外候補の動画ターゲティングはありません。",
-        csv_fname="auto_negative_video.csv",
-        dl_key="dl_akw_vid",
     )
 
 def page_auto_del_product():
