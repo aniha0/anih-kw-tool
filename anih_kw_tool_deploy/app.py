@@ -138,7 +138,8 @@ def tonum(s: pd.Series) -> pd.Series:
 def clear():
     for k in ["has_results", "df_win", "df_del", "df_cpc", "df_cpc_product", "df_cpc_video",
               "df_pt_add", "df_pt_del", "stats", "dbg",
-              "df_auto_del_kw", "df_auto_del_product", "df_auto_del_video"]:
+              "df_auto_del_kw_keyword", "df_auto_del_kw_product", "df_auto_del_kw_video",
+              "df_auto_del_product", "df_auto_del_video"]:
         st.session_state.pop(k, None)
 
 # ===================================================
@@ -264,6 +265,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+st.write("APP VERSION CHECK")
+st.write(__file__)
 
 st.markdown("""<style>
 /* ── サイドバー ── */
@@ -749,7 +752,7 @@ if run:
         df_cpc_video_   = _build_pt_cpc_df(_mask_v)
 
         # ── オート除外KW用 DataFrame ───────────────────────────────
-        # キーワード: オートKW中、マニュアルKWと重複しない出血KW
+        # キーワード / 商品(ASIN) / 動画(category:) を最初から独立して生成する
         if kc and tkc:
             _auto_kw_base = dfs[dfs[cc].str.contains("オート|auto", case=False, na=False)].copy()
             _n_akw1 = len(_auto_kw_base)                                       # ① オート広告抽出（行数）
@@ -767,53 +770,59 @@ if run:
             _dup_kw = _auto_kw_base["kn"].isin(_manual_reg_kw)
             _auto_kw_base = _auto_kw_base[~_dup_kw].copy()
             _n_akw2 = len(_auto_kw_base)                                       # ② マニュアル重複除外後（行数）
-            # DEBUG: groupby前 _auto_kw_base 種別内訳
-            def _kn_type_dbg(k):
-                k = str(k)
-                if ASIN_RE.match(k): return "ASIN件数"
-                if k.startswith("asin:"): return "asin:件数"
-                if k.startswith("category:"): return "category件数"
-                if k in ("", "nan"): return "その他件数"
-                return "検索語件数"
-            _dbg_type_counts = _auto_kw_base["kn"].apply(_kn_type_dbg).value_counts().to_dict()
-            st.write({k: _dbg_type_counts.get(k, 0) for k in ["検索語件数","ASIN件数","category件数","asin:件数","その他件数"]})  # DEBUG
-            _agg_akw_d = {
-                "keyword":        (kc,    "first"),
-                "campaign_theme": ("ct",  lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
-                "sales":          (sc,    "sum"),
-                "cost":           (oc_,   "sum"),
-            }
-            if od:  _agg_akw_d["orders"]   = (od,  "sum")
-            if agn: _agg_akw_d["ad_group"] = (agn, "first")
-            _agg_akw = _auto_kw_base.groupby("kn").agg(**_agg_akw_d).reset_index(drop=True)
-            _n_akw3 = len(_agg_akw)                                            # ③ groupby後KW数
-            _agg_akw["ROAS"]  = _agg_akw.apply(
-                lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
-            _agg_akw["price"] = _agg_akw["campaign_theme"].map(PRICES)
-            _agg_akw = _agg_akw[_agg_akw["price"].notna()].copy()
-            _n_akw4 = len(_agg_akw)                                            # ④ price取得成功数
-            _n_akw5 = int((_agg_akw["cost"] >= _agg_akw["price"] * 2).sum())  # ⑤ 広告費条件通過
-            # DEBUG: cost >= price*2 通過行の種別内訳
-            _dbg_cost_pass = _agg_akw[_agg_akw["cost"] >= _agg_akw["price"] * 2].copy()
-            def _kn_type_dbg2(k):
-                k = str(k)
-                if ASIN_RE.match(k): return "ASIN件数"
-                if k.startswith("asin:"): return "asin:件数"
-                if k.startswith("category:"): return "category件数"
-                if k in ("", "nan"): return "その他件数"
-                return "検索語件数"
-            _dbg_cost_counts = _dbg_cost_pass["keyword"].apply(norm).apply(_kn_type_dbg2).value_counts().to_dict()
-            st.write("【cost>=price*2 通過行 種別内訳】", {k: _dbg_cost_counts.get(k, 0) for k in ["検索語件数","ASIN件数","category件数","asin:件数","その他件数"]})  # DEBUG
-            _n_akw6 = int((_agg_akw["ROAS"] <= 0.8).sum())                    # ⑥ ROAS条件通過
-            df_auto_del_kw_ = _agg_akw[
-                (_agg_akw["cost"] >= _agg_akw["price"] * 2) & (_agg_akw["ROAS"] <= 0.8)
-            ].copy()
-            df_auto_del_kw_.drop(columns=["price"], errors="ignore", inplace=True)
-            _n_akw7 = len(df_auto_del_kw_)                                    # ⑦ 最終表示件数
-            _dbg_auto_kw_ = {"n1":_n_akw1,"n2":_n_akw2,"n3":_n_akw3,"n4":_n_akw4,
-                             "n5":_n_akw5,"n6":_n_akw6,"n7":_n_akw7}
+
+            # 共通agg定義ビルダー
+            def _make_agg_d():
+                _d = {
+                    "keyword":        (kc,   "first"),
+                    "campaign_theme": ("ct", lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
+                    "sales":          (sc,   "sum"),
+                    "cost":           (oc_,  "sum"),
+                }
+                if od:  _d["orders"]   = (od,  "sum")
+                if agn: _d["ad_group"] = (agn, "first")
+                return _d
+
+            def _apply_del_filter(df_agg):
+                df_agg["ROAS"]  = df_agg.apply(
+                    lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+                df_agg["price"] = df_agg["campaign_theme"].map(PRICES)
+                df_agg = df_agg[df_agg["price"].notna()].copy()
+                result = df_agg[
+                    (df_agg["cost"] >= df_agg["price"] * 2) & (df_agg["ROAS"] <= 0.8)
+                ].copy()
+                result.drop(columns=["price"], errors="ignore", inplace=True)
+                return result
+
+            # ── キーワード専用DataFrame: ASIN / asin: / category: をgroupby前に除外 ──
+            _base_kw = _auto_kw_base[~_auto_kw_base["kn"].apply(
+                lambda k: bool(ASIN_RE.match(k)) or k.startswith("asin:") or k.startswith("category:")
+            )].copy()
+            _agg_kw = _base_kw.groupby("kn").agg(**_make_agg_d()).reset_index(drop=True)
+            df_auto_del_kw_keyword_ = _apply_del_filter(_agg_kw)
+
+            # ── 商品専用DataFrame: ASINのみ残す ──
+            _base_pt = _auto_kw_base[_auto_kw_base["kn"].apply(
+                lambda k: bool(ASIN_RE.match(k)) or k.startswith("asin:")
+            )].copy()
+            _agg_pt = _base_pt.groupby("kn").agg(**_make_agg_d()).reset_index(drop=True)
+            df_auto_del_kw_product_ = _apply_del_filter(_agg_pt)
+
+            # ── 動画専用DataFrame: category: のみ残す ──
+            _base_vid = _auto_kw_base[_auto_kw_base["kn"].apply(
+                lambda k: k.startswith("category:")
+            )].copy()
+            _agg_vid = _base_vid.groupby("kn").agg(**_make_agg_d()).reset_index(drop=True)
+            df_auto_del_kw_video_ = _apply_del_filter(_agg_vid)
+
+            _n_akw3 = len(_agg_kw)
+            _n_akw7 = len(df_auto_del_kw_keyword_)
+            _dbg_auto_kw_ = {"n1":_n_akw1,"n2":_n_akw2,"n3":_n_akw3,"n4":_n_akw3,
+                             "n5":_n_akw7,"n6":_n_akw7,"n7":_n_akw7}
         else:
-            df_auto_del_kw_ = pd.DataFrame()
+            df_auto_del_kw_keyword_ = pd.DataFrame()
+            df_auto_del_kw_product_ = pd.DataFrame()
+            df_auto_del_kw_video_   = pd.DataFrame()
             _dbg_auto_kw_ = {"n1":0,"n2":0,"n3":0,"n4":0,"n5":0,"n6":0,"n7":0}
 
         # 商品/動画: オートASIN中、マニュアルASINと重複しない出血ASIN
@@ -874,9 +883,11 @@ if run:
             "df_pt_add_m": df_pt_add_m_, "df_pt_del_m": df_pt_del_m_,
             "df_pt_add_v": df_pt_add_v_, "df_pt_del_v": df_pt_del_v_,
             "df_cpc_product": df_cpc_product_, "df_cpc_video": df_cpc_video_,
-            "df_auto_del_kw": df_auto_del_kw_,
+            "df_auto_del_kw_keyword": df_auto_del_kw_keyword_,
+            "df_auto_del_kw_product": df_auto_del_kw_product_,
+            "df_auto_del_kw_video":   df_auto_del_kw_video_,
             "df_auto_del_product": df_auto_del_product_,
-            "df_auto_del_video": df_auto_del_video_,
+            "df_auto_del_video":   df_auto_del_video_,
             "dbg_auto_kw": _dbg_auto_kw_,
             "dbg_auto_pt": _dbg_auto_pt_,
             "dbg_auto_vid": _dbg_auto_vid_,
@@ -895,7 +906,9 @@ if run:
             "dbg":{"kc":kc,"sc":sc,"oc_":oc_,"od":od,
                    "clk":clk,"imp":imp,"rn":len(reg),"br":brands},
         })
-        st.write(st.session_state["dbg_auto_kw"])  # DEBUG
+        st.write("keyword rows", len(df_auto_del_kw_keyword_))
+        st.write("product rows", len(df_auto_del_kw_product_))
+        st.write("video rows", len(df_auto_del_kw_video_))
 
 # ─── No results: placeholder ─────────────────────────
 if not st.session_state.get("has_results"):
@@ -914,7 +927,6 @@ dc_cpc:         pd.DataFrame = st.session_state.get("df_cpc",         pd.DataFra
 dc_cpc_product: pd.DataFrame = st.session_state.get("df_cpc_product", pd.DataFrame())
 dc_cpc_video:   pd.DataFrame = st.session_state.get("df_cpc_video",   pd.DataFrame())
 sv = st.session_state["stats"]
-df_auto_del_kw:      pd.DataFrame = st.session_state.get("df_auto_del_kw",      pd.DataFrame())
 df_auto_del_product: pd.DataFrame = st.session_state.get("df_auto_del_product", pd.DataFrame())
 df_auto_del_video:   pd.DataFrame = st.session_state.get("df_auto_del_video",   pd.DataFrame())
 nw = len(dw)
@@ -1182,6 +1194,11 @@ def _render_del_kw_block(df, badge_label, list_label, table_label,
     csv_fname   : str  CSVファイル名（None なら DL ボタンなし）
     dl_key      : str  download_button の key
     """
+    st.write(
+        badge_label,
+        len(df),
+        df.head(10)
+    )
     _rn = {"keyword": "KW", "campaign_theme": "キャンペーン",
            "cost": "広告費", "sales": "売上"}
     _del_camps = ["全キャンペーン"] + CAMPAIGNS
@@ -1245,34 +1262,31 @@ def page_auto_del_kw():
             f"⑦最終(⑤AND⑥): {n7:,}件"
         )
         st.divider()
-    df = st.session_state.get("df_auto_del_kw", pd.DataFrame())
-    if df.empty:
+    # ── session_stateから3つの独立DataFrameを直接取得 ─────────────────────
+    df_auto_del_kw_keyword = st.session_state.get("df_auto_del_kw_keyword", pd.DataFrame())
+    df_auto_del_kw_product = st.session_state.get("df_auto_del_kw_product", pd.DataFrame())
+    df_auto_del_kw_video   = st.session_state.get("df_auto_del_kw_video",   pd.DataFrame())
+    st.write("keyword rows", len(df_auto_del_kw_keyword))
+    st.write("product rows", len(df_auto_del_kw_product))
+    st.write("video rows", len(df_auto_del_kw_video))
+    if (
+        df_auto_del_kw_keyword.empty
+        and df_auto_del_kw_product.empty
+        and df_auto_del_kw_video.empty
+    ):
         st.info("除外候補のキーワードはありません。（オートKWで出血中かつマニュアル未登録のものなし）")
         return
 
-    # ── ターゲティング種別で完全排他的に振り分け ───────────────────────────
-    # _classify_auto_kw_type() は処理ブロック _kn_type_dbg と同一ロジックを再利用
-    # ASIN_RE（モジュールレベル定数）を共有。新規実装・二重実装なし。
-    _df_typed = df.copy()
-    _df_typed["_type"] = _df_typed["keyword"].apply(_classify_auto_kw_type)
-    df_auto_del_kw_keyword = _df_typed[_df_typed["_type"] == "キーワード"].drop(columns=["_type"]).reset_index(drop=True)
-    df_auto_del_kw_product = _df_typed[_df_typed["_type"] == "商品"].drop(columns=["_type"]).reset_index(drop=True)
-    df_auto_del_kw_video   = _df_typed[_df_typed["_type"] == "動画"].drop(columns=["_type"]).reset_index(drop=True)
-
     # ── 件数検証（必須）─────────────────────────────────────────────────
-    n_total = len(df)
     n_kw    = len(df_auto_del_kw_keyword)
     n_pt    = len(df_auto_del_kw_product)
     n_vid   = len(df_auto_del_kw_video)
+    n_total = n_kw + n_pt + n_vid
     _cnt_c1, _cnt_c2, _cnt_c3, _cnt_c4 = st.columns(4)
-    _cnt_c1.metric("元件数",           f"{n_total}件")
+    _cnt_c1.metric("合計件数",           f"{n_total}件")
     _cnt_c2.metric("📄 キーワード件数", f"{n_kw}件")
     _cnt_c3.metric("🎯 商品件数",       f"{n_pt}件")
     _cnt_c4.metric("🎬 動画件数",       f"{n_vid}件")
-    if n_kw + n_pt + n_vid == n_total:
-        st.success(f"分類件数一致 ✅  キーワード {n_kw}件 ＋ 商品 {n_pt}件 ＋ 動画 {n_vid}件 ＝ {n_total}件")
-    else:
-        st.error(f"分類件数不一致 ❌  キーワード {n_kw}件 ＋ 商品 {n_pt}件 ＋ 動画 {n_vid}件 ≠ 元データ {n_total}件")
 
     # ── キーワードセクション ─────────────────────────────────────────────
     st.markdown("### 📄 キーワード")
