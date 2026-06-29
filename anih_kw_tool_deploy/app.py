@@ -1293,25 +1293,29 @@ def page_auto_del_kw():
     df_auto_del_kw_product = st.session_state.get("df_auto_del_kw_product", pd.DataFrame())
     df_auto_del_kw_video   = st.session_state.get("df_auto_del_kw_video",   pd.DataFrame())
 
-    # ── 表示直前の最終フィルタ（keyword / product / video を完全排他化）──
+    # ── 表示直前の強制分類（keyword列のみを正規表現で判定）──
+    _RE_KW  = r"^(B0[A-Z0-9]{8}|asin:|category:)"
+    _RE_PT  = r"^(B0[A-Z0-9]{8}|asin:)"
+    _RE_VID = r"^category:"
+
     if not df_auto_del_kw_keyword.empty and "keyword" in df_auto_del_kw_keyword.columns:
         df_auto_del_kw_keyword = df_auto_del_kw_keyword[
-            ~df_auto_del_kw_keyword["keyword"].astype(str).apply(
-                lambda x: is_asin_kn(norm(x)) or is_category_kn(norm(x))
+            ~df_auto_del_kw_keyword["keyword"].astype(str).str.contains(
+                _RE_KW, case=False, regex=True, na=False
             )
         ].copy()
 
     if not df_auto_del_kw_product.empty and "keyword" in df_auto_del_kw_product.columns:
         df_auto_del_kw_product = df_auto_del_kw_product[
-            df_auto_del_kw_product["keyword"].astype(str).apply(
-                lambda x: is_asin_kn(norm(x))
+            df_auto_del_kw_product["keyword"].astype(str).str.contains(
+                _RE_PT, case=False, regex=True, na=False
             )
         ].copy()
 
     if not df_auto_del_kw_video.empty and "keyword" in df_auto_del_kw_video.columns:
         df_auto_del_kw_video = df_auto_del_kw_video[
-            df_auto_del_kw_video["keyword"].astype(str).apply(
-                lambda x: is_category_kn(norm(x))
+            df_auto_del_kw_video["keyword"].astype(str).str.contains(
+                _RE_VID, case=False, regex=True, na=False
             )
         ].copy()
 
