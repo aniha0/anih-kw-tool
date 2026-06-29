@@ -780,10 +780,21 @@ if run:
             _auto_kw_base = _auto_kw_base[~_dup_kw].copy()
             _n_akw2 = len(_auto_kw_base)                                       # ② マニュアル重複除外後（行数）
 
-            # 共通agg定義ビルダー
+            # 共通agg定義ビルダー（商品・動画専用。keyword列を含む）
             def _make_agg_d():
                 _d = {
                     "keyword":        (kc,   "first"),
+                    "campaign_theme": ("ct", lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
+                    "sales":          (sc,   "sum"),
+                    "cost":           (oc_,  "sum"),
+                }
+                if od:  _d["orders"]   = (od,  "sum")
+                if agn: _d["ad_group"] = (agn, "first")
+                return _d
+
+            # キーワード専用agg定義ビルダー（keyword列を含めない。kn由来でしか作らない）
+            def _make_agg_d_kw():
+                _d = {
                     "campaign_theme": ("ct", lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
                     "sales":          (sc,   "sum"),
                     "cost":           (oc_,  "sum"),
@@ -808,16 +819,13 @@ if run:
                 lambda k: is_asin_kn(k) or is_category_kn(k)
             )].copy()
 
-            st.write(_base_kw["kn"].head(30))
-            st.write(_base_kw[_base_kw["kn"].str.startswith("b0", na=False)])
-            st.write(_base_kw[_base_kw["kn"].str.startswith("category:", na=False)])
-
             _agg_kw = (
                 _base_kw
                 .groupby("kn", as_index=False)
-                .agg(**_make_agg_d())
+                .agg(**_make_agg_d_kw())
             )
-            _agg_kw["keyword"] = _agg_kw["kn"]
+            _agg_kw.insert(0, "keyword", _agg_kw["kn"])
+
             df_auto_del_kw_keyword_ = _apply_del_filter(_agg_kw)
 
             # ── 商品専用DataFrame: ASINのみ残す ──
@@ -1284,6 +1292,29 @@ def page_auto_del_kw():
     df_auto_del_kw_keyword = st.session_state.get("df_auto_del_kw_keyword", pd.DataFrame())
     df_auto_del_kw_product = st.session_state.get("df_auto_del_kw_product", pd.DataFrame())
     df_auto_del_kw_video   = st.session_state.get("df_auto_del_kw_video",   pd.DataFrame())
+
+    # ── 表示直前の最終フィルタ（keyword / product / video を完全排他化）──
+    if not df_auto_del_kw_keyword.empty and "keyword" in df_auto_del_kw_keyword.columns:
+        df_auto_del_kw_keyword = df_auto_del_kw_keyword[
+            ~df_auto_del_kw_keyword["keyword"].astype(str).apply(
+                lambda x: is_asin_kn(norm(x)) or is_category_kn(norm(x))
+            )
+        ].copy()
+
+    if not df_auto_del_kw_product.empty and "keyword" in df_auto_del_kw_product.columns:
+        df_auto_del_kw_product = df_auto_del_kw_product[
+            df_auto_del_kw_product["keyword"].astype(str).apply(
+                lambda x: is_asin_kn(norm(x))
+            )
+        ].copy()
+
+    if not df_auto_del_kw_video.empty and "keyword" in df_auto_del_kw_video.columns:
+        df_auto_del_kw_video = df_auto_del_kw_video[
+            df_auto_del_kw_video["keyword"].astype(str).apply(
+                lambda x: is_category_kn(norm(x))
+            )
+        ].copy()
+
     st.write("keyword rows", len(df_auto_del_kw_keyword))
     st.write("product rows", len(df_auto_del_kw_product))
     st.write("video rows", len(df_auto_del_kw_video))
