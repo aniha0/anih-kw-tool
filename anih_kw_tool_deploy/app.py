@@ -544,6 +544,10 @@ if run:
         # オートキャンペーンを含まない行のみ抽出（オート除外KWとは完全に別ロジック）
         _del_manual_mask = ~dfs[cc].str.contains("オート|auto", case=False, na=False)
         _del_d0 = dfs[_del_manual_mask].copy()
+        # ── ASIN / asin: / category: を groupby前に除外（検索語のみ残す）──
+        _del_d0 = _del_d0[~_del_d0["kn"].apply(
+            lambda k: bool(ASIN_RE.match(k)) or k.startswith("asin:") or k.startswith("category:")
+        )].copy()
         _del_agg_d = {
             "keyword":        (kc,   "first"),
             "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
