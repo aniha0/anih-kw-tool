@@ -1301,31 +1301,11 @@ def page_auto_del_kw():
     )
 
 def page_auto_del_product():
-    _dbg = st.session_state.get("dbg_auto_pt", {})
-    if _dbg:
-        n1,n2,n3,n4,n5,n6,n7 = (_dbg.get(k,0) for k in ["n1","n2","n3","n4","n5","n6","n7"])
-        st.markdown('#### 📊 件数分析（集計単位: `groupby("_asin_key")` ASIN単位）')
-        _r1a,_r1b,_r1c,_r1d = st.columns(4)
-        _r1a.metric("① オート商品行数",   f"{n1:,}件")
-        _r1b.metric("② 完全一致除外後",   f"{n2:,}件", delta=f"-{n1-n2:,}除外", delta_color="off")
-        _r1c.metric("③ groupby後ASIN数",  f"{n3:,}件")
-        _r1d.metric("④ price取得成功数",  f"{n4:,}件", delta=f"-{n3-n4:,}除外", delta_color="off")
-        _r2a,_r2b,_r2c,_r2d = st.columns(4)
-        _r2a.metric("⑤ 広告費条件通過",   f"{n5:,}件")
-        _r2b.metric("⑥ ROAS条件通過",     f"{n6:,}件")
-        _r2c.metric("⑦ 最終表示件数",     f"{n7:,}件")
-        _r2d.markdown("")
-        st.caption(
-            f"②除外: {n1-n2:,}件（完全一致） ／ "
-            f"④除外: {n3-n4:,}件（未分類キャンペーン） ／ "
-            f"⑤広告費通過: {n5:,}件 ／ ⑥ROAS通過: {n6:,}件 ／ "
-            f"⑦最終(⑤AND⑥): {n7:,}件"
-        )
-        st.divider()
     df = st.session_state.get("df_auto_del_product", pd.DataFrame())
     if df.empty:
         st.info("除外候補の商品ASINはありません。（オート商品広告で出血中かつマニュアル未登録のものなし）")
         return
+    st.metric("🎯 商品件数", f"{len(df)}件")
     _del_camps = ["全キャンペーン"] + CAMPAIGNS
     _sc, _ = st.columns([3, 2])
     with _sc:
@@ -1349,31 +1329,11 @@ def page_auto_del_product():
     st.download_button("📥 除外商品ASIN候補.csv", data=_csv, file_name="除外商品ASIN候補.csv", mime="text/csv")
 
 def page_auto_del_video():
-    _dbg = st.session_state.get("dbg_auto_vid", {})
-    if _dbg:
-        n1,n2,n3,n4,n5,n6,n7 = (_dbg.get(k,0) for k in ["n1","n2","n3","n4","n5","n6","n7"])
-        st.markdown('#### 📊 件数分析（集計単位: `groupby("_asin_key")` ASIN単位）')
-        _r1a,_r1b,_r1c,_r1d = st.columns(4)
-        _r1a.metric("① オート動画行数",   f"{n1:,}件")
-        _r1b.metric("② 完全一致除外後",   f"{n2:,}件", delta=f"-{n1-n2:,}除外", delta_color="off")
-        _r1c.metric("③ groupby後ASIN数",  f"{n3:,}件")
-        _r1d.metric("④ price取得成功数",  f"{n4:,}件", delta=f"-{n3-n4:,}除外", delta_color="off")
-        _r2a,_r2b,_r2c,_r2d = st.columns(4)
-        _r2a.metric("⑤ 広告費条件通過",   f"{n5:,}件")
-        _r2b.metric("⑥ ROAS条件通過",     f"{n6:,}件")
-        _r2c.metric("⑦ 最終表示件数",     f"{n7:,}件")
-        _r2d.markdown("")
-        st.caption(
-            f"②除外: {n1-n2:,}件（完全一致） ／ "
-            f"④除外: {n3-n4:,}件（未分類キャンペーン） ／ "
-            f"⑤広告費通過: {n5:,}件 ／ ⑥ROAS通過: {n6:,}件 ／ "
-            f"⑦最終(⑤AND⑥): {n7:,}件"
-        )
-        st.divider()
     df = st.session_state.get("df_auto_del_video", pd.DataFrame())
     if df.empty:
         st.info("除外候補の動画ASINはありません。（オート動画広告で出血中かつマニュアル未登録のものなし）")
         return
+    st.metric("🎬 動画件数", f"{len(df)}件")
     _del_camps = ["全キャンペーン"] + CAMPAIGNS
     _sc, _ = st.columns([3, 2])
     with _sc:
