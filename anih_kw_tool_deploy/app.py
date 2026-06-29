@@ -779,9 +779,9 @@ if run:
                 return "検索語件数"
             _dbg_cost_counts = _dbg_cost_pass["keyword"].apply(norm).apply(_kn_type_dbg2).value_counts().to_dict()
             st.write("【cost>=price*2 通過行 種別内訳】", {k: _dbg_cost_counts.get(k, 0) for k in ["検索語件数","ASIN件数","category件数","asin:件数","その他件数"]})  # DEBUG
-            _n_akw6 = int((_agg_akw["ROAS"] <= 0.5).sum())                    # ⑥ ROAS条件通過
+            _n_akw6 = int((_agg_akw["ROAS"] <= 0.8).sum())                    # ⑥ ROAS条件通過
             df_auto_del_kw_ = _agg_akw[
-                (_agg_akw["cost"] >= _agg_akw["price"] * 2) & (_agg_akw["ROAS"] <= 0.5)
+                (_agg_akw["cost"] >= _agg_akw["price"] * 2) & (_agg_akw["ROAS"] <= 0.8)
             ].copy()
             df_auto_del_kw_.drop(columns=["price"], errors="ignore", inplace=True)
             _n_akw7 = len(df_auto_del_kw_)                                    # ⑦ 最終表示件数
@@ -822,9 +822,9 @@ if run:
             _agg3 = _agg3[_agg3["price"].notna()].copy()
             _c4 = len(_agg3)                                                       # ④ price取得成功数
             _c5 = int((_agg3["cost"] >= _agg3["price"] * 2).sum())                # ⑤ 広告費条件通過
-            _c6 = int((_agg3["ROAS"] <= 0.5).sum())                               # ⑥ ROAS条件通過
+            _c6 = int((_agg3["ROAS"] <= 0.8).sum())                               # ⑥ ROAS条件通過
             _result = _agg3[
-                (_agg3["cost"] >= _agg3["price"] * 2) & (_agg3["ROAS"] <= 0.5)
+                (_agg3["cost"] >= _agg3["price"] * 2) & (_agg3["ROAS"] <= 0.8)
             ].copy()
             _result.drop(columns=["price"], errors="ignore", inplace=True)
             _c7 = len(_result)                                                     # ⑦ 最終表示件数
@@ -1021,54 +1021,6 @@ def page_add_kw():
     st.dataframe(_dd, use_container_width=True)
 
 
-def _render_del_kw_block(df, badge_label, list_label, table_label,
-                         empty_msg=None, csv_fname=None, dl_key=None):
-    """page_del_kw() / page_auto_del_kw() 共通描画ブロック
-
-    Parameters
-    ----------
-    df          : 表示対象DataFrame (キャンペーン絞り込み済み)
-    badge_label : count-badge に表示するラベル文字列
-    list_label  : st.code 上部の "📋 ..." ラベル
-    table_label : "##### ..." テーブル見出し
-    empty_msg   : df が空のとき表示する st.info テキスト
-    csv_fname   : CSVファイル名 (Noneのときダウンロードボタン非表示)
-    dl_key      : download_button の Streamlit ウィジェットキー
-    """
-    _rn = {"keyword": "KW", "campaign_theme": "キャンペーン",
-           "cost": "広告費", "sales": "売上"}
-    n = len(df)
-    st.markdown(
-        f'<div class="count-badge" style="border-left-color:#E53E3E;">{badge_label}: '
-        f'<b style="font-size:1.1rem;color:#C53030;">{n}件</b></div>',
-        unsafe_allow_html=True,
-    )
-    if not df.empty:
-        kw_list = "\n".join(df["keyword"].tolist())
-        st.markdown(f"**📋 {list_label}**（右上のコピーボタンでコピー）")
-        st.code(kw_list, language=None)
-        st.markdown(f"##### {table_label}")
-        _disp_cols = [c for c in ["keyword", "campaign_theme", "ROAS", "cost", "sales"]
-                      if c in df.columns]
-        _dd = df[_disp_cols].copy().sort_values("ROAS", ascending=True).reset_index(drop=True)
-        _dd.index = _dd.index + 1
-        _dd = _dd.rename(columns=_rn)
-        if "広告費" in _dd.columns: _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
-        if "売上"   in _dd.columns: _dd["売上"]   = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
-        if "ROAS"   in _dd.columns: _dd["ROAS"]   = _dd["ROAS"].round(2)
-        st.dataframe(_dd, use_container_width=True)
-        if csv_fname and dl_key:
-            _rn_csv = {**_rn, "orders": "購入数", "ad_group": "広告グループ"}
-            _all_cols = [c for c in ["keyword", "campaign_theme", "cost", "ROAS",
-                                     "sales", "orders", "ad_group"] if c in df.columns]
-            _csv = df[_all_cols].rename(columns=_rn_csv).to_csv(
-                index=False, encoding="utf-8-sig").encode("utf-8-sig")
-            st.download_button(f"📥 {csv_fname}", data=_csv,
-                               file_name=csv_fname, mime="text/csv", key=dl_key)
-    else:
-        st.info(empty_msg or "削除対象キーワードはありません。")
-
-
 def page_del_kw():
     _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "< 0.8"), ("勝ちKW", "除外")])
     render_logic_section(
@@ -1132,14 +1084,119 @@ def page_del_kw():
     sel_dd = dd.copy()
     if del_camp != "全キャンペーン" and "campaign_theme" in sel_dd.columns:
         sel_dd = sel_dd[sel_dd["campaign_theme"] == del_camp].copy()
-    _render_del_kw_block(
-        sel_dd,
-        badge_label="削除対象件数",
-        list_label="削除対象KW一覧",
-        table_label="削除KW詳細テーブル",
+    n_del = len(sel_dd)
+    st.markdown(
+        f'<div class="count-badge" style="border-left-color:#E53E3E;">削除対象件数: '
+        f'<b style="font-size:1.1rem;color:#C53030;">{n_del}件</b></div>',
+        unsafe_allow_html=True,
     )
+    if not sel_dd.empty:
+        kw_list_del = "\n".join(sel_dd["keyword"].tolist())
+        st.markdown("**📋 削除対象KW一覧**（右上のコピーボタンでコピー）")
+        st.code(kw_list_del, language=None)
+        st.markdown("##### 削除KW詳細テーブル")
+        _disp_cols = [c for c in ["keyword", "campaign_theme", "ROAS", "cost", "sales"] if c in sel_dd.columns]
+        _dd2 = sel_dd[_disp_cols].copy().sort_values("ROAS", ascending=True).reset_index(drop=True)
+        _dd2.index = _dd2.index + 1
+        _rn2 = {"keyword": "KW", "campaign_theme": "キャンペーン", "cost": "広告費", "sales": "売上"}
+        _dd2 = _dd2.rename(columns=_rn2)
+        if "広告費" in _dd2.columns: _dd2["広告費"] = _dd2["広告費"].apply(lambda x: f"¥{x:,.0f}")
+        if "売上"   in _dd2.columns: _dd2["売上"]   = _dd2["売上"].apply(lambda x: f"¥{x:,.0f}")
+        if "ROAS"   in _dd2.columns: _dd2["ROAS"]   = _dd2["ROAS"].round(2)
+        st.dataframe(_dd2, use_container_width=True)
+    else:
+        st.info("削除対象キーワードはありません。")
 
 
+
+
+def _classify_auto_kw_type(kraw):
+    """オートKW種別を判定する（処理ブロック _kn_type_dbg と完全同一ロジックを再利用）。
+
+    _kn_type_dbg との対応（新規実装ゼロ・二重実装ゼロ）:
+        ASIN_RE.match(k)          → "ASIN件数"     ＝ 戻り値 "商品"
+        k.startswith("asin:")     → "asin:件数"    ＝ 戻り値 "商品"
+        k.startswith("category:") → "category件数" ＝ 戻り値 "動画"
+        else                      → "検索語件数"   ＝ 戻り値 "キーワード"
+
+    ASIN_RE: モジュールレベル定数を共有（_kn_type_dbg と同一オブジェクト）。
+    norm()  : モジュールレベル関数を共有（_auto_kw_base["kn"]=norm(kc) と同一処理）。
+
+    Parameters
+    ----------
+    kraw : str  keyword 列の値（元値）
+
+    Returns
+    -------
+    str : "商品" | "動画" | "キーワード"
+    """
+    kn = norm(str(kraw))                          # _auto_kw_base["kn"] = apply(norm) と同一正規化
+    if ASIN_RE.match(kn): return "商品"           # _kn_type_dbg 既存ロジック再利用
+    if kn.startswith("asin:"): return "商品"      # _kn_type_dbg 既存ロジック再利用
+    if kn.startswith("category:"): return "動画"  # _kn_type_dbg 既存ロジック再利用
+    return "キーワード"                            # _kn_type_dbg 既存ロジック再利用
+
+
+def _render_del_kw_block(df, badge_label, list_label, table_label,
+                         camp_label, camp_key,
+                         empty_msg=None, csv_fname=None, dl_key=None):
+    """page_del_kw() と完全に同一のUIコンポーネント・レイアウト・スタイルで1ブロックを描画する。
+
+    page_del_kw() の描画コードを共通関数として抽出したもの。
+    page_auto_del_kw() の各セクション（キーワード/商品/動画）がこの関数を呼び出す。
+
+    Parameters
+    ----------
+    df          : pd.DataFrame  表示対象 DataFrame
+    badge_label : str  カウントバッジのラベル
+    list_label  : str  コードブロックのヘッダー
+    table_label : str  詳細テーブルのヘッダー
+    camp_label  : str  selectbox のラベル
+    camp_key    : str  selectbox の key
+    empty_msg   : str  空のときの st.info メッセージ
+    csv_fname   : str  CSVファイル名（None なら DL ボタンなし）
+    dl_key      : str  download_button の key
+    """
+    _rn = {"keyword": "KW", "campaign_theme": "キャンペーン",
+           "cost": "広告費", "sales": "売上"}
+    _del_camps = ["全キャンペーン"] + CAMPAIGNS
+    _sc, _ = st.columns([3, 2])
+    with _sc:
+        _sel = st.selectbox(camp_label, _del_camps,
+                            label_visibility="visible", key=camp_key)
+    _sec = df.copy()
+    if _sel != "全キャンペーン" and "campaign_theme" in _sec.columns:
+        _sec = _sec[_sec["campaign_theme"] == _sel].copy()
+    n = len(_sec)
+    st.markdown(
+        f'<div class="count-badge" style="border-left-color:#E53E3E;">{badge_label}: '
+        f'<b style="font-size:1.1rem;color:#C53030;">{n}件</b></div>',
+        unsafe_allow_html=True,
+    )
+    if not _sec.empty:
+        kw_list = "\n".join(_sec["keyword"].tolist())
+        st.markdown(f"**📋 {list_label}**（右上のコピーボタンでコピー）")
+        st.code(kw_list, language=None)
+        st.markdown(f"##### {table_label}")
+        _disp = [c for c in ["keyword", "campaign_theme", "ROAS", "cost", "sales"]
+                 if c in _sec.columns]
+        _dd = _sec[_disp].copy().sort_values("ROAS", ascending=True).reset_index(drop=True)
+        _dd.index = _dd.index + 1
+        _dd = _dd.rename(columns=_rn)
+        if "広告費" in _dd.columns: _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
+        if "売上"   in _dd.columns: _dd["売上"]   = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
+        if "ROAS"   in _dd.columns: _dd["ROAS"]   = _dd["ROAS"].round(2)
+        st.dataframe(_dd, use_container_width=True)
+        if csv_fname and dl_key:
+            _rn_csv = {**_rn, "orders": "購入数", "ad_group": "広告グループ"}
+            _all = [c for c in ["keyword", "campaign_theme", "cost", "ROAS",
+                                 "sales", "orders", "ad_group"] if c in _sec.columns]
+            _csv = _sec[_all].rename(columns=_rn_csv).to_csv(
+                index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            st.download_button(f"📥 {csv_fname}", data=_csv,
+                               file_name=csv_fname, mime="text/csv", key=dl_key)
+    else:
+        st.info(empty_msg or "削除対象キーワードはありません。")
 
 def page_auto_del_kw():
     _dbg = st.session_state.get("dbg_auto_kw", {})
@@ -1168,67 +1225,78 @@ def page_auto_del_kw():
         st.info("除外候補のキーワードはありません。（オートKWで出血中かつマニュアル未登録のものなし）")
         return
 
-    # ターゲティング種別で完全排他的に振り分け（1件は必ず1セクションのみ）
-    def _akw_type(k):
-        """keyword列の生値で種別を判定する（正規化前の原文で判定）
-
-        商品: ASIN形式 (B0XXXXXXXXXX) または "asin:" プレフィックス
-        動画: "category:" プレフィックス または "動画ターゲティング"
-        キーワード: 上記以外の通常検索語
-        """
-        ks = str(k).strip()           # 生値（大文字小文字そのまま）
-        kl = ks.lower()               # 小文字化（プレフィックス比較用）
-        # ── 商品判定 ──────────────────────────────────────────────────
-        if ASIN_RE.match(ks): return "商品"   # B0XXXXXXXXXX (大文字ASIN)
-        if ASIN_RE.match(kl): return "商品"   # b0xxxxxxxxxx (正規化済みの場合)
-        if kl.startswith("asin:"): return "商品"
-        # ── 動画判定 ──────────────────────────────────────────────────
-        if kl.startswith("category:"): return "動画"
-        if "動画ターゲティング" in ks: return "動画"
-        # ── キーワード（通常検索語）────────────────────────────────────
-        return "キーワード"
-
+    # ── ターゲティング種別で完全排他的に振り分け ───────────────────────────
+    # _classify_auto_kw_type() は処理ブロック _kn_type_dbg と同一ロジックを再利用
+    # ASIN_RE（モジュールレベル定数）を共有。新規実装・二重実装なし。
     _df_typed = df.copy()
-    _df_typed["_type"] = _df_typed["keyword"].apply(_akw_type)
-    # 完全排他的振り分け: 各行は必ずどれか1つのDFにのみ属する
-    df_kw  = _df_typed[_df_typed["_type"] == "キーワード"].drop(columns=["_type"]).reset_index(drop=True)
-    df_pt  = _df_typed[_df_typed["_type"] == "商品"].drop(columns=["_type"]).reset_index(drop=True)
-    df_vid = _df_typed[_df_typed["_type"] == "動画"].drop(columns=["_type"]).reset_index(drop=True)
+    _df_typed["_type"] = _df_typed["keyword"].apply(_classify_auto_kw_type)
+    df_auto_del_kw_keyword = _df_typed[_df_typed["_type"] == "キーワード"].drop(columns=["_type"]).reset_index(drop=True)
+    df_auto_del_kw_product = _df_typed[_df_typed["_type"] == "商品"].drop(columns=["_type"]).reset_index(drop=True)
+    df_auto_del_kw_video   = _df_typed[_df_typed["_type"] == "動画"].drop(columns=["_type"]).reset_index(drop=True)
 
-    # page_del_kw() と完全同一の _render_del_kw_block() を各セクションで呼び出す
-    st.markdown("")
+    # ── 件数検証（必須）─────────────────────────────────────────────────
+    n_total = len(df)
+    n_kw    = len(df_auto_del_kw_keyword)
+    n_pt    = len(df_auto_del_kw_product)
+    n_vid   = len(df_auto_del_kw_video)
+    _cnt_c1, _cnt_c2, _cnt_c3, _cnt_c4 = st.columns(4)
+    _cnt_c1.metric("元件数",           f"{n_total}件")
+    _cnt_c2.metric("📄 キーワード件数", f"{n_kw}件")
+    _cnt_c3.metric("🎯 商品件数",       f"{n_pt}件")
+    _cnt_c4.metric("🎬 動画件数",       f"{n_vid}件")
+    if n_kw + n_pt + n_vid == n_total:
+        st.success(f"分類件数一致 ✅  キーワード {n_kw}件 ＋ 商品 {n_pt}件 ＋ 動画 {n_vid}件 ＝ {n_total}件")
+    else:
+        st.error(f"分類件数不一致 ❌  キーワード {n_kw}件 ＋ 商品 {n_pt}件 ＋ 動画 {n_vid}件 ≠ 元データ {n_total}件")
+
+    # ── キーワードセクション ─────────────────────────────────────────────
+    st.markdown("### 📄 キーワード")
     _render_del_kw_block(
-        df_kw,
-        badge_label="🔤 キーワード除外候補",
+        df_auto_del_kw_keyword,
+        badge_label="キーワード除外候補",
         list_label="除外対象KW一覧",
         table_label="除外KW詳細テーブル",
+        camp_label="キャンペーン（キーワード）",
+        camp_key="auto_kw_camp_kw",
         empty_msg="除外候補のキーワードはありません。",
         csv_fname="auto_negative_keyword.csv",
-        dl_key="dl_auto_kw",
+        dl_key="dl_akw_kw",
     )
 
-    st.markdown(""); st.divider(); st.markdown("")
+    st.markdown("")
+    st.divider()
+    st.markdown("")
 
+    # ── 商品セクション ───────────────────────────────────────────────────
+    st.markdown("### 🎯 商品")
     _render_del_kw_block(
-        df_pt,
-        badge_label="🎯 商品除外候補",
+        df_auto_del_kw_product,
+        badge_label="商品除外候補",
         list_label="除外対象商品ターゲティング一覧",
         table_label="除外商品詳細テーブル",
+        camp_label="キャンペーン（商品）",
+        camp_key="auto_kw_camp_pt",
         empty_msg="除外候補の商品ターゲティングはありません。",
         csv_fname="auto_negative_product.csv",
-        dl_key="dl_auto_pt",
+        dl_key="dl_akw_pt",
     )
 
-    st.markdown(""); st.divider(); st.markdown("")
+    st.markdown("")
+    st.divider()
+    st.markdown("")
 
+    # ── 動画セクション ───────────────────────────────────────────────────
+    st.markdown("### 🎬 動画")
     _render_del_kw_block(
-        df_vid,
-        badge_label="📹 動画除外候補",
+        df_auto_del_kw_video,
+        badge_label="動画除外候補",
         list_label="除外対象動画ターゲティング一覧",
         table_label="除外動画詳細テーブル",
+        camp_label="キャンペーン（動画）",
+        camp_key="auto_kw_camp_vid",
         empty_msg="除外候補の動画ターゲティングはありません。",
         csv_fname="auto_negative_video.csv",
-        dl_key="dl_auto_vid",
+        dl_key="dl_akw_vid",
     )
 
 def page_auto_del_product():
@@ -1257,7 +1325,7 @@ def page_auto_del_product():
     if df.empty:
         st.info("除外候補の商品ASINはありません。（オート商品広告で出血中かつマニュアル未登録のものなし）")
         return
-    st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.5 / マニュアル商品重複除外済み")
+    st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.8 / マニュアル商品重複除外済み")
     _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
     _rn = {"asin":"ASIN","campaign_theme":"キャンペーン","cost":"広告費",
            "sales":"売上","orders":"購入数","campaign_name":"キャンペーン名","ad_group":"広告グループ"}
@@ -1295,7 +1363,7 @@ def page_auto_del_video():
     if df.empty:
         st.info("除外候補の動画ASINはありません。（オート動画広告で出血中かつマニュアル未登録のものなし）")
         return
-    st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.5 / マニュアル動画重複除外済み")
+    st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.8 / マニュアル動画重複除外済み")
     _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
     _rn = {"asin":"ASIN","campaign_theme":"キャンペーン","cost":"広告費",
            "sales":"売上","orders":"購入数","campaign_name":"キャンペーン名","ad_group":"広告グループ"}
