@@ -1275,27 +1275,6 @@ def _render_del_kw_block(df, badge_label, list_label, table_label,
         st.info(empty_msg or "削除対象キーワードはありません。")
 
 def page_auto_del_kw():
-    _dbg = st.session_state.get("dbg_auto_kw", {})
-    if _dbg:
-        n1,n2,n3,n4,n5,n6,n7 = (_dbg.get(k,0) for k in ["n1","n2","n3","n4","n5","n6","n7"])
-        st.markdown('#### 📊 件数分析（集計単位: `groupby("kn")` 検索語句単位）')
-        _r1a,_r1b,_r1c,_r1d = st.columns(4)
-        _r1a.metric("① オート広告行数",   f"{n1:,}件")
-        _r1b.metric("② 完全一致除外後",   f"{n2:,}件", delta=f"-{n1-n2:,}除外", delta_color="off")
-        _r1c.metric("③ groupby後KW数",    f"{n3:,}件")
-        _r1d.metric("④ price取得成功数",  f"{n4:,}件", delta=f"-{n3-n4:,}除外", delta_color="off")
-        _r2a,_r2b,_r2c,_r2d = st.columns(4)
-        _r2a.metric("⑤ 広告費条件通過",   f"{n5:,}件")
-        _r2b.metric("⑥ ROAS条件通過",     f"{n6:,}件")
-        _r2c.metric("⑦ 最終表示件数",     f"{n7:,}件")
-        _r2d.markdown("")
-        st.caption(
-            f"②除外: {n1-n2:,}件（完全一致） ／ "
-            f"④除外: {n3-n4:,}件（未分類キャンペーン） ／ "
-            f"⑤広告費通過: {n5:,}件 ／ ⑥ROAS通過: {n6:,}件 ／ "
-            f"⑦最終(⑤AND⑥): {n7:,}件"
-        )
-        st.divider()
     # ── session_stateからキーワードDataFrameを取得（商品/動画は別ページへ合流済み）──
     df_auto_del_kw_keyword = st.session_state.get("df_auto_del_kw_keyword", pd.DataFrame())
 
@@ -1347,6 +1326,16 @@ def page_auto_del_product():
     if df.empty:
         st.info("除外候補の商品ASINはありません。（オート商品広告で出血中かつマニュアル未登録のものなし）")
         return
+    _del_camps = ["全キャンペーン"] + CAMPAIGNS
+    _sc, _ = st.columns([3, 2])
+    with _sc:
+        _sel = st.selectbox("キャンペーン（商品）", _del_camps,
+                            label_visibility="visible", key="auto_pt_camp_sel")
+    if _sel != "全キャンペーン" and "campaign_theme" in df.columns:
+        df = df[df["campaign_theme"] == _sel].copy()
+    if df.empty:
+        st.info("除外候補の商品ASINはありません。")
+        return
     st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.8 / マニュアル商品重複除外済み")
     _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
     _rn = {"asin":"ASIN","campaign_theme":"キャンペーン","cost":"広告費",
@@ -1384,6 +1373,16 @@ def page_auto_del_video():
     df = st.session_state.get("df_auto_del_video", pd.DataFrame())
     if df.empty:
         st.info("除外候補の動画ASINはありません。（オート動画広告で出血中かつマニュアル未登録のものなし）")
+        return
+    _del_camps = ["全キャンペーン"] + CAMPAIGNS
+    _sc, _ = st.columns([3, 2])
+    with _sc:
+        _sel = st.selectbox("キャンペーン（動画）", _del_camps,
+                            label_visibility="visible", key="auto_vid_camp_sel")
+    if _sel != "全キャンペーン" and "campaign_theme" in df.columns:
+        df = df[df["campaign_theme"] == _sel].copy()
+    if df.empty:
+        st.info("除外候補の動画ASINはありません。")
         return
     st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.8 / マニュアル動画重複除外済み")
     _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
