@@ -896,8 +896,6 @@ if run:
                    "clk":clk,"imp":imp,"rn":len(reg),"br":brands},
         })
         st.write(st.session_state["dbg_auto_kw"])  # DEBUG
-        st.write("DEBUG session_state df_auto_del_kw")
-        st.write(st.session_state["df_auto_del_kw"].head(20))
 
 # ─── No results: placeholder ─────────────────────────
 if not st.session_state.get("has_results"):
@@ -1184,17 +1182,6 @@ def _render_del_kw_block(df, badge_label, list_label, table_label,
     csv_fname   : str  CSVファイル名（None なら DL ボタンなし）
     dl_key      : str  download_button の key
     """
-    st.write(
-        "DEBUG render",
-        badge_label,
-        id(df),
-        len(df),
-    )
-    st.write(df.head(20))
-    st.write(
-        "B0 only",
-        df[df["keyword"].astype(str).str.match(r"^B0", na=False)]
-    )
     _rn = {"keyword": "KW", "campaign_theme": "キャンペーン",
            "cost": "広告費", "sales": "売上"}
     _del_camps = ["全キャンペーン"] + CAMPAIGNS
@@ -1259,8 +1246,6 @@ def page_auto_del_kw():
         )
         st.divider()
     df = st.session_state.get("df_auto_del_kw", pd.DataFrame())
-    st.write("DEBUG page_auto_del_kw len", len(df))
-    st.write(df.head(20))
     if df.empty:
         st.info("除外候補のキーワードはありません。（オートKWで出血中かつマニュアル未登録のものなし）")
         return
@@ -1273,15 +1258,6 @@ def page_auto_del_kw():
     df_auto_del_kw_keyword = _df_typed[_df_typed["_type"] == "キーワード"].drop(columns=["_type"]).reset_index(drop=True)
     df_auto_del_kw_product = _df_typed[_df_typed["_type"] == "商品"].drop(columns=["_type"]).reset_index(drop=True)
     df_auto_del_kw_video   = _df_typed[_df_typed["_type"] == "動画"].drop(columns=["_type"]).reset_index(drop=True)
-
-    st.write("DEBUG keyword")
-    st.write(df_auto_del_kw_keyword)
-
-    st.write("DEBUG product")
-    st.write(df_auto_del_kw_product)
-
-    st.write("DEBUG video")
-    st.write(df_auto_del_kw_video)
 
     # ── 件数検証（必須）─────────────────────────────────────────────────
     n_total = len(df)
@@ -1300,7 +1276,6 @@ def page_auto_del_kw():
 
     # ── キーワードセクション ─────────────────────────────────────────────
     st.markdown("### 📄 キーワード")
-    st.write("CALL keyword")
     _render_del_kw_block(
         df_auto_del_kw_keyword,
         badge_label="キーワード除外候補",
@@ -1319,7 +1294,6 @@ def page_auto_del_kw():
 
     # ── 商品セクション ───────────────────────────────────────────────────
     st.markdown("### 🎯 商品")
-    st.write("CALL product")
     _render_del_kw_block(
         df_auto_del_kw_product,
         badge_label="商品除外候補",
@@ -1338,7 +1312,6 @@ def page_auto_del_kw():
 
     # ── 動画セクション ───────────────────────────────────────────────────
     st.markdown("### 🎬 動画")
-    st.write("CALL video")
     _render_del_kw_block(
         df_auto_del_kw_video,
         badge_label="動画除外候補",
