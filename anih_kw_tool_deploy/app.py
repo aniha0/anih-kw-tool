@@ -540,8 +540,29 @@ if run:
         dw = deduplicate_keyword_intent(d1)
         nf = len(dw)
         win_kws = set(dw["keyword"].tolist())
-        del_mask = (agg["cost"] >= agg["price"] * 2) & (agg["ROAS"] < 0.8)
-        df_del_ = agg[del_mask].copy()
+        # ── キーワード削除用: マニュアルキャンペーンのみを母集団にして集計 ──
+        # オートキャンペーンを含まない行のみ抽出（オート除外KWとは完全に別ロジック）
+        _del_manual_mask = ~dfs[cc].str.contains("オート|auto", case=False, na=False)
+        _del_d0 = dfs[_del_manual_mask].copy()
+        _del_agg_d = {
+            "keyword":        (kc,   "first"),
+            "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
+            "sales":          (sc,   "sum"),
+            "cost":           (oc_,  "sum"),
+        }
+        if od:  _del_agg_d["orders"]      = (od,  "sum")
+        if clk: _del_agg_d["clicks"]      = (clk, "sum")
+        if imp: _del_agg_d["impressions"] = (imp, "sum")
+        _del_agg = _del_d0.groupby("kn").agg(**_del_agg_d).reset_index(drop=True)
+        _del_agg["ROAS"] = _del_agg.apply(
+            lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+        if "clicks" in _del_agg.columns and "orders" in _del_agg.columns:
+            _del_agg["CVR"] = _del_agg.apply(
+                lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0, axis=1)
+        _del_agg["price"] = _del_agg["campaign_theme"].map(PRICES)
+        _del_agg = _del_agg[_del_agg["price"].notna()].copy()
+        del_mask = (_del_agg["cost"] >= _del_agg["price"] * 2) & (_del_agg["ROAS"] < 0.8)
+        df_del_ = _del_agg[del_mask].copy()
         df_del_ = df_del_[~df_del_["keyword"].isin(win_kws)].copy()
         df_del_.drop(columns=["price"], inplace=True, errors="ignore")
         # ── CPC用: Manual KWのみ抽出（Customer Search Termではなく Keyword Text単位）
