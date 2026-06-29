@@ -10,6 +10,16 @@ import streamlit as st
 # 定数
 # ===================================================
 ASIN_RE = re.compile(r"^B0[A-Z0-9]{8}$", re.IGNORECASE)
+
+def is_asin_kn(kn: str) -> bool:
+    """ASIN判定の単一基準。ファイル全体でこの関数のみを使用する。"""
+    kn = str(kn)
+    return bool(ASIN_RE.match(kn)) or kn.startswith("asin:")
+
+def is_category_kn(kn: str) -> bool:
+    """category判定の単一基準。ファイル全体でこの関数のみを使用する。"""
+    return str(kn).startswith("category:")
+
 DEFAULT_BRANDS = "アニハ\nANIHA\nゾイック\nノルバサン\nマラセブ"
 
 CAMPAIGNS = [
@@ -549,7 +559,7 @@ if run:
         _del_d0 = dfs[_del_manual_mask].copy()
         # ── ASIN / asin: / category: を groupby前に除外（検索語のみ残す）──
         _del_d0 = _del_d0[~_del_d0["kn"].apply(
-            lambda k: bool(ASIN_RE.match(k)) or k.startswith("asin:") or k.startswith("category:")
+            lambda k: is_asin_kn(k) or is_category_kn(k)
         )].copy()
         _del_agg_d = {
             "keyword":        (kc,   "first"),
@@ -595,12 +605,11 @@ if run:
 
         # ②Product Targeting除外 (ASIN/category/asin:/complement/substitute)
         def _is_pt(s):
-            s = str(s).strip()
-            return (bool(_re.match(r"^[Bb]0[A-Za-z0-9]{8}", s))
-                    or s.lower().startswith("category:")
-                    or s.lower().startswith("asin:")
-                    or "complement" in s.lower()
-                    or "substitute" in s.lower())
+            kn = norm(s)
+            return (is_asin_kn(kn)
+                    or is_category_kn(kn)
+                    or "complement" in kn
+                    or "substitute" in kn)
         if cpc_kw_col:
             _pt_mask = _cpc_raw[cpc_kw_col].apply(_is_pt)
         else:
@@ -796,21 +805,31 @@ if run:
 
             # ── キーワード専用DataFrame: ASIN / asin: / category: をgroupby前に除外 ──
             _base_kw = _auto_kw_base[~_auto_kw_base["kn"].apply(
-                lambda k: bool(ASIN_RE.match(k)) or k.startswith("asin:") or k.startswith("category:")
+                lambda k: is_asin_kn(k) or is_category_kn(k)
             )].copy()
-            _agg_kw = _base_kw.groupby("kn").agg(**_make_agg_d()).reset_index(drop=True)
+
+            st.write(_base_kw["kn"].head(30))
+            st.write(_base_kw[_base_kw["kn"].str.startswith("b0", na=False)])
+            st.write(_base_kw[_base_kw["kn"].str.startswith("category:", na=False)])
+
+            _agg_kw = (
+                _base_kw
+                .groupby("kn", as_index=False)
+                .agg(**_make_agg_d())
+            )
+            _agg_kw["keyword"] = _agg_kw["kn"]
             df_auto_del_kw_keyword_ = _apply_del_filter(_agg_kw)
 
             # ── 商品専用DataFrame: ASINのみ残す ──
             _base_pt = _auto_kw_base[_auto_kw_base["kn"].apply(
-                lambda k: bool(ASIN_RE.match(k)) or k.startswith("asin:")
+                lambda k: is_asin_kn(k)
             )].copy()
             _agg_pt = _base_pt.groupby("kn").agg(**_make_agg_d()).reset_index(drop=True)
             df_auto_del_kw_product_ = _apply_del_filter(_agg_pt)
 
             # ── 動画専用DataFrame: category: のみ残す ──
             _base_vid = _auto_kw_base[_auto_kw_base["kn"].apply(
-                lambda k: k.startswith("category:")
+                lambda k: is_category_kn(k)
             )].copy()
             _agg_vid = _base_vid.groupby("kn").agg(**_make_agg_d()).reset_index(drop=True)
             df_auto_del_kw_video_ = _apply_del_filter(_agg_vid)
@@ -1148,15 +1167,15 @@ def page_del_kw():
 
 
 def _classify_auto_kw_type(kraw):
-    """オートKW種別を判定する（処理ブロック _kn_type_dbg と完全同一ロジックを再利用）。
+    """オートKW種別を判定する（is_asin_kn / is_category_kn と完全同一基準）。
 
-    _kn_type_dbg との対応（新規実装ゼロ・二重実装ゼロ）:
-        ASIN_RE.match(k)          → "ASIN件数"     ＝ 戻り値 "商品"
-        k.startswith("asin:")     → "asin:件数"    ＝ 戻り値 "商品"
-        k.startswith("category:") → "category件数" ＝ 戻り値 "動画"
-        else                      → "検索語件数"   ＝ 戻り値 "キーワード"
+    対応関係:
+        is_asin_kn(kn)     → 戻り値 "商品"
+        is_category_kn(kn) → 戻り値 "動画"
+        else                → 戻り値 "キーワード"
 
-    ASIN_RE: モジュールレベル定数を共有（_kn_type_dbg と同一オブジェクト）。
+    is_asin_kn() / is_category_kn(): モジュールレベル関数を共有
+        （_base_kw / _base_pt / _base_vid と同一の判定基準）。
     norm()  : モジュールレベル関数を共有（_auto_kw_base["kn"]=norm(kc) と同一処理）。
 
     Parameters
@@ -1168,10 +1187,9 @@ def _classify_auto_kw_type(kraw):
     str : "商品" | "動画" | "キーワード"
     """
     kn = norm(str(kraw))                          # _auto_kw_base["kn"] = apply(norm) と同一正規化
-    if ASIN_RE.match(kn): return "商品"           # _kn_type_dbg 既存ロジック再利用
-    if kn.startswith("asin:"): return "商品"      # _kn_type_dbg 既存ロジック再利用
-    if kn.startswith("category:"): return "動画"  # _kn_type_dbg 既存ロジック再利用
-    return "キーワード"                            # _kn_type_dbg 既存ロジック再利用
+    if is_asin_kn(kn): return "商品"              # _base_kw / _base_pt と同一基準
+    if is_category_kn(kn): return "動画"          # _base_kw / _base_vid と同一基準
+    return "キーワード"                            # 上記いずれにも該当しない場合
 
 
 def _render_del_kw_block(df, badge_label, list_label, table_label,
