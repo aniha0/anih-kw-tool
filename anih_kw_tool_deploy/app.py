@@ -742,6 +742,16 @@ if run:
             _dup_kw = _auto_kw_base["kn"].isin(_manual_reg_kw)
             _auto_kw_base = _auto_kw_base[~_dup_kw].copy()
             _n_akw2 = len(_auto_kw_base)                                       # ② マニュアル重複除外後（行数）
+            # DEBUG: groupby前 _auto_kw_base 種別内訳
+            def _kn_type_dbg(k):
+                k = str(k)
+                if ASIN_RE.match(k): return "ASIN件数"
+                if k.startswith("asin:"): return "asin:件数"
+                if k.startswith("category:"): return "category件数"
+                if k in ("", "nan"): return "その他件数"
+                return "検索語件数"
+            _dbg_type_counts = _auto_kw_base["kn"].apply(_kn_type_dbg).value_counts().to_dict()
+            st.write({k: _dbg_type_counts.get(k, 0) for k in ["検索語件数","ASIN件数","category件数","asin:件数","その他件数"]})  # DEBUG
             _agg_akw_d = {
                 "keyword":        (kc,    "first"),
                 "campaign_theme": ("ct",  lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
@@ -758,6 +768,17 @@ if run:
             _agg_akw = _agg_akw[_agg_akw["price"].notna()].copy()
             _n_akw4 = len(_agg_akw)                                            # ④ price取得成功数
             _n_akw5 = int((_agg_akw["cost"] >= _agg_akw["price"] * 2).sum())  # ⑤ 広告費条件通過
+            # DEBUG: cost >= price*2 通過行の種別内訳
+            _dbg_cost_pass = _agg_akw[_agg_akw["cost"] >= _agg_akw["price"] * 2].copy()
+            def _kn_type_dbg2(k):
+                k = str(k)
+                if ASIN_RE.match(k): return "ASIN件数"
+                if k.startswith("asin:"): return "asin:件数"
+                if k.startswith("category:"): return "category件数"
+                if k in ("", "nan"): return "その他件数"
+                return "検索語件数"
+            _dbg_cost_counts = _dbg_cost_pass["keyword"].apply(norm).apply(_kn_type_dbg2).value_counts().to_dict()
+            st.write("【cost>=price*2 通過行 種別内訳】", {k: _dbg_cost_counts.get(k, 0) for k in ["検索語件数","ASIN件数","category件数","asin:件数","その他件数"]})  # DEBUG
             _n_akw6 = int((_agg_akw["ROAS"] <= 0.5).sum())                    # ⑥ ROAS条件通過
             df_auto_del_kw_ = _agg_akw[
                 (_agg_akw["cost"] >= _agg_akw["price"] * 2) & (_agg_akw["ROAS"] <= 0.5)
