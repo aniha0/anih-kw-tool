@@ -386,12 +386,11 @@ _VALID_PAGES = {
     "📹 動画追加",     "📹 動画削除",
     "📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除",
     "📥 ダウンロード", "📖 取扱説明書",
-    "📊 KW追加分析", "📊 CPC分析",
 }
-_ADD_PAGES = {"📋 キーワード追加", "➕ 商品追加", "📹 動画追加", "📊 KW追加分析"}
+_ADD_PAGES = {"📋 キーワード追加", "➕ 商品追加", "📹 動画追加"}
 _DEL_PAGES = {"🚫 キーワード削除", "🗑️ 商品削除", "📹 動画削除"}
 _AUTO_DEL_PAGES = {"📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除"}
-_CPC_PAGES = {"📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整", "📊 CPC分析"}
+_CPC_PAGES = {"📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整"}
 
 if "current_page" not in st.session_state or st.session_state["current_page"] not in _VALID_PAGES:
     st.session_state["current_page"] = "📋 キーワード追加"
@@ -411,7 +410,6 @@ with st.sidebar:
         _nav_btn("キーワード",  "📋 キーワード追加",               "📋 ")
         _nav_btn("商品",        "➕ 商品追加", "🎯 ")
         _nav_btn("動画",        "📹 動画追加",       "📹 ")
-        _nav_btn("分析",        "📊 KW追加分析",     "📊 ")
     # ── 削除
     with st.expander("🚫  キーワード削除", expanded=(_cp in _DEL_PAGES)):
         _nav_btn("キーワード",  "🚫 キーワード削除",               "📋 ")
@@ -422,7 +420,6 @@ with st.sidebar:
         _nav_btn("キーワード",  "📈 キーワードCPC調整",   "📋 ")
         _nav_btn("商品",        "🎯 商品CPC調整", "🎯 ")
         _nav_btn("動画",        "📹 動画CPC調整", "📹 ")
-        _nav_btn("分析",        "📊 CPC分析",     "📊 ")
     # ── オート除外KW
     with st.expander("🧹  オート除外KW", expanded=(_cp in _AUTO_DEL_PAGES)):
         _nav_btn("キーワード",  "📄 オートKW削除",    "📄 ")
@@ -1008,96 +1005,100 @@ def render_logic_section(title: str, content_html: str):
 # ===================================================
 
 def page_add_kw():
-    _cond_bar([
-        ("最小注文数",  f'{sv["mo"]}件'),
-        ("最小クリック数", f'{sv["mc"]}回'),
-        ("最小広告費",  f'¥{sv["mco"]:,}'),
-    ])
+    _t_tab1, _t_tab2 = st.tabs(["改善", "分析"])
+    with _t_tab1:
+        _cond_bar([
+            ("最小注文数",  f'{sv["mo"]}件'),
+            ("最小クリック数", f'{sv["mc"]}回'),
+            ("最小広告費",  f'¥{sv["mco"]:,}'),
+        ])
 
-    render_logic_section(
-        "📋 キーワード追加 判定ロジック",
-        '''
-<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
-<thead>
-  <tr style="background:#DBEAFE;">
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>
-  </tr>
-</thead>
-<tbody>
-  <tr style="background:#F1F5F9;">
-    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【目的】</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;" colspan="2">
-      オート広告で成果が出た検索語句を、手動広告（部分一致）のマニュアルキーワードへ追加する候補を抽出します。
-    </td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【抽出条件】</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">信頼度フィルター</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      注文数 ≥ 3件 <b>かつ</b> クリック数 ≥ 5 <b>かつ</b> 広告費 ≥ ¥300<br>
-      <span style="font-size:.8rem;color:#718096;">サイドバーで変更可能</span>
-    </td>
-  </tr>
-  <tr style="background:#F0FFF4;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">採用条件</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">売上 ≥ 売価 × 2 <b>かつ</b> ROAS ≥ 2.0</td>
-  </tr>
-</tbody>
-</table>
-<p style="font-size:.78rem;color:#718096;margin-top:10px;">
-  ▶ 同一意図KW統合: 語順・表記ゆれが同じKWは代表1件に集約<br>
-  ▶ ブランドワード・商品コード・タイトル文字列は自動除外
-</p>''',
-    )
-    st.markdown("")
-    # ② キャンペーン選択
-    _c1, _c3 = st.columns([3, 2])
-    with _c1:
-        kw_camp = st.selectbox(
-            "キャンペーン",
-            ["全キャンペーン"] + CAMPAIGNS,
-            label_visibility="visible",
-            key="add_camp_sel",
+        render_logic_section(
+            "📋 キーワード追加 判定ロジック",
+            '''
+    <table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
+    <thead>
+      <tr style="background:#DBEAFE;">
+        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>
+        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background:#F1F5F9;">
+        <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【目的】</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;" colspan="2">
+          オート広告で成果が出た検索語句を、手動広告（部分一致）のマニュアルキーワードへ追加する候補を抽出します。
+        </td>
+      </tr>
+      <tr style="background:#F1F5F9;">
+        <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【抽出条件】</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">信頼度フィルター</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">
+          注文数 ≥ 3件 <b>かつ</b> クリック数 ≥ 5 <b>かつ</b> 広告費 ≥ ¥300<br>
+          <span style="font-size:.8rem;color:#718096;">サイドバーで変更可能</span>
+        </td>
+      </tr>
+      <tr style="background:#F0FFF4;">
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">採用条件</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">売上 ≥ 売価 × 2 <b>かつ</b> ROAS ≥ 2.0</td>
+      </tr>
+    </tbody>
+    </table>
+    <p style="font-size:.78rem;color:#718096;margin-top:10px;">
+      ▶ 同一意図KW統合: 語順・表記ゆれが同じKWは代表1件に集約<br>
+      ▶ ブランドワード・商品コード・タイトル文字列は自動除外
+    </p>''',
         )
-    sel_df = dw.copy()
+        st.markdown("")
+        # ② キャンペーン選択
+        _c1, _c3 = st.columns([3, 2])
+        with _c1:
+            kw_camp = st.selectbox(
+                "キャンペーン",
+                ["全キャンペーン"] + CAMPAIGNS,
+                label_visibility="visible",
+                key="add_camp_sel",
+            )
+        sel_df = dw.copy()
 
-    if kw_camp != "全キャンペーン":
-        sel_df = sel_df[sel_df["campaign_theme"] == kw_camp].copy()
+        if kw_camp != "全キャンペーン":
+            sel_df = sel_df[sel_df["campaign_theme"] == kw_camp].copy()
 
-    n_sel = len(sel_df)
+        n_sel = len(sel_df)
 
-    # 件数表示
-    st.markdown(
-        f'<div class="count-badge">該当件数: <b style="font-size:1.1rem;">{n_sel}件</b>'
-        f'　<span style="color:#718096;font-size:.8rem;">キャンペーン: {kw_camp}</span></div>',
-        unsafe_allow_html=True,
-    )
+        # 件数表示
+        st.markdown(
+            f'<div class="count-badge">該当件数: <b style="font-size:1.1rem;">{n_sel}件</b>'
+            f'　<span style="color:#718096;font-size:.8rem;">キャンペーン: {kw_camp}</span></div>',
+            unsafe_allow_html=True,
+        )
 
-    if sel_df.empty:
-        st.info("条件に合うキーワードはありません。")
-        return
+        if sel_df.empty:
+            st.info("条件に合うキーワードはありません。")
+            return
 
-    # ④ コピー用KW一覧
-    kw_list = "\n".join(sel_df.sort_values("ROAS", ascending=False)["keyword"].tolist())
-    st.markdown("**📋 Amazon広告登録用KW一覧**（右上のコピーボタンでコピー）")
-    st.code(kw_list, language=None)
+        # ④ コピー用KW一覧
+        kw_list = "\n".join(sel_df.sort_values("ROAS", ascending=False)["keyword"].tolist())
+        st.markdown("**📋 Amazon広告登録用KW一覧**（右上のコピーボタンでコピー）")
+        st.code(kw_list, language=None)
 
-    # ⑤ 詳細テーブル
-    st.markdown("##### KW詳細テーブル")
-    _dd = sel_df[bcols(sel_df)].copy().sort_values("ROAS", ascending=False).reset_index(drop=True)
-    _dd.index = _dd.index + 1
-    _dd = _dd.rename(columns=RENAME)
-    _dd["売上"]  = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
-    _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    _dd["ROAS"]  = _dd["ROAS"].round(2)
-    if "CVR" in _dd.columns:
-        _dd["CVR"] = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
-    st.dataframe(_dd, use_container_width=True)
+        # ⑤ 詳細テーブル
+        st.markdown("##### KW詳細テーブル")
+        _dd = sel_df[bcols(sel_df)].copy().sort_values("ROAS", ascending=False).reset_index(drop=True)
+        _dd.index = _dd.index + 1
+        _dd = _dd.rename(columns=RENAME)
+        _dd["売上"]  = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
+        _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
+        _dd["ROAS"]  = _dd["ROAS"].round(2)
+        if "CVR" in _dd.columns:
+            _dd["CVR"] = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
+        st.dataframe(_dd, use_container_width=True)
+    with _t_tab2:
+        st.info("分析機能は次工程で実装予定です。")
 
 
 def page_del_kw():
@@ -1360,196 +1361,200 @@ def page_auto_del_video():
     st.download_button("📥 除外動画ASIN候補.csv", data=_csv, file_name="除外動画ASIN候補.csv", mime="text/csv")
 
 def page_cpc():
-    _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
-    _RC = {
-        "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
-        "A":   "#2C7A7B", "B": "#2B6CB0", "C": "#C05621",
-        "D":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
-    }
-    _cond_bar([("CPC調整ルール", "適用"), ("最小クリック数", f"{sv['mc']}回")])
-    render_logic_section(
-        "📈 CPC調整ロジック",
-        '''
-<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
-<thead>
-  <tr style="background:#DBEAFE;">
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:15%;">ランク</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:45%;">判定条件</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">アクション</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">CPC変更幅</th>
-  </tr>
-</thead>
-<tbody>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 1】 データ不足判定（最優先）
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#4A5568;">判断保留</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>かつ</b> 購入数 &lt; 4件</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">変更なし</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 2】 高実績ランク（購入数 ≥ 20件）
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#D69E2E;">SS+</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> ROAS ≥ 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
-  </tr>
-  <tr style="background:#FFFBEB;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#B7791F;">SS</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> 2.0 ≤ ROAS &lt; 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 3】 ROASベースランク
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#553C9A;">S</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS ≥ 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
-  </tr>
-  <tr style="background:#F0FFF4;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2C7A7B;">A</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">3.0 ≤ ROAS &lt; 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2B6CB0;">B</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.8 ≤ ROAS &lt; 3.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">C</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 1.8</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">D</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS &lt; 1.5</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 4】 即削除判定（広告費過多 × 低ROAS）
-    </td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#742A2A;">即削除</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      ROAS &lt; 0.8 <b>かつ</b> 広告費が閾値以上<br>
-      <span style="font-size:.8rem;color:#718096;">
-        売価 ≤¥1,500 → 広告費 ≥¥3,000 ／
-        売価 ≤¥2,000 → 広告費 ≥¥4,000 ／
-        売価 &gt;¥2,000 → 広告費 ≥¥5,000
-      </span>
-    </td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#742A2A;font-weight:700;">即削除</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">—</td>
-  </tr>
-</tbody>
-</table>
-<p style="font-size:.78rem;color:#718096;margin-top:10px;">
-  ▶ 判定順序: STEP1（データ不足）→ STEP2（購入数優先） → STEP3（ROASベース） → STEP4（即削除）<br>
-  ▶ 基本思想: ROASだけでなく、広告費と購入数を重視した複合判定
-</p>''',
-    )
-    if dc_cpc.empty:
-        st.info("分析を実行してください。")
-        return
-    sel_options = ["全商品"] + [c for c in CAMPAIGNS if not dc_cpc[dc_cpc["campaign_theme"] == c].empty]
-    _sc, _ = st.columns([3, 2])
-    with _sc:
-        cpc_camp = st.selectbox("商品選択（キーワードCPC調整）", sel_options, label_visibility="visible", key="cpc_camp_sel")
-    if cpc_camp == "全商品":
-        df_c = dc_cpc.copy()
-    else:
-        df_c = dc_cpc[dc_cpc["campaign_theme"] == cpc_camp].copy()
-    cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
-    st.markdown("---")
-    kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
-    kc_ = st.columns(len(kpi_rks))
-    for _col, rk in zip(kc_, kpi_rks):
-        bg_map = {
-            "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
-            "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
+    _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
+    with _t_tab1:
+        _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
+        _RC = {
+            "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
+            "A":   "#2C7A7B", "B": "#2B6CB0", "C": "#C05621",
+            "D":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
         }
-        _col.markdown(f'''<div class="kpi-card" style="background:{bg_map.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
-            <div class="kpi-label">{rk}</div>
-            <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{cnt[rk]}</div>
+        _cond_bar([("CPC調整ルール", "適用"), ("最小クリック数", f"{sv['mc']}回")])
+        render_logic_section(
+            "📈 CPC調整ロジック",
+            '''
+    <table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
+    <thead>
+      <tr style="background:#DBEAFE;">
+        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:15%;">ランク</th>
+        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:45%;">判定条件</th>
+        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">アクション</th>
+        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">CPC変更幅</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background:#F1F5F9;">
+        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+          【STEP 1】 データ不足判定（最優先）
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#4A5568;">判断保留</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>かつ</b> 購入数 &lt; 4件</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">変更なし</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+      </tr>
+      <tr style="background:#F1F5F9;">
+        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+          【STEP 2】 高実績ランク（購入数 ≥ 20件）
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#D69E2E;">SS+</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> ROAS ≥ 4.0</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
+      </tr>
+      <tr style="background:#FFFBEB;">
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#B7791F;">SS</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> 2.0 ≤ ROAS &lt; 4.0</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+      </tr>
+      <tr style="background:#F1F5F9;">
+        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+          【STEP 3】 ROASベースランク
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#553C9A;">S</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS ≥ 4.0</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
+      </tr>
+      <tr style="background:#F0FFF4;">
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2C7A7B;">A</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">3.0 ≤ ROAS &lt; 4.0</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2B6CB0;">B</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.8 ≤ ROAS &lt; 3.0</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+      </tr>
+      <tr style="background:#FFF5F5;">
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">C</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 1.8</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
+      </tr>
+      <tr style="background:#FFF5F5;">
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">D</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS &lt; 1.5</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
+      </tr>
+      <tr style="background:#F1F5F9;">
+        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+          【STEP 4】 即削除判定（広告費過多 × 低ROAS）
+        </td>
+      </tr>
+      <tr style="background:#FFF5F5;">
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#742A2A;">即削除</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">
+          ROAS &lt; 0.8 <b>かつ</b> 広告費が閾値以上<br>
+          <span style="font-size:.8rem;color:#718096;">
+            売価 ≤¥1,500 → 広告費 ≥¥3,000 ／
+            売価 ≤¥2,000 → 広告費 ≥¥4,000 ／
+            売価 &gt;¥2,000 → 広告費 ≥¥5,000
+          </span>
+        </td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#742A2A;font-weight:700;">即削除</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">—</td>
+      </tr>
+    </tbody>
+    </table>
+    <p style="font-size:.78rem;color:#718096;margin-top:10px;">
+      ▶ 判定順序: STEP1（データ不足）→ STEP2（購入数優先） → STEP3（ROASベース） → STEP4（即削除）<br>
+      ▶ 基本思想: ROASだけでなく、広告費と購入数を重視した複合判定
+    </p>''',
+        )
+        if dc_cpc.empty:
+            st.info("分析を実行してください。")
+            return
+        sel_options = ["全商品"] + [c for c in CAMPAIGNS if not dc_cpc[dc_cpc["campaign_theme"] == c].empty]
+        _sc, _ = st.columns([3, 2])
+        with _sc:
+            cpc_camp = st.selectbox("商品選択（キーワードCPC調整）", sel_options, label_visibility="visible", key="cpc_camp_sel")
+        if cpc_camp == "全商品":
+            df_c = dc_cpc.copy()
+        else:
+            df_c = dc_cpc[dc_cpc["campaign_theme"] == cpc_camp].copy()
+        cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
+        st.markdown("---")
+        kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
+        kc_ = st.columns(len(kpi_rks))
+        for _col, rk in zip(kc_, kpi_rks):
+            bg_map = {
+                "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
+                "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
+            }
+            _col.markdown(f'''<div class="kpi-card" style="background:{bg_map.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
+                <div class="kpi-label">{rk}</div>
+                <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{cnt[rk]}</div>
+                <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+        if cnt["判断保留"] > 0:
+            st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
+        # ── 本日調整対象ブロック ──────────────────────────────────
+        _n_up   = int((df_c["cpc_delta"] > 0).sum())
+        _n_down = int((df_c["cpc_delta"] < 0).sum())
+        _n_adj  = _n_up + _n_down
+        st.markdown("---")
+        st.caption("📅 本日調整対象")
+        _bc1, _bc2, _bc3 = st.columns(3)
+        _bc1.markdown(f'''<div class="kpi-card" style="background:#E6FFFA;border-top:3px solid #276749;">
+            <div class="kpi-label">🔺 CPC上げ</div>
+            <div class="kpi-value" style="color:#276749;font-size:1.5rem;">{_n_up}</div>
             <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    if cnt["判断保留"] > 0:
-        st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
-    # ── 本日調整対象ブロック ──────────────────────────────────
-    _n_up   = int((df_c["cpc_delta"] > 0).sum())
-    _n_down = int((df_c["cpc_delta"] < 0).sum())
-    _n_adj  = _n_up + _n_down
-    st.markdown("---")
-    st.caption("📅 本日調整対象")
-    _bc1, _bc2, _bc3 = st.columns(3)
-    _bc1.markdown(f'''<div class="kpi-card" style="background:#E6FFFA;border-top:3px solid #276749;">
-        <div class="kpi-label">🔺 CPC上げ</div>
-        <div class="kpi-value" style="color:#276749;font-size:1.5rem;">{_n_up}</div>
-        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    _bc2.markdown(f'''<div class="kpi-card" style="background:#FFF5F5;border-top:3px solid #C53030;">
-        <div class="kpi-label">🔻 CPC下げ</div>
-        <div class="kpi-value" style="color:#C53030;font-size:1.5rem;">{_n_down}</div>
-        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    _bc3.markdown(f'''<div class="kpi-card" style="background:#EBF8FF;border-top:3px solid #2B6CB0;">
-        <div class="kpi-label">📊 変更対象合計</div>
-        <div class="kpi-value" style="color:#2B6CB0;font-size:1.5rem;">{_n_adj}</div>
-        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    st.markdown("---")
-    disp_cols = [c for c in ["campaign_name","ad_group","keyword","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
-    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","keyword":"KWテキスト",
-           "cost":"広告費","sales":"売上","orders":"購入数",
-           "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
-           "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
-    cat_t = pd.CategoricalDtype(categories=_RANK_ORDER, ordered=True)
-    df_c["_r"] = df_c["cpc_rank"].astype(cat_t)
-    df_c = df_c.sort_values(["_r","ROAS"], ascending=[True, False]).drop(columns=["_r"]).reset_index(drop=True)
-    df_c.index = df_c.index + 1
-    # ③ 変更対象のみ表示（cpc_delta != 0）
-    df_disp = df_c[df_c["cpc_delta"] != 0].copy()
-    df_disp.index = range(1, len(df_disp) + 1)
-    _d = df_disp[disp_cols].rename(columns=_rn).copy()
-    if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
-    if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
-    if "変更幅" in _d.columns: _d["変更幅"] = _d["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
-    if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-    if "推奨CPC" in _d.columns: _d["推奨CPC"] = _d["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-    def _cr(row):
-        c = _RC.get(row.get("判定ランク", ""), "")
-        return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
-    if df_disp.empty:
-        st.info("変更幅が発生するキーワードはありません（全件 現状維持 または 判断保留）。")
-    else:
-        st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
-    # ④ CSV: 実行用（変更対象のみ）+ 全件
-    _c1, _c2 = st.columns(2)
-    with _c1:
-        _dl_csv_adj = df_disp[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-        st.download_button(f"📥 {cpc_camp}_CPC調整_実行用.csv", data=_dl_csv_adj,
-            file_name=f"{cpc_camp}_CPC調整_実行用.csv", mime="text/csv", use_container_width=True)
-    with _c2:
-        _dl_csv_all = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-        st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
-            file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
+        _bc2.markdown(f'''<div class="kpi-card" style="background:#FFF5F5;border-top:3px solid #C53030;">
+            <div class="kpi-label">🔻 CPC下げ</div>
+            <div class="kpi-value" style="color:#C53030;font-size:1.5rem;">{_n_down}</div>
+            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+        _bc3.markdown(f'''<div class="kpi-card" style="background:#EBF8FF;border-top:3px solid #2B6CB0;">
+            <div class="kpi-label">📊 変更対象合計</div>
+            <div class="kpi-value" style="color:#2B6CB0;font-size:1.5rem;">{_n_adj}</div>
+            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+        st.markdown("---")
+        disp_cols = [c for c in ["campaign_name","ad_group","keyword","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
+        _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","keyword":"KWテキスト",
+               "cost":"広告費","sales":"売上","orders":"購入数",
+               "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
+               "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
+        cat_t = pd.CategoricalDtype(categories=_RANK_ORDER, ordered=True)
+        df_c["_r"] = df_c["cpc_rank"].astype(cat_t)
+        df_c = df_c.sort_values(["_r","ROAS"], ascending=[True, False]).drop(columns=["_r"]).reset_index(drop=True)
+        df_c.index = df_c.index + 1
+        # ③ 変更対象のみ表示（cpc_delta != 0）
+        df_disp = df_c[df_c["cpc_delta"] != 0].copy()
+        df_disp.index = range(1, len(df_disp) + 1)
+        _d = df_disp[disp_cols].rename(columns=_rn).copy()
+        if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
+        if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
+        if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
+        if "変更幅" in _d.columns: _d["変更幅"] = _d["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
+        if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
+        if "推奨CPC" in _d.columns: _d["推奨CPC"] = _d["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
+        def _cr(row):
+            c = _RC.get(row.get("判定ランク", ""), "")
+            return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
+        if df_disp.empty:
+            st.info("変更幅が発生するキーワードはありません（全件 現状維持 または 判断保留）。")
+        else:
+            st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
+        # ④ CSV: 実行用（変更対象のみ）+ 全件
+        _c1, _c2 = st.columns(2)
+        with _c1:
+            _dl_csv_adj = df_disp[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            st.download_button(f"📥 {cpc_camp}_CPC調整_実行用.csv", data=_dl_csv_adj,
+                file_name=f"{cpc_camp}_CPC調整_実行用.csv", mime="text/csv", use_container_width=True)
+        with _c2:
+            _dl_csv_all = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
+                file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
+    with _t_tab2:
+        st.info("分析機能は次工程で実装予定です。")
 
 
 def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
@@ -1744,10 +1749,18 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
 
 
 def page_cpc_product():
-    _render_pt_cpc_page(dc_cpc_product, "商品CPC調整", "cpc_product_sel")
+    _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
+    with _t_tab1:
+        _render_pt_cpc_page(dc_cpc_product, "商品CPC調整", "cpc_product_sel")
+    with _t_tab2:
+        st.info("分析機能は次工程で実装予定です。")
 
 def page_cpc_video():
-    _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel")
+    _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
+    with _t_tab1:
+        _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel")
+    with _t_tab2:
+        st.info("分析機能は次工程で実装予定です。")
 
 
 # ===================================================
@@ -2460,13 +2473,21 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key):
 
 
 def page_pt_add_manual():
-    _render_pt_page("df_pt_add_m", True,  "商品", "pt_add_m_sel")
+    _t_tab1, _t_tab2 = st.tabs(["改善", "分析"])
+    with _t_tab1:
+        _render_pt_page("df_pt_add_m", True,  "商品", "pt_add_m_sel")
+    with _t_tab2:
+        st.info("分析機能は次工程で実装予定です。")
 
 def page_pt_del_manual():
     _render_pt_page("df_pt_del_m", False, "商品", "pt_del_m_sel")
 
 def page_pt_add_video():
-    _render_pt_page("df_pt_add_v", True,  "動画", "pt_add_v_sel")
+    _t_tab1, _t_tab2 = st.tabs(["改善", "分析"])
+    with _t_tab1:
+        _render_pt_page("df_pt_add_v", True,  "動画", "pt_add_v_sel")
+    with _t_tab2:
+        st.info("分析機能は次工程で実装予定です。")
 
 def page_pt_del_video():
     _render_pt_page("df_pt_del_v", False, "動画", "pt_del_v_sel")
@@ -2504,12 +2525,6 @@ def page_download():
                 file_name="cpc_adjust.zip", mime="application/zip", use_container_width=True)
 
 
-
-def page_add_kw_analysis():
-    st.info("（分析機能は近日実装予定です）")
-
-def page_cpc_analysis():
-    st.info("（分析機能は近日実装予定です）")
 
 def page_manual():
 
@@ -3775,7 +3790,5 @@ _PAGE_FUNCS = {
     "🎥 オート動画削除":             page_auto_del_video,
     "📥 ダウンロード":                 page_download,
     "📖 取扱説明書":                   page_manual,
-    "📊 KW追加分析":                   page_add_kw_analysis,
-    "📊 CPC分析":                      page_cpc_analysis,
 }
 _PAGE_FUNCS[current_page]()
