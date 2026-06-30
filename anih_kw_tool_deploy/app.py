@@ -386,11 +386,12 @@ _VALID_PAGES = {
     "📹 動画追加",     "📹 動画削除",
     "📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除",
     "📥 ダウンロード", "📖 取扱説明書",
+    "📊 KW追加分析", "📊 CPC分析",
 }
-_ADD_PAGES = {"📋 キーワード追加", "➕ 商品追加", "📹 動画追加"}
+_ADD_PAGES = {"📋 キーワード追加", "➕ 商品追加", "📹 動画追加", "📊 KW追加分析"}
 _DEL_PAGES = {"🚫 キーワード削除", "🗑️ 商品削除", "📹 動画削除"}
 _AUTO_DEL_PAGES = {"📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除"}
-_CPC_PAGES = {"📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整"}
+_CPC_PAGES = {"📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整", "📊 CPC分析"}
 
 if "current_page" not in st.session_state or st.session_state["current_page"] not in _VALID_PAGES:
     st.session_state["current_page"] = "📋 キーワード追加"
@@ -410,6 +411,7 @@ with st.sidebar:
         _nav_btn("キーワード",  "📋 キーワード追加",               "📋 ")
         _nav_btn("商品",        "➕ 商品追加", "🎯 ")
         _nav_btn("動画",        "📹 動画追加",       "📹 ")
+        _nav_btn("分析",        "📊 KW追加分析",     "📊 ")
     # ── 削除
     with st.expander("🚫  キーワード削除", expanded=(_cp in _DEL_PAGES)):
         _nav_btn("キーワード",  "🚫 キーワード削除",               "📋 ")
@@ -420,6 +422,7 @@ with st.sidebar:
         _nav_btn("キーワード",  "📈 キーワードCPC調整",   "📋 ")
         _nav_btn("商品",        "🎯 商品CPC調整", "🎯 ")
         _nav_btn("動画",        "📹 動画CPC調整", "📹 ")
+        _nav_btn("分析",        "📊 CPC分析",     "📊 ")
     # ── オート除外KW
     with st.expander("🧹  オート除外KW", expanded=(_cp in _AUTO_DEL_PAGES)):
         _nav_btn("キーワード",  "📄 オートKW削除",    "📄 ")
@@ -2502,6 +2505,12 @@ def page_download():
 
 
 
+def page_add_kw_analysis():
+    st.info("（分析機能は近日実装予定です）")
+
+def page_cpc_analysis():
+    st.info("（分析機能は近日実装予定です）")
+
 def page_manual():
 
     # ── 概要 ──────────────────────────────────────────────────────────
@@ -3766,5 +3775,7 @@ _PAGE_FUNCS = {
     "🎥 オート動画削除":             page_auto_del_video,
     "📥 ダウンロード":                 page_download,
     "📖 取扱説明書":                   page_manual,
+    "📊 KW追加分析":                   page_add_kw_analysis,
+    "📊 CPC分析":                      page_cpc_analysis,
 }
 _PAGE_FUNCS[current_page]()
