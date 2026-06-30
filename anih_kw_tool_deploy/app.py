@@ -2503,7 +2503,6 @@ def page_download():
 
 
 def page_manual():
-    st.markdown("### 📖 ANIHA Amazon広告分析ツール — 取扱説明書 Ver.71")
 
     # ── 概要 ──────────────────────────────────────────────────────────
     with st.expander("📌 概要", expanded=True):
