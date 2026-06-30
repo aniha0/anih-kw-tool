@@ -1,6 +1,8 @@
 """ANIHA 勝ちKW抽出ツール 最終確定版"""
 from __future__ import annotations
-import io, re, unicodedata, zipfile
+import io, json, re, unicodedata, uuid, zipfile
+from datetime import datetime, date, timedelta
+from pathlib import Path
 from typing import Optional
 import pandas as pd
 import streamlit as st
@@ -2504,669 +2506,423 @@ def page_download():
                 file_name="cpc_adjust.zip", mime="application/zip", use_container_width=True)
 
 
-def page_add_analysis():
-    st.markdown("## 📊 分析")
-    st.info("現在この機能は準備中です。")
+# ═══════════════════════════════════════════════════════════════════════════════
+# 分析機能
+# 構成: 永続化レイヤー → スナップショット → 改善履歴 → Before/After → 自動評価 → レポート蓄積
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_ANALYSIS_DIR = Path(__file__).parent / "analysis_data"
 
 
-def page_cpc_analysis():
+# ─── 永続化レイヤー ──────────────────────────────────────────────────────────
+
+def _analysis_load(fname: str) -> list:
+    """JSONファイルをリストとして読み込む。ファイルがなければ空リストを返す。"""
+    p = _ANALYSIS_DIR / fname
+    if p.exists():
+        return json.loads(p.read_text("utf-8"))
+    return []
+
+
+def _analysis_save(fname: str, data: list) -> None:
+    """リストをJSONファイルへ保存する。"""
+    _ANALYSIS_DIR.mkdir(exist_ok=True)
+    (_ANALYSIS_DIR / fname).write_text(
+        json.dumps(data, ensure_ascii=False, indent=2, default=str), "utf-8"
+    )
+
+
+# ─── スナップショット ────────────────────────────────────────────────────────
+
+def _snapshot_kpis(df: pd.DataFrame) -> dict:
+    """DataFrameから集計KPIを返す。列がなければ 0 / None とする。"""
+    if df.empty:
+        return {}
+    d: dict = {}
+    for col in ["sales", "cost", "orders", "clicks", "impressions"]:
+        if col in df.columns:
+            d[col] = float(df[col].sum())
+    if d.get("cost", 0) > 0:
+        d["ROAS"] = round(d.get("sales", 0) / d["cost"], 2)
+        d["CPC"]  = round(d["cost"] / d["clicks"], 0) if d.get("clicks", 0) > 0 else None
+    if d.get("clicks", 0) > 0:
+        d["CVR"] = round(d.get("orders", 0) / d["clicks"] * 100, 2)
+        if d.get("impressions", 0) > 0:
+            d["CTR"] = round(d["clicks"] / d["impressions"] * 100, 2)
+    return d
+
+
+def _save_snapshot() -> None:
+    """現在の session_state（df_win / df_cpc）からスナップショットを保存する。
+    同日のスナップショットは上書きする。
+    """
+    today = date.today().isoformat()
+    dw_s  = st.session_state.get("df_win", pd.DataFrame())
+    cpc_s = st.session_state.get("df_cpc", pd.DataFrame())
+    snap = {
+        "snapshot_id": str(uuid.uuid4())[:8],
+        "date":        today,
+        "kw_add":      _snapshot_kpis(dw_s),
+        "cpc":         _snapshot_kpis(cpc_s),
+    }
+    snaps = [s for s in _analysis_load("snapshots.json") if s["date"] != today]
+    snaps.append(snap)
+    _analysis_save("snapshots.json", snaps)
+
+
+def _find_snapshots(improvement_date: str) -> tuple:
+    """改善日の前後7日に最も近いスナップショットをそれぞれ返す。
+    戻り値: (before_snap | None, after_snap | None)
+    """
+    snaps = _analysis_load("snapshots.json")
+    if not snaps:
+        return None, None
+    td       = date.fromisoformat(improvement_date)
+    target_b = td - timedelta(days=7)
+    target_a = td + timedelta(days=7)
+
+    def _closest(target: date, pool: list, side: str) -> dict | None:
+        if side == "before":
+            cands = [s for s in pool if date.fromisoformat(s["date"]) <= td]
+        else:
+            cands = [s for s in pool if date.fromisoformat(s["date"]) >= td]
+        if not cands:
+            return None
+        return min(cands, key=lambda s: abs((date.fromisoformat(s["date"]) - target).days))
+
+    return _closest(target_b, snaps, "before"), _closest(target_a, snaps, "after")
+
+
+# ─── 改善履歴 ────────────────────────────────────────────────────────────────
+
+def _history_load() -> list:
+    return _analysis_load("history.json")
+
+
+def _history_save(entries: list) -> None:
+    _analysis_save("history.json", entries)
+
+
+def _history_add(entry_date: str, feature: str, detail: str) -> None:
+    entries = _history_load()
+    entries.append({
+        "id":         str(uuid.uuid4())[:8],
+        "date":       entry_date,
+        "feature":    feature,
+        "detail":     detail,
+        "created_at": datetime.now().isoformat(),
+    })
+    entries.sort(key=lambda x: x["date"], reverse=True)
+    _history_save(entries)
+
+
+# ─── 分析レポート ────────────────────────────────────────────────────────────
+
+def _report_save(report: dict) -> None:
+    reports = _analysis_load("reports.json")
+    reports.append(report)
+    _analysis_save("reports.json", reports)
+
+
+def _report_load() -> list:
+    return _analysis_load("reports.json")
+
+
+# ─── UIブロック関数 ──────────────────────────────────────────────────────────
+
+def render_history(page_key: str) -> list:
+    """改善履歴一覧を表示 + 新規追加フォーム。
+    戻り値: 履歴レコードのリスト（date / feature / detail / id）
+    """
+    entries = _history_load()
+
+    with st.expander("＋ 改善履歴を追加"):
+        _h_date    = st.date_input("実施日", value=date.today(), key=f"{page_key}_h_date")
+        _h_feature = st.selectbox("機能", ["キーワード追加", "CPC調整"], key=f"{page_key}_h_feature")
+        _h_detail  = st.text_input("内容（例: ○○を追加）", key=f"{page_key}_h_detail")
+        if st.button("保存", key=f"{page_key}_h_save", type="primary"):
+            if _h_detail.strip():
+                _history_add(str(_h_date), _h_feature, _h_detail.strip())
+                st.success("保存しました")
+                st.rerun()
+            else:
+                st.warning("内容を入力してください")
+
+    if not entries:
+        st.caption("（現在データなし）")
+        return []
+    _df_hist = pd.DataFrame(entries)[["date", "feature", "detail"]]
+    _df_hist.columns = ["実施日", "機能", "内容"]
+    st.dataframe(_df_hist, use_container_width=True, hide_index=True)
+    return entries
+
+
+def render_compare(history_entry: dict | None, page_key: str) -> dict | None:
+    """Before / After 比較テーブルを表示。
+    改善日の前後7日に最も近いスナップショットを自動選択して比較する。
+    戻り値: {metric_key: {before, after, diff, rate}} | None
+    """
+    if not history_entry:
+        st.caption("（現在データなし）")
+        return None
+
+    snap_key = "kw_add" if history_entry.get("feature") == "キーワード追加" else "cpc"
+    before_snap, after_snap = _find_snapshots(history_entry["date"])
+
+    if not before_snap and not after_snap:
+        st.info("スナップショットがありません。分析ページの「📸 スナップショット保存」で広告データ読み込み後に保存してください。")
+        return None
+
+    _miss = []
+    if not before_snap:
+        _miss.append(f"Before（改善日 {history_entry['date']} 以前のスナップショット）")
+    if not after_snap:
+        _miss.append(f"After（改善日 {history_entry['date']} 以降のスナップショット）")
+    if _miss:
+        st.warning("以下のスナップショットが不足しています: " + " / ".join(_miss))
+        return None
+
+    bf = before_snap.get(snap_key, {})
+    af = after_snap.get(snap_key, {})
+
+    _METRICS = [
+        ("売上",       "sales",   "¥{:,.0f}"),
+        ("広告費",     "cost",    "¥{:,.0f}"),
+        ("ROAS",       "ROAS",    "{:.2f}"),
+        ("CPC",        "CPC",     "¥{:,.0f}"),
+        ("CTR",        "CTR",     "{:.2f}%"),
+        ("CVR",        "CVR",     "{:.2f}%"),
+        ("クリック数", "clicks",  "{:,.0f}"),
+        ("注文数",     "orders",  "{:,.0f}"),
+    ]
+
+    rows   = []
+    result = {}
+    for label, key, fmt in _METRICS:
+        bv = float(bf.get(key) or 0)
+        av = float(af.get(key) or 0)
+        has_data = key in bf or key in af
+        if not has_data:
+            rows.append({"項目": label, "Before": "—", "After": "—", "差分": "—", "増減率": "—"})
+            continue
+        diff = av - bv
+        rate = (diff / bv * 100) if bv else 0.0
+        try:
+            bv_str = fmt.format(bv)
+            av_str = fmt.format(av)
+        except Exception:
+            bv_str = str(bv)
+            av_str = str(av)
+        rows.append({"項目": label, "Before": bv_str, "After": av_str,
+                     "差分": f"{diff:+,.2f}", "増減率": f"{rate:+.1f}%"})
+        result[key] = {"before": bv, "after": av, "diff": diff, "rate": rate}
+
+    st.caption(
+        f"Before: {before_snap['date']} のスナップショット　"
+        f"After: {after_snap['date']} のスナップショット"
+    )
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    return result if result else None
+
+
+def render_result(compare_result: dict | None) -> str | None:
+    """自動評価ブロック。改善 / 悪化 / 変化なし を判定して表示する。
+    戻り値: "改善" | "悪化" | "変化なし" | None
+    """
+    if not compare_result:
+        st.caption("（現在データなし）")
+        return None
+
+    reasons_up: list[str] = []
+    reasons_dn: list[str] = []
+
+    def _get(key: str) -> dict:
+        return compare_result.get(key, {})
+
+    if _get("ROAS").get("diff",  0) >= 0.1:  reasons_up.append("ROAS改善")
+    if _get("ROAS").get("diff",  0) <= -0.1: reasons_dn.append("ROAS低下")
+    if _get("cost").get("rate",  0) <= -5:   reasons_up.append("広告費減少")
+    if _get("cost").get("rate",  0) >= 5:    reasons_dn.append("広告費増加")
+    if _get("CVR").get("diff",   0) >= 0.5:  reasons_up.append("CVR向上")
+    if _get("CVR").get("diff",   0) <= -0.5: reasons_dn.append("CVR低下")
+    if _get("CTR").get("diff",   0) >= 0.5:  reasons_up.append("CTR向上")
+    if _get("CTR").get("diff",   0) <= -0.5: reasons_dn.append("CTR低下")
+    if _get("sales").get("rate", 0) >= 5:    reasons_up.append("売上増加")
+    if _get("sales").get("rate", 0) <= -5:   reasons_dn.append("売上減少")
+
+    if len(reasons_up) > len(reasons_dn):
+        verdict, color, reasons = "改善",    "#22c55e", reasons_up
+    elif len(reasons_dn) > len(reasons_up):
+        verdict, color, reasons = "悪化",    "#ef4444", reasons_dn
+    else:
+        verdict, color, reasons = "変化なし", "#94a3b8", ["大きな変化なし"]
+
+    st.markdown(f'<h4 style="color:{color}">■ {verdict}</h4>', unsafe_allow_html=True)
+    for r in reasons:
+        st.markdown(f"- {r}")
+    return verdict
+
+
+def _render_report_list() -> None:
+    """保存済みレポート一覧を表示する。"""
+    reports = _report_load()
+    if not reports:
+        st.caption("（保存済みレポートなし）")
+        return
+    rows = []
+    for r in sorted(reports, key=lambda x: x.get("analysis_date", ""), reverse=True):
+        h = r.get("history_entry", {})
+        rows.append({
+            "分析日":   (r.get("analysis_date") or "")[:10],
+            "改善日":   h.get("date", ""),
+            "対象機能": h.get("feature", ""),
+            "評価":     r.get("evaluation", ""),
+        })
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
+def _render_analysis_page(page_key: str) -> None:
+    """分析画面共通レンダラー。
+    UI構成: スナップショット保存 → 改善履歴一覧 → 履歴を選択 → 分析開始
+             → Before/After → 評価 → レポート保存 → 保存済みレポート
+    page_key: "add_analysis" | "cpc_analysis"
+    """
     st.markdown("## 📊 分析")
-    st.info("現在この機能は準備中です。")
+
+    # ── スナップショット保存 ──────────────────────────────────────────
+    with st.expander("📸 スナップショット保存", expanded=False):
+        st.caption("広告データをアップロードして「抽出実行」を押した後、このボタンでKPIを記録してください。Before / After 比較に使用します（毎週保存を推奨）。")
+        _snaps = _analysis_load("snapshots.json")
+        if _snaps:
+            st.caption(f"保存済み: {len(_snaps)} 件 / 最新: {_snaps[-1]['date']}")
+        if st.button("📸 現在のデータを保存", key=f"{page_key}_snap",
+                     disabled=not st.session_state.get("has_results")):
+            _save_snapshot()
+            st.success(f"スナップショットを保存しました（{date.today()}）")
+            st.rerun()
+        if not st.session_state.get("has_results"):
+            st.info("先に検索用語レポートをアップロードして「抽出実行」を押してください。")
+
+    st.markdown("---")
+
+    # ── ① 改善履歴一覧 ───────────────────────────────────────────────
+    st.markdown("#### 改善履歴一覧")
+    history_list = render_history(page_key)
+
+    st.markdown("---")
+
+    # ── ② 履歴を選択 ────────────────────────────────────────────────
+    st.markdown("#### 履歴を選択")
+    if history_list:
+        _options = [
+            f"{h['date']}　{h['feature']}　{h['detail']}"
+            for h in history_list
+        ]
+        _sel_idx = st.selectbox(
+            "分析する改善履歴を選択してください",
+            range(len(_options)),
+            format_func=lambda i: _options[i],
+            key=f"{page_key}_sel",
+        )
+        selected_entry = history_list[_sel_idx]
+        can_run = True
+    else:
+        st.selectbox(
+            "分析する改善履歴を選択してください",
+            ["（履歴なし）"],
+            disabled=True,
+            key=f"{page_key}_sel",
+        )
+        selected_entry = None
+        can_run = False
+
+    # ── ③ 分析開始 ───────────────────────────────────────────────────
+    if st.button(
+        "▶ 分析開始",
+        key=f"{page_key}_run",
+        type="primary",
+        use_container_width=True,
+        disabled=not can_run,
+    ):
+        st.session_state[f"{page_key}_ran"]   = True
+        st.session_state[f"{page_key}_entry"] = selected_entry
+
+    # ── 分析結果 ─────────────────────────────────────────────────────
+    if st.session_state.get(f"{page_key}_ran"):
+        _entry = st.session_state.get(f"{page_key}_entry")
+
+        st.markdown("---")
+        st.markdown("##### Before / After")
+        _compare_result = render_compare(_entry, page_key)
+
+        st.markdown("---")
+        st.markdown("##### 評価")
+        _verdict = render_result(_compare_result)
+
+        if _compare_result and _verdict:
+            if st.button("💾 レポートを保存", key=f"{page_key}_save_rep"):
+                _report_save({
+                    "report_id":     str(uuid.uuid4())[:8],
+                    "analysis_date": datetime.now().isoformat(),
+                    "history_entry": _entry,
+                    "evaluation":    _verdict,
+                    "compare":       _compare_result,
+                })
+                st.success("レポートを保存しました")
+                st.rerun()
+
+        st.markdown("---")
+        st.markdown("##### 保存済みレポート")
+        _render_report_list()
+
+
+def page_add_analysis() -> None:
+    """キーワード追加 > 分析ページ"""
+    _render_analysis_page("add_analysis")
+
+
+def page_cpc_analysis() -> None:
+    """CPC調整 > 分析ページ"""
+    _render_analysis_page("cpc_analysis")
+
 
 
 def page_manual():
     st.markdown("### 📖 ANIHA Amazon広告分析ツール — 取扱説明書 Ver.71")
 
-    # ── 概要 ──────────────────────────────────────────────────────────
-    with st.expander("📌 概要", expanded=True):
+    with st.expander("① キーワード追加"):
         st.markdown("""
-**ANIHA Amazon広告分析ツール** は、Amazon SP広告レポートを読み込み、
-追加・削除・CPC調整の候補を自動抽出するANIHA専用ツールです。
-
-| 機能 | 内容 |
-|---|---|
-| 📋 キーワード追加 | 成果KWを抽出しマニュアル広告追加候補を表示 |
-| 🚫 キーワード削除 | 利益毀損KWを停止候補として抽出 |
-| 📈 キーワードCPC調整 | 既存マニュアルKWの入札最適化 |
-| ➕ 商品追加 | 成果ASINを商品広告へ追加候補として抽出 |
-| 🗑️ 商品削除 | 成果の出ていない商品を停止候補として抽出 |
-| 📹 動画追加 | 成果ASINを動画広告へ追加候補として抽出 |
-| 📹 動画削除 | 成果の出ていない動画広告を停止候補として抽出 |
-| 🎯 商品CPC調整 | 商品広告の入札最適化 |
-| 📹 動画CPC調整 | 動画広告の入札最適化 |
-| 🧹 オート除外KW（キーワード/商品/動画） | オート広告で利益毀損している項目を停止候補として抽出 |
-| 📊 DateDive売れる予測KW | スコアリングによる有力KW抽出 |
+- **対象**：検索語句
+- CSVを読み込みキーワードを追加する機能
+- 対象キャンペーンへ追加されること
+- 追加前にCSV内容を確認すること
 """)
 
-    # ── サイドバー構成 ─────────────────────────────────────────────────
-    with st.expander("🗂️ サイドバー構成"):
+    with st.expander("② キーワード削除"):
         st.markdown("""
-```
-追加
-├ キーワード   → キーワード追加
-├ 商品         → 商品追加
-└ 動画         → 動画追加
-
-削除
-├ キーワード   → キーワード削除
-├ 商品         → 商品削除
-└ 動画         → 動画削除
-
-CPC調整
-├ キーワード   → キーワードCPC調整
-├ 商品         → 商品CPC調整
-└ 動画         → 動画CPC調整
-
-オート除外KW
-├ キーワード   → オートKW削除
-├ 商品         → オート商品削除
-└ 動画         → オート動画削除
-
-DateDive売れる予測KW
-ダウンロード
-取扱説明書
-```
+- **対象**：検索語句
+- CSVを読み込みキーワードを削除する機能
+- 削除対象を確認して実行すること
 """)
 
-    # ── キーワード追加 ────────────────────────────────────────────────
-    with st.expander("📋 キーワード追加"):
+    with st.expander("③ CPC調整"):
         st.markdown("""
-**目的**
-オート広告で成果が確認できた検索語句を、手動広告（部分一致）へ追加するための候補抽出です。
-
----
-
-**信頼度フィルター（データ量が少ない語句を除外）**
-
-| 条件 | 閾値 |
-|---|---|
-| 注文数 | ≥ 3件 |
-| クリック数 | ≥ 5回 |
-| 広告費 | ≥ ¥300 |
-
-**採用条件**
-
-| 条件 | 閾値 |
-|---|---|
-| 売上 | ≥ 売価 × 2 |
-| ROAS | ≥ 2.0 |
-
-**除外条件**
-
-| 除外対象 | 内容 |
-|---|---|
-| 既存マニュアルKW（完全一致） | 登録済のため除外 |
-| 既存マニュアルKW（部分一致） | 登録済のため除外 |
-| 重複検索語 | 同一キャンペーン内での重複を除外 |
+- **対象**：検索語句
+- CSVを読み込みCPCを変更する機能
+- 変更内容を確認して実行すること
 """)
 
-    # ── キーワード削除 ────────────────────────────────────────────────
-    with st.expander("🚫 キーワード削除"):
+    with st.expander("④ オート除外KW"):
         st.markdown("""
-**目的**
-利益を毀損している検索語を抽出し、停止候補として表示します。
-
----
-
-**削除条件（両方を同時に満たす場合に削除候補）**
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ 売価 × 2 |
-| ROAS | < 0.8 |
+- **対象**
+    - キーワードページ：検索語句
+    - 商品ページ：ASIN
+    - 動画ページ：category
+- オート除外条件を満たしたデータのみ除外対象となる。
 """)
 
-    # ── キーワードCPC調整─────────────────────────────────────────
-    with st.expander("📈 キーワードCPC調整"):
-        st.markdown("""
-**目的** — 既存マニュアルKWの入札額を最適化します。
 
----
 
-**判定対象条件**（いずれか一方を満たせば判定対象）
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ ¥3,000 |
-| 購入数 | ≥ 4件 |
-
-> **判断保留になるのは「広告費 < ¥3,000 かつ 購入数 < 4件」の場合のみです。**
->
-> 例: 広告費¥1,000・購入数7件 → **判定対象**（購入数4件以上のため）
->
-> 例: 広告費¥1,500・購入数2件 → **判断保留**（両方とも閾値未満）
-
----
-
-**ランク判定（判定順序: STEP1 → STEP2 → STEP3 → STEP4）**
-
-| ランク | 条件 | アクション | 変更幅 |
-|---|---|---|---|
-| 判断保留 | 広告費 < ¥3,000 **かつ** 購入数 < 4件 | 変更なし | ±0円 |
-| SS+ | 購入数 ≥ 20 **かつ** ROAS ≥ 4.0 | CPC上げ | +5円 |
-| SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| S | ROAS ≥ 4.0 | CPC上げ | +5円 |
-| A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
-| B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
-| C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
-| D | ROAS < 1.5 | CPC下げ | −10円 |
-| 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
-
-**即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
-
----
-
-**画面表示仕様**
-
-| 表示エリア | 表示内容 |
-|---|---|
-| SS〜E 件数カード | **全件数**を表示（変更なし・判断保留を含む） |
-| 詳細テーブル | **全件表示**（変更なし・判断保留を含む） |
-""")
-
-    # ── 商品追加 ──────────────────────────────────────────────────────
-    with st.expander("➕ 商品追加"):
-        st.markdown("""
-**目的** — 商品広告で成果が出ているASINを追加候補として表示します。
-
----
-
-**対象キャンペーン**
-
-| 条件 | 内容 |
-|---|---|
-| 含む | 「商品ターゲ」を含むキャンペーン |
-| 除外 | 「動画」を含むキャンペーン |
-| 除外 | 「オート」「auto」を含むキャンペーン |
-
-**信頼度フィルター**
-
-| 条件 | 閾値 |
-|---|---|
-| 注文数 | ≥ 3件 |
-| クリック数 | ≥ 5回 |
-| 広告費 | ≥ ¥300 |
-
-**採用条件**
-
-| 条件 | 閾値 |
-|---|---|
-| 売上 | ≥ 売価 × 2 |
-| ROAS | ≥ 2.0 |
-""")
-
-    # ── 商品削除 ──────────────────────────────────────────────────────
-    with st.expander("🗑️ 商品削除"):
-        st.markdown("""
-**目的** — 成果の出ていない商品を停止候補として表示します。
-
----
-
-**対象キャンペーン** — 商品追加と同一（動画・オート除外）
-
-**削除条件（両方を同時に満たす場合に削除候補）**
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ 売価 × 2 |
-| ROAS | < 0.8 |
-""")
-
-    # ── 動画追加 ──────────────────────────────────────────────────────
-    with st.expander("📹 動画追加"):
-        st.markdown("""
-**目的** — 動画広告で成果の出ているASINを追加候補として表示します。
-
----
-
-**対象キャンペーン**
-
-| 条件 | 内容 |
-|---|---|
-| 含む | 「動画」を含むキャンペーン |
-
-**信頼度フィルター**
-
-| 条件 | 閾値 |
-|---|---|
-| 注文数 | ≥ 3件 |
-| クリック数 | ≥ 5回 |
-| 広告費 | ≥ ¥300 |
-
-**採用条件**
-
-| 条件 | 閾値 |
-|---|---|
-| 売上 | ≥ 売価 × 2 |
-| ROAS | ≥ 2.0 |
-""")
-
-    # ── 動画削除 ──────────────────────────────────────────────────────
-    with st.expander("📹 動画削除"):
-        st.markdown("""
-**目的** — 成果の出ていない動画広告を停止候補として表示します。
-
----
-
-**対象キャンペーン** — 動画追加と同一（動画キャンペーンが対象）
-
-**削除条件（両方を同時に満たす場合に削除候補）**
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ 売価 × 2 |
-| ROAS | < 0.8 |
-""")
-
-    # ── 商品CPC調整 ───────────────────────────────────────────────────
-    with st.expander("🎯 商品CPC調整"):
-        st.markdown("""
-**目的** — 商品広告の入札額を最適化します。
-
----
-
-**判定対象条件**（いずれか一方を満たせば判定対象）
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ ¥3,000 |
-| 購入数 | ≥ 4件 |
-
-> **判断保留になるのは「広告費 < ¥3,000 かつ 購入数 < 4件」の場合のみです。**
->
-> 例: 広告費¥1,000・購入数7件 → **判定対象**（購入数4件以上のため）
->
-> 例: 広告費¥1,500・購入数2件 → **判断保留**（両方とも閾値未満）
-
----
-
-**ランク判定**
-
-| ランク | 条件 | アクション | 変更幅 |
-|---|---|---|---|
-| 判断保留 | 広告費 < ¥3,000 **かつ** 購入数 < 4件 | 変更なし | ±0円 |
-| SS+ | 購入数 ≥ 20 **かつ** ROAS ≥ 4.0 | CPC上げ | +5円 |
-| SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| S | ROAS ≥ 4.0 | CPC上げ | +5円 |
-| A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
-| B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
-| C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
-| D | ROAS < 1.5 | CPC下げ | −10円 |
-| 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
-
-**即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
-
----
-
-**画面表示仕様**
-
-| 表示エリア | 表示内容 |
-|---|---|
-| SS〜E 件数カード | **全件数**を表示（変更なし・判断保留を含む） |
-| 詳細テーブル | **変更幅 ≠ 0円のみ**表示（CPC上げ・CPC下げのみ） |
-| 非表示 | 変更なし（SS / A / B）・判断保留 |
-
-> ⚠️ 件数カードの合計とテーブルの件数は一致しない場合があります。これは正常動作です。
-
----
-
-**全商品フィルター**
-
-初期値は **全商品** です。
-
-| 選択 | 動作 |
-|---|---|
-| 全商品（初期値） | すべての対象キャンペーンを集計して表示する |
-| 個別商品名 | 選択商品のキャンペーンのみ表示する |
-""")
-
-    # ── 動画CPC調整 ───────────────────────────────────────────────────
-    with st.expander("📹 動画CPC調整"):
-        st.markdown("""
-**目的** — 動画広告の入札額を最適化します。
-
----
-
-**判定対象条件**（いずれか一方を満たせば判定対象）
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ ¥3,000 |
-| 購入数 | ≥ 4件 |
-
-> **判断保留になるのは「広告費 < ¥3,000 かつ 購入数 < 4件」の場合のみです。**
->
-> 例: 広告費¥1,000・購入数7件 → **判定対象**（購入数4件以上のため）
->
-> 例: 広告費¥1,500・購入数2件 → **判断保留**（両方とも閾値未満）
-
----
-
-**ランク判定**
-
-| ランク | 条件 | アクション | 変更幅 |
-|---|---|---|---|
-| 判断保留 | 広告費 < ¥3,000 **かつ** 購入数 < 4件 | 変更なし | ±0円 |
-| SS+ | 購入数 ≥ 20 **かつ** ROAS ≥ 4.0 | CPC上げ | +5円 |
-| SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| S | ROAS ≥ 4.0 | CPC上げ | +5円 |
-| A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
-| B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
-| C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
-| D | ROAS < 1.5 | CPC下げ | −10円 |
-| 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
-
-**即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
-
----
-
-**画面表示仕様**
-
-| 表示エリア | 表示内容 |
-|---|---|
-| SS〜E 件数カード | **全件数**を表示（変更なし・判断保留を含む） |
-| 詳細テーブル | **変更幅 ≠ 0円のみ**表示（CPC上げ・CPC下げのみ） |
-| 非表示 | 変更なし（SS / A / B）・判断保留 |
-
-> ⚠️ 件数カードの合計とテーブルの件数は一致しない場合があります。これは正常動作です。
-
----
-
-**全商品フィルター**
-
-初期値は **全商品** です。
-
-| 選択 | 動作 |
-|---|---|
-| 全商品（初期値） | すべての動画キャンペーンを集計して表示する |
-| 個別商品名 | 選択商品の動画キャンペーンのみ表示する |
-""")
-
-    # ── オート除外KW ──────────────────────────────────────────────────
-    with st.expander("🧹 オート除外KW"):
-        st.markdown("""
-**目的**
-
-オート広告（自動ターゲティング）で利益を毀損している項目を検出し、停止候補として
-「キーワード」「商品」「動画」の3ページに分けて表示します。
-
-サイドバーの「🧹 オート除外KW」内に、キーワード・商品・動画の3つのボタンがあります。
-
----
-
-**集計の元データ**
-
-「検索用語レポート」内のオートキャンペーン行から、「検索用語（カスタマーの検索用語）」列の
-内容によって3種類に振り分けます。
-
-| 検索用語の内容 | 振り分け先 |
-|---|---|
-| 通常の検索語句（日本語など） | 📄 キーワード |
-| ASIN形式（例: B0XXXXXXXXX） | 🎯 商品 |
-| category形式（例: category:〜） | 🎬 動画 |
-
-商品・動画に振り分けられた項目は、既存の「🎯 オート商品削除」「🎥 オート動画削除」
-ページ（商品ターゲティング・動画キャンペーン由来のASIN削除候補）と合流して表示されます。
-
----
-
-**削除条件（両方を同時に満たす場合に削除候補）**
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ 売価 × 2 |
-| ROAS | ≤ 0.8 |
-
----
-
-**除外条件**
-
-| 除外対象 | 内容 |
-|---|---|
-| マニュアル広告に完全一致登録済みの語句／ASIN | 重複のため除外 |
-| 未分類キャンペーン | 売価が特定できないため除外 |
-
----
-
-**各ページの表示内容**
-
-| ページ | 表示内容 |
-|---|---|
-| 📄 キーワード | 通常検索語句のみ（ASIN・category形式は含まれません） |
-| 🎯 商品 | ASIN形式のみ |
-| 🎬 動画 | category形式のみ |
-
-各ページに「キャンペーン」フィルター（全キャンペーン＋各キャンペーン）があり、
-件数カード・除外対象一覧（コピー用）・詳細テーブル・CSVダウンロードを表示します。
-""")
-
-    # ── 売れる予測KW ──────────────────────────────────────────────────
-    with st.expander("📊 DateDive 売れる予測KW"):
-        st.markdown("""
-**目的** — 今後Amazon検索語へ追加すべき有力キーワード候補をスコアリングして抽出します。
-
----
-
-**スコア配点（合計100点）**
-
-| 項目 | 配点 | 説明 |
-|---|---|---|
-| 需要 | 45点 | 検索ボリューム・トレンドを評価 |
-| 関連性 | 35点 | 商品との関連度を評価 |
-| 競争強度 | 15点 | 競合の少なさを評価 |
-| 未使用KW | 5点 | 既存KWに未登録であれば加点 |
-
-需要と関連性を最重視します。
-競争強度や未使用ボーナスのみで上位表示されることはありません。
-
-上位 **TOP10** を表示します。
-""")
-
-    # ── ダウンロード ──────────────────────────────────────────────────
-    with st.expander("📥 ダウンロード"):
-        st.markdown("""
-各分析結果はCSVでダウンロード可能です。
-
-**各ページ内のCSVダウンロードボタン**
-
-| 機能 | CSVファイル名 |
-|---|---|
-| 商品追加 | 商品追加_{商品名}.csv |
-| 商品削除 | 商品削除_{商品名}.csv |
-| 動画追加 | 動画追加_{商品名}.csv |
-| 動画削除 | 動画削除_{商品名}.csv |
-| キーワードCPC調整 | {キャンペーン名}_CPC調整表.csv |
-| 商品CPC調整 | {キャンペーン名}_商品CPC調整_CPC調整表.csv |
-| 動画CPC調整 | {キャンペーン名}_動画CPC調整_CPC調整表.csv |
-
-**ダウンロードページ（ZIPファイル）**
-
-| ZIP名 | 内容 |
-|---|---|
-| 全候補 勝ちKW ZIP | キーワード追加 — 追加KW_{商品名}.csv |
-| 削除用KW ZIP | キーワード削除 — 削除KW_{商品名}.csv |
-| キーワードCPC調整 ZIP | キーワードCPC調整 — {キャンペーン名}_CPC調整表.csv |
-
-> ⚠️ CSVは全件出力です（KW CPC調整テーブルの±0円行も含みます）。
-""")
-
-    # ── ASIN抽出 ──────────────────────────────────────────────────────
-    with st.expander("🔍 ASIN抽出 対応形式"):
-        st.markdown("""
-商品広告・動画広告のASINは以下3形式をすべて自動認識します。
-
-| 形式 | 例 |
-|---|---|
-| `asin="B0XXXXXXXX"` | TargetingExpression 標準形式 |
-| `asin-expanded="B0XXXXXXXX"` | 拡張ターゲティング形式 |
-| 裸ASIN `B0XXXXXXXX` | 直接記述形式 |
-
-> ASINは `B0` で始まる10文字（`B0[A-Z0-9]{8}`）で識別します。
-""")
-
-    # ── 画面サンプル ──────────────────────────────────────────────────
-    with st.expander("🖼️ 画面サンプル"):
-        st.markdown("""
-各ページの主な表示構成は以下の通りです。
-
----
-
-**【追加】キーワード追加**
-```
-[条件バー: 最小注文数 / 最小クリック数 / 最小広告費]
-[商品選択プルダウン]
-[KPIカード: 抽出前件数 / 抽出後件数（同一意図KW統合後）]
-[一覧テーブル: keyword / キャンペーン名 / ROAS / 広告費 / 売上 / 注文数 / クリック数]
-※ CSVはダウンロードページの「全候補 勝ちKW ZIP」から取得
-```
-
----
-
-**【追加】商品（商品追加）**
-```
-[条件バー: 売上≥売価×2 / ROAS≥2.0 / 商品]
-[商品選択プルダウン]
-[KPIカード: 追加候補数 / 平均ROAS / 平均注文数 / 平均広告費]
-[一覧テーブル: キャンペーン名 / 広告グループ / ASIN / 注文数 / クリック数 / 広告費 / 売上 / ROAS / 採用理由]
-[CSVダウンロードボタン: 商品追加_{商品名}.csv]
-```
-
----
-
-**【追加】動画（動画追加）**
-```
-[条件バー: 売上≥売価×2 / ROAS≥2.0 / 動画]
-[商品選択プルダウン]
-[KPIカード: 追加候補数 / 平均ROAS / 平均注文数 / 平均広告費]
-[一覧テーブル: キャンペーン名 / 広告グループ / ASIN / 注文数 / クリック数 / 広告費 / 売上 / ROAS / 採用理由]
-[CSVダウンロードボタン: 動画追加_{商品名}.csv]
-```
-
----
-
-**【削除】キーワード削除**
-```
-[条件バー: 広告費≥売価×2 / ROAS<0.8 / 勝ちKW除外]
-[商品選択プルダウン]
-[件数バッジ: 削除対象件数: N件]
-[一覧テーブル: keyword / キャンペーン名 / ROAS / 広告費 / 売上]
-※ CSVはダウンロードページの「削除用KW ZIP」から取得
-```
-
----
-
-**【削除】商品（商品削除）**
-```
-[条件バー: 広告費≥売価×2 / ROAS<0.8 / 商品]
-[商品選択プルダウン]
-[KPIカード: 削除候補数 / 平均ROAS / 平均広告費]
-[一覧テーブル: ASIN / campaign / ROAS / cost / 削除理由]
-[CSVダウンロードボタン]
-```
-
----
-
-**【削除】動画（動画削除）**
-```
-[条件バー: 広告費≥売価×2 / ROAS<0.8 / 動画]
-[商品選択プルダウン]
-[KPIカード: 削除候補数 / 平均ROAS / 平均広告費]
-[一覧テーブル: ASIN / campaign / ROAS / cost / 削除理由]
-[CSVダウンロードボタン]
-```
-
----
-
-**【CPC調整】キーワードCPC調整**
-```
-[条件バー: CPC調整ルール適用]
-[ロジックテーブル expander]
-[キャンペーン選択プルダウン]
-[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
-[一覧テーブル: keyword / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
-                                                      ← 全件表示（±0含む）
-[CSVダウンロードボタン]
-```
-
----
-
-**【CPC調整】商品CPC調整**
-```
-[条件バー: CPC調整ルール適用 / 商品]
-[ロジックテーブル expander]
-[商品選択プルダウン: 全商品 / 液体 / 涙やけ / ...]  ← 全商品が初期値
-[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
-[一覧テーブル: ASIN / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
-                                                       ← 変更幅≠0のみ
-[CSVダウンロードボタン]
-```
-
----
-
-**【CPC調整】動画CPC調整**
-```
-[条件バー: CPC調整ルール適用 / 動画]
-[ロジックテーブル expander]
-[商品選択プルダウン: 全商品 / 液体 / 涙やけ / ...]  ← 全商品が初期値
-[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
-[一覧テーブル: ASIN / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
-                                                       ← 変更幅≠0のみ
-[CSVダウンロードボタン]
-```
-""")
-
-    # ── トラブルシューティング ────────────────────────────────────────
-    with st.expander("🛠️ トラブルシューティング"):
-        st.markdown("""
-**Q. データが表示されない**
-→ 画面上部でCSVをアップロードし「🔍 抽出実行」ボタンを押してください。
-ボタンを押すまで分析は実行されません。
-
----
-
-**Q. 全商品が表示されない（商品が一部しか出ない）**
-→ 売価マスタ（PRICES辞書）に登録されていない商品は除外されます。
-campaign_theme が PRICES のキーと一致しているか確認してください。
-
----
-
-**Q. 商品追加・動画追加が0件になる**
-→ 以下を確認してください。
-- 信頼度フィルター（注文≥3 / クリック≥5 / 広告費≥¥300）を満たす語句があるか
-- 売上 ≥ 売価×2 かつ ROAS ≥ 2.0 を満たすASINがあるか
-- 対象キャンペーン名に「商品ターゲ」が含まれているか
-
----
-
-**Q. CPC調整（商品/動画）のテーブルが空になる**
-→ 商品CPC / 動画CPCの詳細テーブルは「変更幅 ≠ 0円」のみ表示する仕様です。
-SS / A / B（現状維持）と判断保留は表示されません。
-件数カードで各ランクの件数を確認してください。
-なお、キーワードCPC調整の詳細テーブルは**全件表示**です。
-
----
-
-**Q. CSVが出力できない**
-→ 分析結果が0件の場合もダウンロードボタンは表示されますが、
-CSVは空ファイルになる場合があります。
-データがあるページでダウンロードしてください。
-
----
-
-**Q. 売価マスタ未登録時の動作**
-→ campaign_theme が PRICES に存在しない商品は、
-追加・削除・CPC調整のすべての判定から除外されます。
-該当商品を利用するにはPRICES辞書への登録が必要です。
-""")
-
-    # ── デバッグ情報 ──────────────────────────────────────────────────
-    with st.expander("ℹ️ デバッグ情報"):
-        dbg = st.session_state.get("dbg", {})
-        st.json(dbg)
-
-
-
-# ─── Page Router ─────────────────────────────────────
 _PAGE_FUNCS = {
     "📋 キーワード追加":              page_add_kw,
     "📊 DateDive売れる予測KW":        page_dd_v4,
