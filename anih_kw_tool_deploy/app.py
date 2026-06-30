@@ -2508,14 +2508,38 @@ def page_download():
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 分析機能
+# ═══════════════════════════════════════════════════════════════════════════════
+# 正式ロードマップ
+#   Step1 レポート蓄積         （完了）
+#   Step2 保存済みレポート      （完了）
+#   Step3 レポート検索・フィルター（完了）
+#   Step4 分析ダッシュボード    （完了）
+#   Step5 AI傾向分析            （次に実装）
+#   Step6 全体高速化            （最後に実施）
+# ═══════════════════════════════════════════════════════════════════════════════
 # 構成: 永続化レイヤー → スナップショット → 改善履歴 → Before/After → 自動評価 → レポート蓄積
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _ANALYSIS_DIR = Path(__file__).parent / "analysis_data"
 
+# ─── 共通KPI定義 ─────────────────────────────────────────────────────────────
+
+_METRICS = [
+    ("売上",       "sales",       "¥{:,.0f}"),
+    ("広告費",     "cost",        "¥{:,.0f}"),
+    ("ROAS",       "ROAS",        "{:.2f}"),
+    ("CPC",        "CPC",         "¥{:,.0f}"),
+    ("CTR",        "CTR",         "{:.2f}%"),
+    ("CVR",        "CVR",         "{:.2f}%"),
+    ("クリック数", "clicks",      "{:,.0f}"),
+    ("注文数",     "orders",      "{:,.0f}"),
+    ("表示回数",   "impressions", "{:,.0f}"),
+]
+
 
 # ─── 永続化レイヤー ──────────────────────────────────────────────────────────
 
+@st.cache_data(show_spinner=False)
 def _analysis_load(fname: str) -> list:
     """JSONファイルをリストとして読み込む。ファイルがなければ空リストを返す。"""
     p = _ANALYSIS_DIR / fname
@@ -2530,6 +2554,7 @@ def _analysis_save(fname: str, data: list) -> None:
     (_ANALYSIS_DIR / fname).write_text(
         json.dumps(data, ensure_ascii=False, indent=2, default=str), "utf-8"
     )
+    _analysis_load.clear()  # 保存後にキャッシュを破棄し次回読込を強制する
 
 
 # ─── スナップショット ────────────────────────────────────────────────────────
@@ -2552,29 +2577,76 @@ def _snapshot_kpis(df: pd.DataFrame) -> dict:
     return d
 
 
-def _save_snapshot() -> None:
-    """現在の session_state（df_win / df_cpc）からスナップショットを保存する。
-    同日のスナップショットは上書きする。
+def _snapshot_item_kpis(df: pd.DataFrame, key_col: str) -> dict:
+    """DataFrameをkey_col単位でKPI辞書にする（キーワード/商品/動画 単位保存用）。"""
+    if df.empty or key_col not in df.columns:
+        return {}
+    result: dict = {}
+    for _, row in df.iterrows():
+        item_key = str(row[key_col])
+        if not item_key or item_key == "nan":
+            continue
+        d: dict = {}
+        for col in ["sales", "cost", "orders", "clicks", "impressions"]:
+            if col in row.index and pd.notna(row[col]):
+                d[col] = float(row[col])
+        if d.get("cost", 0) > 0:
+            d["ROAS"] = round(d.get("sales", 0) / d["cost"], 2)
+            d["CPC"]  = round(d["cost"] / d["clicks"], 0) if d.get("clicks", 0) > 0 else None
+        if d.get("clicks", 0) > 0:
+            d["CVR"] = round(d.get("orders", 0) / d["clicks"] * 100, 2)
+            if d.get("impressions", 0) > 0:
+                d["CTR"] = round(d["clicks"] / d["impressions"] * 100, 2)
+        result[item_key] = d
+    return result
+
+
+def _save_snapshot(period_type: str = "7d") -> None:
+    """現在の session_state からスナップショットを保存する。
+    kw_add/cpc 集計KPI に加え、keyword/product/video 単位KPI も保存する。
+    同日・同period_typeのスナップショットは上書きする。
+    period_type: "7d" | "30d"
     """
-    today = date.today().isoformat()
-    dw_s  = st.session_state.get("df_win", pd.DataFrame())
-    cpc_s = st.session_state.get("df_cpc", pd.DataFrame())
+    today     = date.today().isoformat()
+    dw_s      = st.session_state.get("df_win",         pd.DataFrame())
+    cpc_s     = st.session_state.get("df_cpc",         pd.DataFrame())
+    cpc_pt_s  = st.session_state.get("df_cpc_product", pd.DataFrame())
+    cpc_vid_s = st.session_state.get("df_cpc_video",   pd.DataFrame())
+
+    # keyword: df_win + df_cpc をマージ（重複は df_win 優先）
+    kw_frames = [f for f in [dw_s, cpc_s] if not f.empty and "keyword" in f.columns]
+    if kw_frames:
+        df_kw = pd.concat(kw_frames, ignore_index=True).drop_duplicates(subset=["keyword"], keep="first")
+    else:
+        df_kw = pd.DataFrame()
+
     snap = {
         "snapshot_id": str(uuid.uuid4())[:8],
         "date":        today,
+        "period_type": period_type,
         "kw_add":      _snapshot_kpis(dw_s),
         "cpc":         _snapshot_kpis(cpc_s),
+        "keyword":     _snapshot_item_kpis(df_kw,      "keyword"),
+        "product":     _snapshot_item_kpis(cpc_pt_s,   "asin"),
+        "video":       _snapshot_item_kpis(cpc_vid_s,  "asin"),
     }
-    snaps = [s for s in _analysis_load("snapshots.json") if s["date"] != today]
+    # 同日・同period_typeのみ上書き（7d と 30d は同日でも共存する）
+    snaps = [
+        s for s in _analysis_load("snapshots.json")
+        if not (s["date"] == today and s.get("period_type", "7d") == period_type)
+    ]
     snaps.append(snap)
     _analysis_save("snapshots.json", snaps)
 
 
 def _find_snapshots(improvement_date: str) -> tuple:
-    """改善日の前後7日に最も近いスナップショットをそれぞれ返す。
+    """改善日の前後7日に最も近いスナップショットをそれぞれ返す（改善履歴分析用）。
+    period_type="7d" のみ使用する。period_typeが存在しない旧データは "7d" として扱う。
     戻り値: (before_snap | None, after_snap | None)
     """
-    snaps = _analysis_load("snapshots.json")
+    all_snaps = _analysis_load("snapshots.json")
+    # 分析には period_type="7d" のみ使用する（旧データはデフォルト "7d" として扱う）
+    snaps = [s for s in all_snaps if s.get("period_type", "7d") == "7d"]
     if not snaps:
         return None, None
     td       = date.fromisoformat(improvement_date)
@@ -2591,6 +2663,19 @@ def _find_snapshots(improvement_date: str) -> tuple:
         return min(cands, key=lambda s: abs((date.fromisoformat(s["date"]) - target).days))
 
     return _closest(target_b, snaps, "before"), _closest(target_a, snaps, "after")
+
+
+def _find_item_snapshots(item_key: str, analysis_type: str, improvement_date: str) -> tuple:
+    """指定アイテムのBefore/Afterスナップショットを返す（keyword/product/video分析用）。
+    _find_snapshots と同じ±7日ロジックを使用する（改善履歴分析と共通）。
+    戻り値: (before_kpis | None, after_kpis | None, before_date: str, after_date: str)
+    """
+    before_snap, after_snap = _find_snapshots(improvement_date)
+    before_kpis = before_snap.get(analysis_type, {}).get(item_key) if before_snap else None
+    after_kpis  = after_snap.get(analysis_type, {}).get(item_key) if after_snap else None
+    before_date = before_snap["date"] if before_snap else ""
+    after_date  = after_snap["date"] if after_snap else ""
+    return before_kpis, after_kpis, before_date, after_date
 
 
 # ─── 改善履歴 ────────────────────────────────────────────────────────────────
@@ -2628,6 +2713,68 @@ def _report_load() -> list:
     return _analysis_load("reports.json")
 
 
+# ─── 共通比較ロジック ─────────────────────────────────────────────────────────
+
+def _compute_compare(bf: dict, af: dict) -> tuple:
+    """Before/After KPI辞書から比較行リストと結果辞書を計算する。
+    戻り値: (rows: list[dict], result: dict)
+    """
+    rows: list[dict] = []
+    result: dict = {}
+    for label, key, fmt in _METRICS:
+        bv = float(bf.get(key) or 0)
+        av = float(af.get(key) or 0)
+        has_data = key in bf or key in af
+        if not has_data:
+            rows.append({"項目": label, "Before": "—", "After": "—", "差分": "—", "増減率": "—"})
+            continue
+        diff = av - bv
+        rate = (diff / bv * 100) if bv else 0.0
+        try:
+            bv_str = fmt.format(bv)
+            av_str = fmt.format(av)
+        except Exception:
+            bv_str = str(bv)
+            av_str = str(av)
+        rows.append({"項目": label, "Before": bv_str, "After": av_str,
+                     "差分": f"{diff:+,.2f}", "増減率": f"{rate:+.1f}%"})
+        result[key] = {"before": bv, "after": av, "diff": diff, "rate": rate}
+    return rows, result
+
+
+def _gen_ai_comment(compare_result: dict, verdict: str) -> str:
+    """比較結果から自動コメントを生成する。"""
+    if not compare_result:
+        return ""
+
+    def _r(key: str) -> float:
+        return compare_result.get(key, {}).get("rate", 0.0)
+
+    roas_rate  = _r("ROAS")
+    cvr_rate   = _r("CVR")
+    ctr_rate   = _r("CTR")
+    cost_rate  = _r("cost")
+    sales_rate = _r("sales")
+
+    if verdict == "改善":
+        if roas_rate >= 5 and cvr_rate >= 0:
+            return "ROASとCVRが改善しています。現在の運用を維持してください。"
+        if roas_rate >= 5:
+            return f"ROASが{roas_rate:+.1f}%改善しています。広告効率が向上しています。"
+        if sales_rate >= 5:
+            return f"売上が{sales_rate:+.1f}%増加しています。引き続き運用を継続してください。"
+        return "全体的に改善傾向にあります。現在の運用を維持してください。"
+    if verdict == "悪化":
+        if ctr_rate >= 0 and cvr_rate < 0:
+            return "CTRは改善していますがCVRが悪化しています。検索語句または商品ページの見直しを推奨します。"
+        if roas_rate <= -5:
+            return f"ROASが{roas_rate:+.1f}%低下しています。入札単価または対象KWの見直しを推奨します。"
+        if cost_rate >= 10:
+            return f"広告費が{cost_rate:+.1f}%増加しています。費用対効果を確認してください。"
+        return "全体的に悪化傾向にあります。運用の見直しを推奨します。"
+    return "大きな変化はありません。引き続きデータを蓄積してください。"
+
+
 # ─── UIブロック関数 ──────────────────────────────────────────────────────────
 
 def render_history(page_key: str) -> list:
@@ -2658,8 +2805,7 @@ def render_history(page_key: str) -> list:
 
 
 def render_compare(history_entry: dict | None, page_key: str) -> dict | None:
-    """Before / After 比較テーブルを表示。
-    改善日の前後7日に最も近いスナップショットを自動選択して比較する。
+    """改善履歴の Before / After 比較テーブルを表示する（改善履歴分析専用）。
     戻り値: {metric_key: {before, after, diff, rate}} | None
     """
     if not history_entry:
@@ -2684,42 +2830,38 @@ def render_compare(history_entry: dict | None, page_key: str) -> dict | None:
 
     bf = before_snap.get(snap_key, {})
     af = after_snap.get(snap_key, {})
-
-    _METRICS = [
-        ("売上",       "sales",   "¥{:,.0f}"),
-        ("広告費",     "cost",    "¥{:,.0f}"),
-        ("ROAS",       "ROAS",    "{:.2f}"),
-        ("CPC",        "CPC",     "¥{:,.0f}"),
-        ("CTR",        "CTR",     "{:.2f}%"),
-        ("CVR",        "CVR",     "{:.2f}%"),
-        ("クリック数", "clicks",  "{:,.0f}"),
-        ("注文数",     "orders",  "{:,.0f}"),
-    ]
-
-    rows   = []
-    result = {}
-    for label, key, fmt in _METRICS:
-        bv = float(bf.get(key) or 0)
-        av = float(af.get(key) or 0)
-        has_data = key in bf or key in af
-        if not has_data:
-            rows.append({"項目": label, "Before": "—", "After": "—", "差分": "—", "増減率": "—"})
-            continue
-        diff = av - bv
-        rate = (diff / bv * 100) if bv else 0.0
-        try:
-            bv_str = fmt.format(bv)
-            av_str = fmt.format(av)
-        except Exception:
-            bv_str = str(bv)
-            av_str = str(av)
-        rows.append({"項目": label, "Before": bv_str, "After": av_str,
-                     "差分": f"{diff:+,.2f}", "増減率": f"{rate:+.1f}%"})
-        result[key] = {"before": bv, "after": av, "diff": diff, "rate": rate}
+    rows, result = _compute_compare(bf, af)
 
     st.caption(
         f"Before: {before_snap['date']} のスナップショット　"
         f"After: {after_snap['date']} のスナップショット"
+    )
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    return result if result else None
+
+
+def _render_compare_kpis(
+    bf: dict | None,
+    af: dict | None,
+    before_date: str,
+    after_date: str,
+    item_key: str,
+    analysis_type: str,
+) -> dict | None:
+    """アイテム単位（keyword/product/video）のBefore/After比較テーブルを表示する。
+    戻り値: {metric_key: {before, after, diff, rate}} | None
+    """
+    if not bf and not af:
+        st.info(
+            f"「{item_key}」のスナップショットが2件以上必要です。"
+            "「📸 スナップショット保存」を複数回実施してください。"
+        )
+        return None
+
+    rows, result = _compute_compare(bf or {}, af or {})
+    st.caption(
+        f"Before: {before_date} のスナップショット　"
+        f"After: {after_date} のスナップショット"
     )
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
     return result if result else None
@@ -2733,22 +2875,28 @@ def render_result(compare_result: dict | None) -> str | None:
         st.caption("（現在データなし）")
         return None
 
-    reasons_up: list[str] = []
-    reasons_dn: list[str] = []
-
     def _get(key: str) -> dict:
         return compare_result.get(key, {})
 
-    if _get("ROAS").get("diff",  0) >= 0.1:  reasons_up.append("ROAS改善")
-    if _get("ROAS").get("diff",  0) <= -0.1: reasons_dn.append("ROAS低下")
-    if _get("cost").get("rate",  0) <= -5:   reasons_up.append("広告費減少")
-    if _get("cost").get("rate",  0) >= 5:    reasons_dn.append("広告費増加")
-    if _get("CVR").get("diff",   0) >= 0.5:  reasons_up.append("CVR向上")
-    if _get("CVR").get("diff",   0) <= -0.5: reasons_dn.append("CVR低下")
-    if _get("CTR").get("diff",   0) >= 0.5:  reasons_up.append("CTR向上")
-    if _get("CTR").get("diff",   0) <= -0.5: reasons_dn.append("CTR低下")
-    if _get("sales").get("rate", 0) >= 5:    reasons_up.append("売上増加")
-    if _get("sales").get("rate", 0) <= -5:   reasons_dn.append("売上減少")
+    reasons_up: list[str] = []
+    reasons_dn: list[str] = []
+
+    roas_rate  = _get("ROAS").get("rate",  0)
+    cost_rate  = _get("cost").get("rate",  0)
+    cvr_rate   = _get("CVR").get("rate",   0)
+    ctr_rate   = _get("CTR").get("rate",   0)
+    sales_rate = _get("sales").get("rate", 0)
+
+    if roas_rate  >= 5:   reasons_up.append(f"ROAS {roas_rate:+.1f}%")
+    if roas_rate  <= -5:  reasons_dn.append(f"ROAS {roas_rate:+.1f}%")
+    if cost_rate  <= -5:  reasons_up.append(f"広告費 {cost_rate:+.1f}%")
+    if cost_rate  >= 5:   reasons_dn.append(f"広告費 {cost_rate:+.1f}%")
+    if cvr_rate   >= 5:   reasons_up.append(f"CVR {cvr_rate:+.1f}%")
+    if cvr_rate   <= -5:  reasons_dn.append(f"CVR {cvr_rate:+.1f}%")
+    if ctr_rate   >= 5:   reasons_up.append(f"CTR {ctr_rate:+.1f}%")
+    if ctr_rate   <= -5:  reasons_dn.append(f"CTR {ctr_rate:+.1f}%")
+    if sales_rate >= 5:   reasons_up.append(f"売上 {sales_rate:+.1f}%")
+    if sales_rate <= -5:  reasons_dn.append(f"売上 {sales_rate:+.1f}%")
 
     if len(reasons_up) > len(reasons_dn):
         verdict, color, reasons = "改善",    "#22c55e", reasons_up
@@ -2757,123 +2905,762 @@ def render_result(compare_result: dict | None) -> str | None:
     else:
         verdict, color, reasons = "変化なし", "#94a3b8", ["大きな変化なし"]
 
-    st.markdown(f'<h4 style="color:{color}">■ {verdict}</h4>', unsafe_allow_html=True)
     for r in reasons:
         st.markdown(f"- {r}")
+    st.markdown(f'<h4 style="color:{color}">総合評価：{verdict}</h4>', unsafe_allow_html=True)
     return verdict
 
 
-def _render_report_list() -> None:
-    """保存済みレポート一覧を表示する。"""
+def _render_dashboard() -> None:
+    """分析ダッシュボードを表示する。保存済みレポートのみ集計する。"""
+    reports = _report_load()
+
+    if not reports:
+        st.info("分析レポートがありません")
+        return
+
+    total = len(reports)
+    n_up  = sum(1 for r in reports if r.get("evaluation") == "改善")
+    n_dn  = sum(1 for r in reports if r.get("evaluation") == "悪化")
+    n_nc  = sum(1 for r in reports if r.get("evaluation") == "変化なし")
+    impr_rate = round(n_up / total * 100) if total > 0 else 0
+
+    def _avg_rate(metric_key: str) -> str:
+        vals = [
+            float(r["compare"][metric_key]["rate"])
+            for r in reports
+            if r.get("compare", {}).get(metric_key, {}).get("rate") is not None
+        ]
+        return f"{sum(vals) / len(vals):+.1f}%" if vals else "—"
+
+    _c1, _c2, _c3, _c4, _c5 = st.columns(5)
+    _c1.metric("分析件数",  f"{total}件")
+    _c2.metric("改善",      f"{n_up}件")
+    _c3.metric("悪化",      f"{n_dn}件")
+    _c4.metric("変化なし",  f"{n_nc}件")
+    _c5.metric("改善率",    f"{impr_rate}%")
+
+    _c6, _c7, _c8, _c9 = st.columns(4)
+    _c6.metric("平均ROAS改善率",  _avg_rate("ROAS"))
+    _c7.metric("平均CVR改善率",   _avg_rate("CVR"))
+    _c8.metric("平均CTR改善率",   _avg_rate("CTR"))
+    _c9.metric("平均広告費変化率", _avg_rate("cost"))
+
+
+def _render_report_list(filter_type: str = "すべて", page_key: str = "") -> None:
+    """保存済みレポート一覧を表示する（検索・フィルター・詳細展開付き）。"""
+    _TYPE_LABEL_MAP = {
+        "history": "改善履歴",
+        "keyword": "キーワード",
+        "product": "商品",
+        "video":   "動画",
+    }
+    _ATYPE_FILTER_MAP = {
+        "改善履歴":         "history",
+        "キーワード":       "keyword",
+        "商品（ASIN）":     "product",
+        "動画（category）": "video",
+    }
+    _EVAL_ICON  = {"改善": "🟢", "悪化": "🔴", "変化なし": "⚪"}
+    _EVAL_COLOR = {"改善": "#22c55e", "悪化": "#ef4444", "変化なし": "#94a3b8"}
+    _pk = page_key  # widget key prefix
+
+    # ── フィルター UI ──────────────────────────────────────────────
+    _c1, _c2, _c3 = st.columns(3)
+    with _c1:
+        _f_atype = st.selectbox(
+            "分析対象",
+            ["すべて", "改善履歴", "キーワード", "商品（ASIN）", "動画（category）"],
+            key=f"{_pk}_rpt_f_atype",
+        )
+    with _c2:
+        _f_eval = st.selectbox(
+            "評価",
+            ["すべて", "改善", "悪化", "変化なし"],
+            key=f"{_pk}_rpt_f_eval",
+        )
+    with _c3:
+        _f_sort = st.selectbox(
+            "並び替え",
+            ["実施日（新しい順）", "実施日（古い順）"],
+            key=f"{_pk}_rpt_f_sort",
+        )
+
+    _c4, _c5, _c6 = st.columns(3)
+    with _c4:
+        _f_date_from = st.date_input("開始日", value=None, key=f"{_pk}_rpt_f_from")
+    with _c5:
+        _f_date_to   = st.date_input("終了日", value=None, key=f"{_pk}_rpt_f_to")
+    with _c6:
+        _f_name = st.text_input(
+            "対象名検索", key=f"{_pk}_rpt_f_name", placeholder="キーワード・ASINなど"
+        )
+
     reports = _report_load()
     if not reports:
         st.caption("（保存済みレポートなし）")
         return
-    rows = []
-    for r in sorted(reports, key=lambda x: x.get("analysis_date", ""), reverse=True):
-        h = r.get("history_entry", {})
-        rows.append({
-            "分析日":   (r.get("analysis_date") or "")[:10],
-            "改善日":   h.get("date", ""),
-            "対象機能": h.get("feature", ""),
-            "評価":     r.get("evaluation", ""),
-        })
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    # ── フィルタリング ─────────────────────────────────────────────
+    filtered = []
+    for r in reports:
+        atype_key  = r.get("analysis_type", "history")
+        target     = r.get("target_name") or r.get("history_entry", {}).get("detail", "")
+        rdate      = (r.get("analysis_date") or "")[:10]
+        evaluation = r.get("evaluation", "")
+
+        # 分析対象フィルター
+        if _f_atype != "すべて":
+            if _ATYPE_FILTER_MAP.get(_f_atype) != atype_key:
+                continue
+
+        # 評価フィルター
+        if _f_eval != "すべて" and evaluation != _f_eval:
+            continue
+
+        # 実施日フィルター（開始）
+        if _f_date_from is not None and rdate and rdate < str(_f_date_from):
+            continue
+
+        # 実施日フィルター（終了）
+        if _f_date_to is not None and rdate and rdate > str(_f_date_to):
+            continue
+
+        # 対象名検索（部分一致）
+        if _f_name and _f_name not in (target or ""):
+            continue
+
+        filtered.append(r)
+
+    # ── 並び替え ───────────────────────────────────────────────────
+    _reverse = (_f_sort == "実施日（新しい順）")
+    filtered.sort(key=lambda x: x.get("analysis_date", ""), reverse=_reverse)
+
+    if not filtered:
+        st.caption("（該当レポートなし）")
+        return
+
+    st.caption(f"{len(filtered)} 件")
+
+    # ── 一覧（クリックで詳細展開） ────────────────────────────────
+    for _ri, r in enumerate(filtered):
+        atype_key   = r.get("analysis_type", "history")
+        atype_label = _TYPE_LABEL_MAP.get(atype_key, atype_key)
+        target      = r.get("target_name") or r.get("history_entry", {}).get("detail", "")
+        rdate       = (r.get("analysis_date") or "")[:10]
+        evaluation  = r.get("evaluation", "")
+        ai_comment  = r.get("ai_comment", "")
+        ai_summary  = (ai_comment[:28] + "…") if len(ai_comment) > 28 else ai_comment
+        _icon  = _EVAL_ICON.get(evaluation, "")
+        _color = _EVAL_COLOR.get(evaluation, "#94a3b8")
+
+        with st.expander(
+            f"{rdate}　{atype_label}　{target}　{_icon} {evaluation}　{ai_summary}"
+        ):
+            # ── Before / After 詳細 ──────────────────────────────
+            _compare = r.get("compare", {})
+            if _compare:
+                _rows = []
+                for _lbl, _key, _fmt in _METRICS:
+                    _c = _compare.get(_key)
+                    if not _c:
+                        _rows.append({"項目": _lbl, "Before": "—", "After": "—",
+                                      "差分": "—", "増減率": "—"})
+                        continue
+                    _bv = float(_c.get("before", 0) or 0)
+                    _av = float(_c.get("after",  0) or 0)
+                    try:
+                        _bv_str = _fmt.format(_bv)
+                        _av_str = _fmt.format(_av)
+                    except Exception:
+                        _bv_str = str(_bv)
+                        _av_str = str(_av)
+                    _rows.append({
+                        "項目":   _lbl,
+                        "Before": _bv_str,
+                        "After":  _av_str,
+                        "差分":   f"{_c.get('diff', 0):+,.2f}",
+                        "増減率": f"{_c.get('rate', 0):+.1f}%",
+                    })
+                st.dataframe(pd.DataFrame(_rows), use_container_width=True, hide_index=True)
+
+            # ── 評価 ─────────────────────────────────────────────
+            st.markdown(
+                f'<span style="color:{_color}; font-weight:bold;">■ 評価：{evaluation}</span>',
+                unsafe_allow_html=True,
+            )
+
+            # ── AIコメント ────────────────────────────────────────
+            if ai_comment:
+                st.info(ai_comment)
+
+
+def _gen_ai_summary_comment(
+    impr_rate: int,
+    roas_avg: "float | None",
+    cvr_avg: "float | None",
+    cost_avg: "float | None",
+    type_stats: dict,
+    recent_n: int,
+    recent_rate: int,
+    recent_roas: "float | None",
+) -> dict:
+    """AI要約コメントの4項目を文章で返す（ルールベース生成、外部AI不使用）。
+    戻り値: {"best": str, "worst": str, "trend": str, "action": str}
+    """
+    def _impr(st_: dict) -> float:
+        return st_["up"] / st_["total"] * 100 if st_["total"] > 0 else 0.0
+
+    def _mavg(lst: list) -> "float | None":
+        return sum(lst) / len(lst) if lst else None
+
+    # ① 改善効果が高い施策
+    if type_stats:
+        _b_lbl, _b_st = max(
+            type_stats.items(),
+            key=lambda x: (_impr(x[1]), _mavg(x[1]["roas"]) or 0, _mavg(x[1]["cvr"]) or 0),
+        )
+        _b_ir   = _impr(_b_st)
+        _b_roas = _mavg(_b_st["roas"])
+        _b_cvr  = _mavg(_b_st["cvr"])
+        _b_parts: list[str] = []
+        if _b_ir >= 50:
+            _b_parts.append(f"改善率が高く（{_b_ir:.0f}%）")
+        if _b_roas is not None and _b_roas > 0:
+            _b_parts.append(f"ROASが向上（平均{_b_roas:+.1f}%）")
+        if _b_cvr is not None and _b_cvr > 0:
+            _b_parts.append(f"CVRも改善（平均{_b_cvr:+.1f}%）")
+        _b_desc = "、".join(_b_parts) if _b_parts else "比較的良好な傾向"
+        best_text = f"「{_b_lbl}」は{_b_desc}しており、現在最も改善効果が高い傾向があります。"
+    else:
+        best_text = "施策データが不足しています。"
+
+    # ② 改善効果が低い施策
+    if len(type_stats) >= 2:
+        _w_lbl, _w_st = min(
+            type_stats.items(),
+            key=lambda x: (_impr(x[1]), _mavg(x[1]["roas"]) or 0, _mavg(x[1]["cvr"]) or 0),
+        )
+        _w_ir   = _impr(_w_st)
+        _w_cvr  = _mavg(_w_st["cvr"])
+        _w_roas = _mavg(_w_st["roas"])
+        _w_parts: list[str] = []
+        if _w_ir < 50:
+            _w_parts.append(f"改善率が低く（{_w_ir:.0f}%）")
+        if _w_cvr is not None and _w_cvr < 0:
+            _w_parts.append(f"CVR改善率が低い（平均{_w_cvr:+.1f}%）")
+        if _w_roas is not None and _w_roas < 0:
+            _w_parts.append(f"ROAS低下傾向（平均{_w_roas:+.1f}%）")
+        _w_desc = "、".join(_w_parts) if _w_parts else "改善効果がやや限定的"
+        worst_text = f"「{_w_lbl}」は{_w_desc}傾向があります。改善策の見直しを検討してください。"
+    else:
+        worst_text = "施策種別が1種類のみのため比較できません。"
+
+    # ③ 最近の改善傾向
+    if recent_rate >= impr_rate + 5:
+        trend_text = f"直近{recent_n}件では改善率が上昇しています（{recent_rate}%）。"
+    elif recent_rate <= impr_rate - 5:
+        trend_text = f"直近{recent_n}件では改善率が低下しています（{recent_rate}%）。"
+    else:
+        trend_text = f"直近{recent_n}件の改善率は安定しています（{recent_rate}%）。"
+    if recent_roas is not None:
+        if recent_roas > 0:
+            trend_text += f"直近のROAS改善率は {recent_roas:+.1f}% と上昇傾向です。"
+        else:
+            trend_text += f"直近のROAS改善率は {recent_roas:+.1f}% と低下傾向です。"
+
+    # ④ 推奨アクション
+    _actions: list[str] = []
+    if cost_avg is not None and cost_avg >= 5:
+        _actions.append("広告費が増加傾向にあります。CPC見直しを推奨します。")
+    if cvr_avg is not None and cvr_avg < 0:
+        _actions.append("CVRが低下傾向にあります。検索語句または商品ページの見直しを推奨します。")
+    if roas_avg is not None and roas_avg < 0:
+        _actions.append("ROASが低下傾向にあります。入札単価の最適化を推奨します。")
+    if type_stats:
+        _best_lbl2 = max(type_stats.items(), key=lambda x: _impr(x[1]))[0]
+        _actions.append(f"現在は「{_best_lbl2}」を優先することを推奨します。")
+    if not _actions:
+        _actions.append("現在の運用を維持してください。引き続きデータを蓄積してください。")
+    action_text = "　".join(_actions)
+
+    return {
+        "best":   best_text,
+        "worst":  worst_text,
+        "trend":  trend_text,
+        "action": action_text,
+    }
+
+
+def _render_ai_trend() -> None:
+    """AI傾向分析を表示する。保存済みレポート（analysis_reports）のみ集計する。"""
+    reports = _report_load()
+
+    if not reports:
+        st.info("分析レポートがありません")
+        return
+
+    _TYPE_LABEL_MAP = {
+        "history": "改善履歴",
+        "keyword": "キーワード",
+        "product": "商品",
+        "video":   "動画",
+    }
+
+    total  = len(reports)
+    n_up   = sum(1 for r in reports if r.get("evaluation") == "改善")
+    n_dn   = sum(1 for r in reports if r.get("evaluation") == "悪化")
+    impr_rate = round(n_up / total * 100) if total > 0 else 0
+    det_rate  = round(n_dn / total * 100) if total > 0 else 0
+
+    def _avg_rate(rlist: list, metric_key: str) -> float | None:
+        vals = [
+            float(r["compare"][metric_key]["rate"])
+            for r in rlist
+            if r.get("compare", {}).get(metric_key, {}).get("rate") is not None
+        ]
+        return sum(vals) / len(vals) if vals else None
+
+    def _fmt(v: float | None) -> str:
+        return f"{v:+.1f}%" if v is not None else "—"
+
+    roas_avg = _avg_rate(reports, "ROAS")
+    cvr_avg  = _avg_rate(reports, "CVR")
+    ctr_avg  = _avg_rate(reports, "CTR")
+    cost_avg = _avg_rate(reports, "cost")
+
+    # ── 集計値表示 ────────────────────────────────────────────────
+    _c1, _c2, _c3, _c4 = st.columns(4)
+    _c1.metric("分析件数",      f"{total}件")
+    _c2.metric("改善率",        f"{impr_rate}%")
+    _c3.metric("悪化率",        f"{det_rate}%")
+    _c4.metric("平均ROAS改善率", _fmt(roas_avg))
+
+    _c5, _c6, _c7 = st.columns(3)
+    _c5.metric("平均CVR改善率",   _fmt(cvr_avg))
+    _c6.metric("平均CTR改善率",   _fmt(ctr_avg))
+    _c7.metric("平均広告費変化率", _fmt(cost_avg))
+
+    st.markdown("---")
+
+    # ── 施策別集計 ────────────────────────────────────────────────
+    from collections import defaultdict
+    _type_stats: dict = defaultdict(lambda: {"total": 0, "up": 0, "roas": [], "cvr": []})
+    for r in reports:
+        _ak  = r.get("analysis_type", "history")
+        _lbl = _TYPE_LABEL_MAP.get(_ak, _ak)
+        _type_stats[_lbl]["total"] += 1
+        if r.get("evaluation") == "改善":
+            _type_stats[_lbl]["up"] += 1
+        _rv = r.get("compare", {}).get("ROAS", {}).get("rate")
+        if _rv is not None:
+            _type_stats[_lbl]["roas"].append(float(_rv))
+        _cv = r.get("compare", {}).get("CVR", {}).get("rate")
+        if _cv is not None:
+            _type_stats[_lbl]["cvr"].append(float(_cv))
+
+    def _impr(stats: dict) -> float:
+        return stats["up"] / stats["total"] * 100 if stats["total"] > 0 else 0.0
+
+    def _mavg(lst: list) -> float | None:
+        return sum(lst) / len(lst) if lst else None
+
+    # ── 改善効果が高い施策 ────────────────────────────────────────
+    st.markdown("**改善効果が高い施策**")
+    if _type_stats:
+        _best = max(_type_stats.items(), key=lambda x: (
+            _impr(x[1]),
+            _mavg(x[1]["roas"]) or 0,
+            _mavg(x[1]["cvr"])  or 0,
+        ))
+        _b_lbl, _b_st = _best
+        _b_ir   = _impr(_b_st)
+        _b_roas = _mavg(_b_st["roas"])
+        _b_cvr  = _mavg(_b_st["cvr"])
+        _parts  = []
+        if _b_ir >= 50:
+            _parts.append(f"改善率が高く（{_b_ir:.0f}%）")
+        if _b_roas is not None and _b_roas > 0:
+            _parts.append(f"ROAS改善効果も高い（平均{_b_roas:+.1f}%）")
+        if _b_cvr is not None and _b_cvr > 0:
+            _parts.append(f"CVR向上にも寄与している（平均{_b_cvr:+.1f}%）")
+        _desc = "、".join(_parts) if _parts else "比較的良好な結果が見られる"
+        st.info(f"「{_b_lbl}」は{_desc}傾向があります。")
+    else:
+        st.caption("（データ不足）")
+
+    # ── 改善効果が低い施策 ────────────────────────────────────────
+    st.markdown("**改善効果が低い施策**")
+    if len(_type_stats) >= 2:
+        _worst = min(_type_stats.items(), key=lambda x: (
+            _impr(x[1]),
+            _mavg(x[1]["roas"]) or 0,
+            _mavg(x[1]["cvr"])  or 0,
+        ))
+        _w_lbl, _w_st = _worst
+        _w_ir   = _impr(_w_st)
+        _w_cvr  = _mavg(_w_st["cvr"])
+        _wparts = []
+        if _w_ir < 50:
+            _wparts.append(f"改善率が低い（{_w_ir:.0f}%）")
+        if _w_cvr is not None and _w_cvr < 0:
+            _wparts.append(f"CVR改善率が低い（平均{_w_cvr:+.1f}%）")
+        _wdesc = "、".join(_wparts) if _wparts else "改善効果が限定的"
+        st.warning(f"「{_w_lbl}」は{_wdesc}傾向があります。")
+    else:
+        st.caption("（施策種別が1種類のみのため比較不可）")
+
+    # ── 最近の改善傾向 ────────────────────────────────────────────
+    st.markdown("**最近の改善傾向**")
+    _sorted = sorted(reports, key=lambda x: x.get("analysis_date", ""))
+    _recent = _sorted[-10:] if len(_sorted) >= 10 else _sorted
+    _r_n    = len(_recent)
+    _r_up   = sum(1 for r in _recent if r.get("evaluation") == "改善")
+    _r_rate = round(_r_up / _r_n * 100) if _r_n > 0 else 0
+    _r_roas = _avg_rate(_recent, "ROAS")
+    if _r_rate >= impr_rate + 5:
+        _trend_txt = f"直近{_r_n}件では改善率が上昇しています（{_r_rate}%）。"
+    elif _r_rate <= impr_rate - 5:
+        _trend_txt = f"直近{_r_n}件では改善率が低下しています（{_r_rate}%）。"
+    else:
+        _trend_txt = f"直近{_r_n}件の改善率は安定しています（{_r_rate}%）。"
+    if _r_roas is not None:
+        _trend_txt += f"直近の平均ROAS改善率は {_r_roas:+.1f}% です。"
+    st.info(_trend_txt)
+
+    # ── 推奨アクション ────────────────────────────────────────────
+    st.markdown("**推奨アクション**")
+    _rec_lines: list[str] = []
+    if cost_avg is not None and cost_avg >= 5:
+        _rec_lines.append("広告費が増加傾向にあります。CPC見直しを推奨します。")
+    if cvr_avg is not None and cvr_avg < 0:
+        _rec_lines.append("CVRが低下傾向にあります。検索語句または商品ページの見直しを推奨します。")
+    if roas_avg is not None and roas_avg < 0:
+        _rec_lines.append("ROAS が低下傾向にあります。入札単価の最適化を推奨します。")
+    if _type_stats:
+        _best_lbl = max(_type_stats.items(), key=lambda x: _impr(x[1]))[0]
+        _rec_lines.append(f"現在は「{_best_lbl}」を優先することを推奨します。")
+    if not _rec_lines:
+        _rec_lines.append("現在の運用を維持してください。引き続きデータを蓄積してください。")
+    for _line in _rec_lines:
+        st.success(_line)
+
+    # ── AI要約コメント ────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("#### 🤖 AI要約コメント")
+    _summary = _gen_ai_summary_comment(
+        impr_rate   = impr_rate,
+        roas_avg    = roas_avg,
+        cvr_avg     = cvr_avg,
+        cost_avg    = cost_avg,
+        type_stats  = dict(_type_stats),
+        recent_n    = _r_n,
+        recent_rate = _r_rate,
+        recent_roas = _r_roas,
+    )
+    st.markdown("**改善効果が高い施策**")
+    st.info(_summary["best"])
+    st.markdown("**改善効果が低い施策**")
+    st.warning(_summary["worst"])
+    st.markdown("**最近の改善傾向**")
+    st.info(_summary["trend"])
+    st.markdown("**推奨アクション**")
+    st.success(_summary["action"])
 
 
 def _render_analysis_page(page_key: str) -> None:
     """分析画面共通レンダラー。
-    UI構成: スナップショット保存 → 改善履歴一覧 → 履歴を選択 → 分析開始
-             → Before/After → 評価 → レポート保存 → 保存済みレポート
+    analysis_type: "history" | "keyword" | "product" | "video"
     page_key: "add_analysis" | "cpc_analysis"
     """
     st.markdown("## 📊 分析")
 
-    # ── スナップショット保存 ──────────────────────────────────────────
+    with st.expander("📊 分析ダッシュボード", expanded=False):
+        _render_dashboard()
+
+    with st.expander("🤖 AI傾向分析", expanded=False):
+        _render_ai_trend()
+
+    # ── 分析対象 ──────────────────────────────────────────────────────
+    _ATYPE_LABELS = ["改善履歴", "キーワード", "商品（ASIN）", "動画（category）"]
+    _ATYPE_KEYS   = ["history",  "keyword",    "product",      "video"]
+    _atype_sel    = st.radio(
+        "分析対象",
+        _ATYPE_LABELS,
+        horizontal=True,
+        key=f"{page_key}_atype",
+    )
+    _analysis_type = _ATYPE_KEYS[_ATYPE_LABELS.index(_atype_sel)]
+
+    st.markdown("---")
+
+    # ── スナップショット保存（全対象共通） ───────────────────────────
     with st.expander("📸 スナップショット保存", expanded=False):
-        st.caption("広告データをアップロードして「抽出実行」を押した後、このボタンでKPIを記録してください。Before / After 比較に使用します（毎週保存を推奨）。")
+        st.caption(
+            "広告データをアップロードして「抽出実行」を押した後、このボタンでKPIを記録してください。"
+            "Before / After 比較に使用します（毎週保存を推奨）。"
+        )
         _snaps = _analysis_load("snapshots.json")
         if _snaps:
-            st.caption(f"保存済み: {len(_snaps)} 件 / 最新: {_snaps[-1]['date']}")
-        if st.button("📸 現在のデータを保存", key=f"{page_key}_snap",
-                     disabled=not st.session_state.get("has_results")):
-            _save_snapshot()
-            st.success(f"スナップショットを保存しました（{date.today()}）")
+            _snap_7d  = [s for s in _snaps if s.get("period_type", "7d") == "7d"]
+            _snap_30d = [s for s in _snaps if s.get("period_type", "7d") == "30d"]
+            st.caption(
+                f"保存済み: 7日={len(_snap_7d)}件 / 30日={len(_snap_30d)}件"
+                + (f" / 最新(7d): {_snap_7d[-1]['date']}" if _snap_7d else "")
+            )
+        _period_label = st.radio(
+            "レポート種別",
+            ["7日", "30日"],
+            horizontal=True,
+            key=f"{page_key}_period_sel",
+        )
+        _period_type = "7d" if _period_label == "7日" else "30d"
+        if st.button(
+            "📸 現在のデータを保存",
+            key=f"{page_key}_snap",
+            disabled=not st.session_state.get("has_results"),
+        ):
+            _save_snapshot(period_type=_period_type)
+            st.success(f"スナップショットを保存しました（{date.today()} / {_period_label}）")
             st.rerun()
         if not st.session_state.get("has_results"):
             st.info("先に検索用語レポートをアップロードして「抽出実行」を押してください。")
 
     st.markdown("---")
 
-    # ── ① 改善履歴一覧 ───────────────────────────────────────────────
-    st.markdown("#### 改善履歴一覧")
-    history_list = render_history(page_key)
+    # ════════════════════════════════════════════════════════════════
+    # 改善履歴分析
+    # ════════════════════════════════════════════════════════════════
+    if _analysis_type == "history":
+
+        st.markdown("#### 改善履歴一覧")
+        history_list = render_history(page_key)
+
+        st.markdown("---")
+        st.markdown("#### 履歴を選択")
+        if history_list:
+            _options = [
+                f"{h['date']}　{h['feature']}　{h['detail']}"
+                for h in history_list
+            ]
+            _sel_idx = st.selectbox(
+                "分析する改善履歴を選択してください",
+                range(len(_options)),
+                format_func=lambda i: _options[i],
+                key=f"{page_key}_sel",
+            )
+            selected_entry = history_list[_sel_idx]
+            can_run = True
+        else:
+            st.selectbox(
+                "分析する改善履歴を選択してください",
+                ["（履歴なし）"],
+                disabled=True,
+                key=f"{page_key}_sel",
+            )
+            selected_entry = None
+            can_run = False
+
+        if st.button(
+            "▶ 分析開始",
+            key=f"{page_key}_run",
+            type="primary",
+            use_container_width=True,
+            disabled=not can_run,
+        ):
+            st.session_state[f"{page_key}_ran"]         = True
+            st.session_state[f"{page_key}_entry"]       = selected_entry
+            st.session_state[f"{page_key}_atype_ran"]   = "history"
+
+        if (
+            st.session_state.get(f"{page_key}_ran")
+            and st.session_state.get(f"{page_key}_atype_ran") == "history"
+        ):
+            _entry = st.session_state.get(f"{page_key}_entry")
+
+            st.markdown("---")
+            st.markdown("##### Before / After")
+            _compare_result = render_compare(_entry, page_key)
+
+            st.markdown("---")
+            st.markdown("##### 評価")
+            _verdict = render_result(_compare_result)
+
+            if _compare_result and _verdict:
+                _ai = _gen_ai_comment(_compare_result, _verdict)
+                st.markdown("---")
+                st.markdown("##### AIコメント")
+                st.info(_ai)
+
+                if st.button("💾 レポートを保存", key=f"{page_key}_save_rep"):
+                    _report_save({
+                        "report_id":     str(uuid.uuid4())[:8],
+                        "analysis_date": datetime.now().isoformat(),
+                        "analysis_type": "history",
+                        "target_name":   f"{_entry.get('feature', '')} / {_entry.get('detail', '')}",
+                        "history_entry": _entry,
+                        "evaluation":    _verdict,
+                        "ai_comment":    _ai,
+                        "compare":       _compare_result,
+                    })
+                    st.success("レポートを保存しました")
+                    st.rerun()
+
+        st.markdown("---")
+        st.markdown("##### 保存済みレポート")
+        _render_report_list(page_key=page_key)
+        return
+
+    # ════════════════════════════════════════════════════════════════
+    # キーワード / 商品 / 動画 分析（共通フロー）
+    # ════════════════════════════════════════════════════════════════
+
+    # 分析対象ごとのDataFrameと表示設定
+    _ATYPE_CONFIG = {
+        "keyword": {
+            "df_key":   "df_win",
+            "id_col":   "keyword",
+            "label":    "検索語句",
+        },
+        "product": {
+            "df_key":   "df_cpc_product",
+            "id_col":   "asin",
+            "label":    "ASIN",
+        },
+        "video": {
+            "df_key":   "df_cpc_video",
+            "id_col":   "asin",
+            "label":    "ASIN（動画）",
+        },
+    }
+
+    _cfg   = _ATYPE_CONFIG[_analysis_type]
+    _df    = st.session_state.get(_cfg["df_key"], pd.DataFrame())
+    _id_col = _cfg["id_col"]
+
+    st.markdown(f"#### {_cfg['label']}一覧")
+
+    if _df.empty or _id_col not in _df.columns:
+        st.info("先に検索用語レポートをアップロードして「抽出実行」を押してください。")
+        st.markdown("---")
+        st.markdown("##### 保存済みレポート")
+        _render_report_list(page_key=page_key)
+        return
+
+    _items = _df[_id_col].dropna().unique().tolist()
+    _items = [str(x) for x in _items if str(x) not in ("", "nan")]
+
+    # 一覧テーブル
+    _show_cols = [_id_col] + [c for c in ["ROAS", "sales", "cost", "orders", "clicks"] if c in _df.columns]
+    st.dataframe(_df[_show_cols].head(50), use_container_width=True, hide_index=True)
 
     st.markdown("---")
+    st.markdown(f"#### {_cfg['label']}を選択")
 
-    # ── ② 履歴を選択 ────────────────────────────────────────────────
-    st.markdown("#### 履歴を選択")
-    if history_list:
-        _options = [
-            f"{h['date']}　{h['feature']}　{h['detail']}"
-            for h in history_list
-        ]
-        _sel_idx = st.selectbox(
-            "分析する改善履歴を選択してください",
-            range(len(_options)),
-            format_func=lambda i: _options[i],
-            key=f"{page_key}_sel",
+    if _items:
+        _sel_item = st.selectbox(
+            f"分析する{_cfg['label']}を選択してください",
+            _items,
+            key=f"{page_key}_item_sel",
         )
-        selected_entry = history_list[_sel_idx]
-        can_run = True
+        can_run_item = True
     else:
         st.selectbox(
-            "分析する改善履歴を選択してください",
+            f"分析する{_cfg['label']}を選択してください",
+            ["（データなし）"],
+            disabled=True,
+            key=f"{page_key}_item_sel",
+        )
+        _sel_item = None
+        can_run_item = False
+
+    # ── 改善履歴を選択（比較基準日の取得） ─────────────────────────
+    st.markdown("---")
+    st.markdown("#### 改善履歴を選択（比較基準日）")
+    _h_entries = _history_load()
+    if _h_entries:
+        _h_options = [
+            f"{h['date']}　{h['feature']}　{h['detail']}"
+            for h in _h_entries
+        ]
+        _h_idx = st.selectbox(
+            "比較基準日となる改善履歴を選択してください",
+            range(len(_h_options)),
+            format_func=lambda i: _h_options[i],
+            key=f"{page_key}_item_hist_sel",
+        )
+        _sel_hist_entry = _h_entries[_h_idx]
+        _ref_date = _sel_hist_entry["date"]
+        st.caption(
+            f"比較基準日: {_ref_date}　"
+            f"Before: {_ref_date} の7日前　After: {_ref_date} の7日後"
+        )
+        can_run_item = can_run_item and True
+    else:
+        st.selectbox(
+            "比較基準日となる改善履歴を選択してください",
             ["（履歴なし）"],
             disabled=True,
-            key=f"{page_key}_sel",
+            key=f"{page_key}_item_hist_sel",
         )
-        selected_entry = None
-        can_run = False
+        _ref_date = None
+        can_run_item = False
+        st.info("先に「改善履歴」タブで改善履歴を追加してください。")
 
-    # ── ③ 分析開始 ───────────────────────────────────────────────────
     if st.button(
         "▶ 分析開始",
-        key=f"{page_key}_run",
+        key=f"{page_key}_item_run",
         type="primary",
         use_container_width=True,
-        disabled=not can_run,
+        disabled=not can_run_item,
     ):
-        st.session_state[f"{page_key}_ran"]   = True
-        st.session_state[f"{page_key}_entry"] = selected_entry
+        st.session_state[f"{page_key}_item_ran"]        = True
+        st.session_state[f"{page_key}_item_target"]     = _sel_item
+        st.session_state[f"{page_key}_item_ref_date"]   = _ref_date
+        st.session_state[f"{page_key}_item_hist_entry"] = _sel_hist_entry if _h_entries else None
+        st.session_state[f"{page_key}_atype_ran"]       = _analysis_type
 
-    # ── 分析結果 ─────────────────────────────────────────────────────
-    if st.session_state.get(f"{page_key}_ran"):
-        _entry = st.session_state.get(f"{page_key}_entry")
+    if (
+        st.session_state.get(f"{page_key}_item_ran")
+        and st.session_state.get(f"{page_key}_atype_ran") == _analysis_type
+    ):
+        _target      = st.session_state.get(f"{page_key}_item_target")
+        _ref_date    = st.session_state.get(f"{page_key}_item_ref_date")
+        _hist_entry  = st.session_state.get(f"{page_key}_item_hist_entry")
+
+        _bf, _af, _bd, _ad = _find_item_snapshots(_target, _analysis_type, _ref_date)
 
         st.markdown("---")
         st.markdown("##### Before / After")
-        _compare_result = render_compare(_entry, page_key)
+        _compare_result = _render_compare_kpis(_bf, _af, _bd, _ad, _target, _analysis_type)
 
         st.markdown("---")
         st.markdown("##### 評価")
         _verdict = render_result(_compare_result)
 
         if _compare_result and _verdict:
-            if st.button("💾 レポートを保存", key=f"{page_key}_save_rep"):
+            _ai = _gen_ai_comment(_compare_result, _verdict)
+            st.markdown("---")
+            st.markdown("##### AIコメント")
+            st.info(_ai)
+
+            if st.button("💾 レポートを保存", key=f"{page_key}_item_save_rep"):
                 _report_save({
                     "report_id":     str(uuid.uuid4())[:8],
                     "analysis_date": datetime.now().isoformat(),
-                    "history_entry": _entry,
+                    "analysis_type": _analysis_type,
+                    "target_name":   _target,
+                    "history_entry": _hist_entry,
                     "evaluation":    _verdict,
+                    "ai_comment":    _ai,
                     "compare":       _compare_result,
                 })
                 st.success("レポートを保存しました")
                 st.rerun()
 
-        st.markdown("---")
-        st.markdown("##### 保存済みレポート")
-        _render_report_list()
+    st.markdown("---")
+    st.markdown("##### 保存済みレポート")
+    _render_report_list(page_key=page_key)
 
 
 def page_add_analysis() -> None:
@@ -2923,50 +3710,83 @@ def page_manual():
 
     with st.expander("⑤ 分析"):
         st.markdown("""
-分析機能は改善施策の効果を確認するための機能です。
+## 分析機能
 
-**分析の流れ**
-
-① スナップショット保存  
-↓  
-② 改善履歴追加  
-↓  
-③ 履歴選択  
-↓  
-④ 分析開始  
-↓  
-⑤ Before / After比較  
-↓  
-⑥ 自動評価  
-↓  
-⑦ レポート保存  
-↓  
-⑧ 保存済みレポート確認  
+分析機能は、広告改善を実施した結果、本当に成果が改善したかを確認するための機能です。
+改善履歴の日付を基準として**改善前7日**と**改善後7日**を自動比較し、
+「改善」「悪化」「変化なし」を判定します。
+分析結果はツール内へ保存され、今後の広告運用へ活用します。
 
 ---
 
-**■ スナップショット保存**
+### 分析の流れ
 
-広告データを保存します。  
-毎週CSV更新後に保存してください。  
+```
+① スナップショット保存
+        ↓
+② 改善履歴登録
+        ↓
+③ 分析開始
+        ↓
+④ Before（改善前7日）
+        ↓
+⑤ After（改善後7日）
+        ↓
+⑥ 自動評価
+        ↓
+⑦ AI傾向分析
+        ↓
+⑧ レポート保存
+        ↓
+⑨ 保存済みレポート確認
+```
+
+---
+
+### 分析手順（初心者向け）
+
+① Amazon広告CSVを更新する
+② 7日スナップショットを保存する
+③ 広告改善を実施する
+④ 改善履歴へ登録する
+⑤ 改善後7日経過したらCSVを更新する
+⑥ 再度7日スナップショットを保存する
+⑦ 分析開始を押す
+⑧ Before / After比較を確認する
+⑨ 自動評価を確認する
+⑩ AI傾向分析を確認する
+⑪ レポートを保存する
+⑫ 保存済みレポートからいつでも確認できる
+
+---
+
+### ■ スナップショット保存
+
+広告CSVをアップロードして「抽出実行」を押した後、スナップショット保存ボタンでKPIを記録します。
 保存したデータがBefore / After分析の基準になります。
+毎週CSV更新後に保存することを推奨します。
+
+レポート種別は「7日」を選択してください。
+30日レポートは月次データ保管用です（分析には使用しません）。
 
 ---
 
-**■ 改善履歴**
+### ■ 改善履歴
 
-改善した内容を記録します。
+広告改善の内容を記録します。この日付が分析の基準日になります。
 
 記録項目
 - 実施日
-- 機能
-- 内容
+- 機能（キーワード追加・削除・CPC調整・オート除外KWなど）
+- 内容（具体的な改善内容）
 
 ---
 
-**■ Before / After比較**
+### ■ Before / After比較
 
-改善履歴の日付を基準として前7日・後7日を自動比較します。
+改善履歴の日付を基準として、前7日・後7日のKPIを自動比較します。
+開始日・終了日の入力は不要です。日付は自動で設定されます。
+分析対象は7日スナップショットのみです。
 
 比較項目
 - 売上
@@ -2977,22 +3797,169 @@ def page_manual():
 - CVR
 - クリック数
 - 注文数
+- 表示回数
 
 ---
 
-**■ 自動評価**
+### ■ 自動評価
 
 比較結果から「改善」「悪化」「変化なし」を自動判定します。
+評価はレポートへ保存され、あとから何度でも確認できます。
 
 ---
 
-**■ レポート保存**
+### ■ AI傾向分析
 
-分析結果はツール内へ保存されます。CSVは出力しません。
+保存済みレポート全体を集計し、広告運用全体の傾向を分析します。
+個別レポートを分析する機能ではありません。
+改善傾向・改善効果が高い施策・推奨アクションを自動表示します。
+
+---
+
+### ■ レポート保存
+
+分析結果はCSVへ出力しません。ツール内へ保存されます。
+保存済みレポートからいつでも確認・検索できます。
+
+---
+
+### ■ 7日・30日レポートについて
+
+**7日レポート**（分析用）
+改善履歴分析・Before / After比較・自動評価・AI傾向分析・分析ダッシュボードで使用します。
+
+**30日レポート**（保管用）
+保存のみ可能です。現在の分析では使用しません。
+将来の月次分析・長期分析用として保管します。
+
+---
+
+### ■ おすすめ運用
+
+**毎週**
+① Amazon広告CSV更新
+② 7日スナップショット保存
+③ 広告改善実施
+④ 改善履歴登録
+⑤ 7日後に分析
+
+**毎月**
+① 30日レポート保存（月次データ保管用）
+※ 30日レポートは現在の分析対象ではありません。
+
+---
+
+### ⚠️ 注意事項
+
+- 開始日・終了日は入力不要です。改善履歴の日付を基準に自動で前7日・後7日を比較します。
+- 分析対象は7日スナップショットのみです。
+- 30日レポートは分析対象外です。
+
+---
+
+### 初心者向け 操作手順
+
+**① Amazon広告レポートを更新**
+Amazon広告管理画面から最新の広告CSVを取得します。
+このCSVが分析の元データになります。
+
+────────────────
+
+**② 7日スナップショットを保存**
+取得したCSVを読み込み、7日スナップショットとして保存します。
+改善前の状態を記録するために必要です。
+
+────────────────
+
+**③ 広告改善を実施**
+広告運用を行います。
+
+例
+- キーワード追加
+- キーワード削除
+- CPC調整
+- オート除外KW
+
+実施内容は改善履歴へ登録します。
+
+────────────────
+
+**④ 改善履歴を登録**
+改善した日付・実施した機能・改善内容を記録します。
+この日付がBefore / After比較の基準になります。
+
+────────────────
+
+**⑤ 改善後7日経過**
+改善効果を確認するため、改善後7日程度運用します。
+
+────────────────
+
+**⑥ 最新CSVを取得**
+改善後の広告CSVを取得します。
+改善後の結果を分析するために使用します。
+
+────────────────
+
+**⑦ 7日スナップショットを保存**
+改善後のCSVを保存します。
+改善前後を比較するためのデータになります。
+
+────────────────
+
+**⑧ 分析開始**
+改善履歴を選択し、分析開始を実行します。
+開始日・終了日の入力は不要です。
+改善履歴の日付を基準に前7日・後7日を自動比較します。
+
+────────────────
+
+**⑨ Before / After確認**
+以下を自動比較します。
+
+- 売上
+- 広告費
+- ROAS
+- CPC
+- CTR
+- CVR
+- クリック数
+- 注文数
+
+────────────────
+
+**⑩ 自動評価確認**
+比較結果から「改善」「悪化」「変化なし」を自動判定します。
+
+────────────────
+
+**⑪ AI傾向分析確認**
+保存済みレポート全体を集計し、改善傾向や今後の運用の参考となる内容を表示します。
+
+────────────────
+
+**⑫ レポート保存**
+分析結果はツール内へ保存されます。CSV出力は行いません。
+
+────────────────
+
+**⑬ 保存済みレポート確認**
+保存した分析結果はいつでも確認できます。
+過去の改善内容も継続して管理できます。
+
+---
+
+**■ ポイント**
+
+- 分析対象は7日スナップショットのみです。
+- 30日レポートは保存専用であり、現在の分析には使用しません。
+- 開始日・終了日は入力不要です。
+- 改善履歴の日付を基準に自動で前7日・後7日を比較します。
+- 分析結果はツール内へ保存され、あとから何度でも確認できます。
 """)
 
 
-
+# ─── Page Router ─────────────────────────────────────
 _PAGE_FUNCS = {
     "📋 キーワード追加":              page_add_kw,
     "📊 DateDive売れる予測KW":        page_dd_v4,
