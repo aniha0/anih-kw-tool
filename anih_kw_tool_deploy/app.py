@@ -1004,132 +1004,171 @@ def render_logic_section(title: str, content_html: str):
 # ページ関数
 # ===================================================
 
-# ===================================================
-# 分析機能 共通ヘルパー
-# ===================================================
-import json as _anls_json
-import pathlib as _anls_plib
 import datetime as _anls_dt
+import pathlib as _anls_plib
 
-_ANLS_DIR = _anls_plib.Path("analysis_data")
+# ===================================================
+# 分析ヘルパー関数
+# ===================================================
 
 def _anls_load(fname: str) -> list:
-    p = _ANLS_DIR / fname
-    if not p.exists(): return []
-    try: return _anls_json.loads(p.read_text(encoding="utf-8")).get("records", [])
-    except Exception: return []
+    p = _anls_plib.Path("analysis_data") / fname
+    if not p.exists():
+        return []
+    try:
+        import json
+        return json.loads(p.read_text(encoding="utf-8")).get("records", [])
+    except Exception:
+        return []
 
 def _anls_save(fname: str, records: list):
-    _ANLS_DIR.mkdir(exist_ok=True)
-    (_ANLS_DIR / fname).write_text(
-        _anls_json.dumps({"records": records}, ensure_ascii=False, indent=2),
-        encoding="utf-8")
+    import json
+    p = _anls_plib.Path("analysis_data")
+    p.mkdir(exist_ok=True)
+    (p / fname).write_text(json.dumps({"records": records}, ensure_ascii=False, indent=2), encoding="utf-8")
 
 def _anls_parse_csv(csv_file):
     df = rcsv(csv_file)
-    kc  = fcol(df, ["検索用語","カスタマーの検索用語","Customer Search Term","search term"])
-    cc  = fcol(df, ["キャンペーン名","Campaign Name","campaign name"])
-    sc  = fcol(df, ["売上","売上額","合計売上","広告費売上高","7日間の総売上高","Attributed Sales","Sales"])
-    oc_ = fcol(df, ["合計費用","費用","広告費","コスト","Cost","Spend","spend"])
-    od  = fcol(df, ["商品購入数","注文数","注文された商品点数","Orders","Purchases"])
-    clk = fcol(df, ["クリック数","クリック","Clicks","clicks"])
-    imp = fcol(df, ["インプレッション数","インプレッション","Impressions","impressions"])
-    tkc = fcol(df, ["ターゲティング","ターゲッティング","キーワード","Targeting","targeting","Keyword","keyword"])
-    kwt = fcol(df, ["Keyword Text","Keyword text","keyword text","キーワードテキスト"])
-    agn = fcol(df, ["Ad Group Name","広告グループ名","Ad Group","広告グループ","ad group"])
-    for col in [sc, oc_]:
-        if col: df[col] = tonum(df[col])
-    for col in [od, clk, imp]:
-        if col: df[col] = tonum(df[col])
+    kc  = fcol(df, ["検索用語", "Search Term", "Customer Search Term"])
+    cc  = fcol(df, ["キャンペーン名", "Campaign Name", "campaign_name"])
+    sc  = fcol(df, ["売上", "Sales", "売上金額", "7日間の合計売上高", "14日間の合計売上高", "合計売上高"])
+    oc_ = fcol(df, ["広告費", "Cost", "Spend", "費用", "合計費用"])
+    od  = fcol(df, ["注文数", "Orders", "購入数", "7日間の総注文数", "14日間の総注文数", "合計注文数"])
+    clk = fcol(df, ["クリック数", "Clicks"])
+    imp = fcol(df, ["インプレッション数", "Impressions", "表示回数"])
+    tkc = fcol(df, ["ターゲティング", "Targeting"])
+    kwt = fcol(df, ["キーワードテキスト", "Keyword Text", "キーワード"])
+    agn = fcol(df, ["広告グループ名", "Ad Group Name", "広告グループ"])
     return df, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn
 
 def _anls_build_kw_after(df, kc, cc, sc, oc_, od, clk) -> pd.DataFrame:
-    if not all([kc, cc, sc, oc_]): return pd.DataFrame()
-    df = df.copy()
-    df["kn"] = df[kc].apply(norm)
-    df["ct"] = df[cc].apply(lambda x: official(get_theme(str(x))))
-    df = df[df[cc].str.contains("オート|auto", case=False, na=False)].copy()
-    if df.empty: return pd.DataFrame()
-    agg_d = {"keyword":(kc,"first"),"campaign_theme":("ct",lambda x: x.mode().iloc[0] if len(x)>0 else "未分類"),
-              "sales":(sc,"sum"),"cost":(oc_,"sum")}
-    if od:  agg_d["orders"] = (od,"sum")
-    if clk: agg_d["clicks"] = (clk,"sum")
-    agg = df.groupby("kn").agg(**agg_d).reset_index(drop=True)
-    agg["ROAS"] = agg.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
-    if "clicks" in agg.columns and "orders" in agg.columns:
-        agg["CVR"] = agg.apply(lambda r: round(r["orders"]/r["clicks"]*100,1) if r["clicks"]>0 else 0.0, axis=1)
-    agg["_kn_key"] = agg["keyword"].apply(norm)
-    return agg
+    if not kc or not cc or not sc or not oc_:
+        return pd.DataFrame()
+    d = df.copy()
+    d["_cost_n"] = tonum(d[oc_])
+    d = d[d["_cost_n"] > 0].copy()
+    d["ct"] = d[cc].apply(lambda x: official(get_theme(str(x))))
+    d["_kn_key"] = d[kc].apply(norm)
+    d["_sc_n"]  = tonum(d[sc])
+    d["_oc_n"]  = tonum(d[oc_])
+    agg_d = {"_sc_n": "sum", "_oc_n": "sum",
+             "ct": lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"}
+    if od:  d["_od_n"]  = tonum(d[od]);  agg_d["_od_n"]  = "sum"
+    if clk: d["_clk_n"] = tonum(d[clk]); agg_d["_clk_n"] = "sum"
+    out = d.groupby("_kn_key", as_index=True).agg(agg_d).reset_index()
+    out = out.rename(columns={"_sc_n":"sales","_oc_n":"cost","ct":"campaign_theme"})
+    if "_od_n"  in out.columns: out = out.rename(columns={"_od_n":"orders"})
+    if "_clk_n" in out.columns: out = out.rename(columns={"_clk_n":"clicks"})
+    out["ROAS"] = out.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
+    if "orders" in out.columns and "clicks" in out.columns:
+        out["CVR"] = out.apply(lambda r: round(r["orders"]/r["clicks"]*100,1) if r["clicks"]>0 else 0.0, axis=1)
+    if "clicks" in out.columns:
+        out["avg_cpc"] = out.apply(lambda r: round(r["cost"]/r["clicks"],0) if r["clicks"]>0 else 0, axis=1)
+    return out
 
 def _anls_build_cpc_after(df, cc, sc, oc_, od, clk, kwt_col) -> pd.DataFrame:
-    if not all([cc, sc, oc_, kwt_col]): return pd.DataFrame()
-    df = df.copy()
-    df["ct"] = df[cc].apply(lambda x: official(get_theme(str(x))))
-    mask = (df[cc].str.contains("SP広告.*マニュアル|SP.*manual", case=False, na=False)
-            & ~df[cc].str.contains("商品ターゲ|動画ターゲ|オート|auto", case=False, na=False))
-    df = df[mask].copy()
-    if df.empty: return pd.DataFrame()
-    df["_kn"] = df[kwt_col].apply(norm)
-    df = df[df["_kn"].str.strip() != ""].copy()
-    if df.empty: return pd.DataFrame()
-    agg_d = {"keyword":(kwt_col,"first"),"campaign_theme":("ct",lambda x: x.mode().iloc[0] if len(x)>0 else "未分類"),
-              "sales":(sc,"sum"),"cost":(oc_,"sum")}
-    if od:  agg_d["orders"] = (od,"sum")
-    if clk: agg_d["clicks"] = (clk,"sum")
-    agg = df.groupby(["ct","_kn"]).agg(**agg_d).reset_index(drop=True)
-    agg["ROAS"] = agg.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
-    if "clicks" in agg.columns:
-        agg["avg_cpc"] = (agg["cost"]/agg["clicks"].replace(0,float("nan"))).round(0).fillna(0).astype(int)
-    agg["_kn_key"] = agg["keyword"].apply(norm)
-    return agg
+    if not cc or not sc or not oc_:
+        return pd.DataFrame()
+    d = df.copy()
+    d["_cost_n"] = tonum(d[oc_])
+    d = d[d["_cost_n"] > 0].copy()
+    d["ct"] = d[cc].apply(lambda x: official(get_theme(str(x))))
+    kc2 = kwt_col if kwt_col else fcol(d, ["ターゲティング","Targeting","キーワードテキスト","Keyword Text"])
+    if not kc2:
+        return pd.DataFrame()
+    d["_kn_key"] = d[kc2].apply(norm)
+    d["_sc_n"]  = tonum(d[sc])
+    d["_oc_n"]  = tonum(d[oc_])
+    agg_d = {"_sc_n": "sum", "_oc_n": "sum",
+             "ct": lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"}
+    if od:  d["_od_n"]  = tonum(d[od]);  agg_d["_od_n"]  = "sum"
+    if clk: d["_clk_n"] = tonum(d[clk]); agg_d["_clk_n"] = "sum"
+    out = d.groupby("_kn_key", as_index=True).agg(agg_d).reset_index()
+    out = out.rename(columns={"_sc_n":"sales","_oc_n":"cost","ct":"campaign_theme"})
+    if "_od_n"  in out.columns: out = out.rename(columns={"_od_n":"orders"})
+    if "_clk_n" in out.columns: out = out.rename(columns={"_clk_n":"clicks"})
+    out["ROAS"] = out.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
+    if "orders" in out.columns and "clicks" in out.columns:
+        out["CVR"] = out.apply(lambda r: round(r["orders"]/r["clicks"]*100,1) if r["clicks"]>0 else 0.0, axis=1)
+    if "clicks" in out.columns:
+        out["avg_cpc"] = out.apply(lambda r: round(r["cost"]/r["clicks"],0) if r["clicks"]>0 else 0, axis=1)
+    return out
 
 def _anls_build_asin_after(df, cc, sc, oc_, od, clk, tkc, camp_pat) -> pd.DataFrame:
-    import re as _re_ax
-    def _ex(s):
-        m = _re_ax.search(r'B0[A-Z0-9]{8}', str(s), _re_ax.IGNORECASE)
+    if not cc or not sc or not oc_ or not tkc:
+        return pd.DataFrame()
+    d = df.copy()
+    d["_cost_n"] = tonum(d[oc_])
+    d = d[d["_cost_n"] > 0].copy()
+    if camp_pat:
+        d = d[d[cc].apply(lambda x: camp_pat in str(x))].copy()
+    d["ct"] = d[cc].apply(lambda x: official(get_theme(str(x))))
+    def _ext_asin(v):
+        m = re.search(r'B0[A-Z0-9]{8}', str(v), re.IGNORECASE)
         return m.group(0).upper() if m else ""
-    if not all([cc, sc, oc_, tkc]): return pd.DataFrame()
-    df = df.copy()
-    df["ct"] = df[cc].apply(lambda x: official(get_theme(str(x))))
-    df = df[df[cc].str.contains(camp_pat, na=False)].copy()
-    if df.empty: return pd.DataFrame()
-    df["_asin"] = df[tkc].apply(_ex)
-    df = df[df["_asin"] != ""].copy()
-    if df.empty: return pd.DataFrame()
-    agg_d = {"asin":("_asin","first"),"campaign_theme":("ct",lambda x: x.mode().iloc[0] if len(x)>0 else "未分類"),
-              "sales":(sc,"sum"),"cost":(oc_,"sum")}
-    if od:  agg_d["orders"] = (od,"sum")
-    if clk: agg_d["clicks"] = (clk,"sum")
-    agg = df.groupby("_asin").agg(**agg_d).reset_index(drop=True)
-    agg["ROAS"] = agg.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
-    if "clicks" in agg.columns:
-        agg["avg_cpc"] = (agg["cost"]/agg["clicks"].replace(0,float("nan"))).round(0).fillna(0).astype(int)
-    return agg
+    d["_kn_key"] = d[tkc].apply(_ext_asin)
+    d = d[d["_kn_key"] != ""].copy()
+    if d.empty:
+        return pd.DataFrame()
+    d["_sc_n"]  = tonum(d[sc])
+    d["_oc_n"]  = tonum(d[oc_])
+    agg_d = {"_sc_n": "sum", "_oc_n": "sum",
+             "ct": lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"}
+    if od:  d["_od_n"]  = tonum(d[od]);  agg_d["_od_n"]  = "sum"
+    if clk: d["_clk_n"] = tonum(d[clk]); agg_d["_clk_n"] = "sum"
+    out = d.groupby("_kn_key", as_index=True).agg(agg_d).reset_index()
+    out = out.rename(columns={"_sc_n":"sales","_oc_n":"cost","ct":"campaign_theme"})
+    if "_od_n"  in out.columns: out = out.rename(columns={"_od_n":"orders"})
+    if "_clk_n" in out.columns: out = out.rename(columns={"_clk_n":"clicks"})
+    out["ROAS"] = out.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
+    if "orders" in out.columns and "clicks" in out.columns:
+        out["CVR"] = out.apply(lambda r: round(r["orders"]/r["clicks"]*100,1) if r["clicks"]>0 else 0.0, axis=1)
+    if "clicks" in out.columns:
+        out["avg_cpc"] = out.apply(lambda r: round(r["cost"]/r["clicks"],0) if r["clicks"]>0 else 0, axis=1)
+    return out
 
 def _anls_judge(b, a, higher_ok=True):
-    if b == 0: return "ー"
-    pct = (a - b) / b * 100
-    if abs(pct) < 2: return "→ 変化なし"
-    if higher_ok: return f"↑ 改善 ({pct:+.1f}%)" if pct > 0 else f"↓ 悪化 ({pct:+.1f}%)"
-    return f"↓ 改善 ({pct:+.1f}%)" if pct < 0 else f"↑ 悪化 ({pct:+.1f}%)"
+    try:
+        b = float(b or 0); a = float(a or 0)
+    except Exception:
+        return "→ 変化なし"
+    if b == 0 and a == 0:
+        return "→ 変化なし"
+    if b == 0:
+        return ("↑ 改善 (+∞%)" if higher_ok else "↓ 悪化 (+∞%)")
+    pct = (a - b) / abs(b) * 100
+    if abs(pct) < 3.0:
+        return "→ 変化なし"
+    if pct > 0:
+        return (f"↑ 改善 (+{pct:.1f}%)" if higher_ok else f"↓ 悪化 (+{pct:.1f}%)")
+    else:
+        return (f"↓ 悪化 ({pct:.1f}%)" if higher_ok else f"↑ 改善 ({pct:.1f}%)")
 
 def _anls_pct_str(b, a):
-    if not b or float(b) == 0: return "ー"
-    pct = (float(a) - float(b)) / float(b) * 100
-    return f"{'+' if pct>=0 else ''}{pct:.0f}%"
+    try:
+        b = float(b or 0); a = float(a or 0)
+        if b == 0: return "ー"
+        return f"{(a-b)/abs(b)*100:+.0f}%"
+    except Exception:
+        return "ー"
 
 def _anls_diff_str(b, a, unit=""):
-    diff = float(a) - float(b)
-    return f"{'+' if diff>=0 else ''}{diff:,.0f}{unit}"
+    try:
+        return f"{float(a or 0)-float(b or 0):+.0f}{unit}"
+    except Exception:
+        return "ー"
 
 def _anls_row_judge(row):
-    """ROASベースで行の改善判定: 改善 / 悪化 / 変化なし"""
-    b = float(row.get("ROAS_b", 0) or 0)
-    a = float(row.get("ROAS_a", 0) or 0)
-    j = _anls_judge(b, a)
-    if "改善" in j: return "改善"
-    if "悪化" in j: return "悪化"
-    return "変化なし"
+    try:
+        b = float(row.get("ROAS_b", 0) or 0)
+        a = float(row.get("ROAS_a", 0) or 0)
+        if b == 0 and a == 0: return "変化なし"
+        if b == 0: return "改善"
+        pct = (a - b) / abs(b) * 100
+        if abs(pct) < 3.0: return "変化なし"
+        return "改善" if pct > 0 else "悪化"
+    except Exception:
+        return "変化なし"
 
 def _anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate):
     def _card(bg, brd, lc, vc, label, val):
@@ -1148,8 +1187,6 @@ def _anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate):
     return f'<div style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap;">{cards}</div>'
 
 def _anls_camp_table_html(merged):
-    """キャンペーン別 改善サマリーをHTMLテーブルで返す"""
-    _J = {"改善":"🟢","悪化":"🔴","変化なし":"🟡"}
     rows_html = ""
     for ct, grp in merged.groupby("campaign_theme"):
         n  = len(grp)
@@ -1157,10 +1194,9 @@ def _anls_camp_table_html(merged):
         na = int((grp["_判定"]=="悪化").sum())
         nv = int((grp["_判定"]=="変化なし").sum())
         rate = f"{nk/n*100:.0f}%" if n > 0 else "ー"
-        def _avg_pct(col_b, col_a):
-            if col_b not in grp.columns or col_a not in grp.columns: return "ー"
-            b = grp[col_b].mean(); a = grp[col_a].mean()
-            return _anls_pct_str(b, a)
+        def _avg_pct(col_b, col_a, _grp=grp):
+            if col_b not in _grp.columns or col_a not in _grp.columns: return "ー"
+            return _anls_pct_str(_grp[col_b].mean(), _grp[col_a].mean())
         roas_chg = _avg_pct("ROAS_b","ROAS_a")
         cvr_chg  = (f"{grp['CVR_a'].mean()-grp['CVR_b'].mean():+.1f}pt"
                     if "CVR_b" in grp.columns and "CVR_a" in grp.columns else "ー")
@@ -1188,16 +1224,14 @@ def _anls_camp_table_html(merged):
             f'<thead><tr>{hd}</tr></thead><tbody>{rows_html}</tbody></table>')
 
 def _anls_detail_html(row, id_col):
-    """Before / After 詳細をHTMLで返す"""
     metrics = [
-        ("売上",   "sales_b",  "sales_a",  "¥{:,.0f}", True),
-        ("広告費", "cost_b",   "cost_a",   "¥{:,.0f}", False),
-        ("ROAS",   "ROAS_b",   "ROAS_a",   "{:.2f}",   True),
-        ("CVR",    "CVR_b",    "CVR_a",    "{:.1f}%",  True),
-        ("注文数", "orders_b", "orders_a", "{:.0f}件", True),
-        ("クリック","clicks_b","clicks_a", "{:.0f}",   True),
+        ("売上",    "sales_b",  "sales_a",  "¥{:,.0f}", True),
+        ("広告費",  "cost_b",   "cost_a",   "¥{:,.0f}", False),
+        ("ROAS",    "ROAS_b",   "ROAS_a",   "{:.2f}",   True),
+        ("CVR",     "CVR_b",    "CVR_a",    "{:.1f}%",  True),
+        ("注文数",  "orders_b", "orders_a", "{:.0f}件", True),
+        ("クリック","clicks_b", "clicks_a", "{:.0f}",   True),
     ]
-    # CPC (cost/clicks)
     cpc_b = (float(row.get("cost_b",0) or 0)/float(row.get("clicks_b",1) or 1)
              if float(row.get("clicks_b",0) or 0) > 0 else None)
     cpc_a = (float(row.get("cost_a",0) or 0)/float(row.get("clicks_a",1) or 1)
@@ -1212,12 +1246,11 @@ def _anls_detail_html(row, id_col):
     for lbl, cb, ca, fmt, hok in metrics:
         bv = row.get(cb); av = row.get(ca)
         if bv is None and av is None: continue
-        bvs = _fmt(bv, fmt); avs = _fmt(av, fmt)
         clr, jt = _jclr(bv or 0, av or 0, hok)
         rows_h += (
             f'<tr><td style="padding:6px 10px;border:1px solid #E2E8F0;font-weight:600;">{lbl}</td>'
-            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{bvs}</td>'
-            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{avs}</td>'
+            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{_fmt(bv,fmt)}</td>'
+            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{_fmt(av,fmt)}</td>'
             f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:center;color:{clr};font-weight:700;">{jt}</td>'
             f'</tr>')
     if cpc_b is not None or cpc_a is not None:
@@ -1238,7 +1271,7 @@ def _anls_detail_html(row, id_col):
 def _anls_render_list(merged, id_col):
     _ICON = {"改善":"🟢","悪化":"🔴","変化なし":"🟡"}
     _CLR  = {"改善":"#276749","悪化":"#C53030","変化なし":"#744210"}
-    for i, (_, row) in enumerate(merged.iterrows()):
+    for _, row in merged.iterrows():
         j    = row.get("_判定","変化なし")
         icon = _ICON.get(j,"🟡")
         clr  = _CLR.get(j,"#718096")
@@ -1246,65 +1279,75 @@ def _anls_render_list(merged, id_col):
         kw_disp = kw[:40] + ("…" if len(kw) > 40 else "")
         st.markdown("---")
         st.markdown(f"**{icon} {kw_disp}**")
-        st.markdown(
-            f'　<span style="color:{clr};font-weight:700;">{j}</span>',
-            unsafe_allow_html=True)
+        st.markdown(f'　<span style="color:{clr};font-weight:700;">{j}</span>', unsafe_allow_html=True)
         with st.expander("▶ 詳細", expanded=False):
             st.markdown(_anls_detail_html(row, id_col), unsafe_allow_html=True)
 
 def _anls_render_kw_tab(before_df: pd.DataFrame, period_days: int,
                         hist_fname: str, csv_key: str, label: str,
                         after_builder_type: str):
+    _sk = f"_anls_{csv_key}"
     st.markdown(f"#### 📊 {label} 分析")
     st.info(f"📅 分析期間: **{period_days}日固定** — {period_days}日レポートCSVをアップロードしてください。")
     if before_df is None or before_df.empty:
         st.warning("先に「改善」タブで抽出実行を行ってください。抽出対象が分析対象になります。")
         return
     camps = sorted(before_df["campaign_theme"].unique().tolist()) if "campaign_theme" in before_df.columns else []
-    st.markdown(f"**③ 比較用 {period_days}日レポートCSVをアップロード**")
+    st.markdown(f"**比較用 {period_days}日レポートCSVをアップロード**")
     af_file = st.file_uploader(f"{period_days}日レポートCSV", type="csv", key=csv_key)
-    run_btn = st.button("🔍 分析実行", key=f"_anls_{csv_key}_run", type="primary")
-    if run_btn and af_file is None:
-        st.warning("CSVをアップロードしてください。"); return
-    if not run_btn: return
-    with st.spinner("分析中..."):
-        df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
-        if not all([cc, sc, oc_]):
-            st.error("必要な列が見つかりません（キャンペーン名・売上・広告費）。"); return
-        if after_builder_type == "kw_add":
-            if not kc: st.error("「検索用語」列が見つかりません。"); return
-            after_df = _anls_build_kw_after(df_raw, kc, cc, sc, oc_, od, clk)
-        else:
-            kw_col_cpc = kwt if kwt else fcol(df_raw, ["ターゲティング","Targeting","targeting"])
-            after_df = _anls_build_cpc_after(df_raw, cc, sc, oc_, od, clk, kw_col_cpc)
-        if after_df.empty:
-            st.warning("Afterデータが取得できませんでした。"); return
-        bf = before_df.copy()
-        bf["_kn_key"] = bf["keyword"].apply(norm) if "keyword" in bf.columns else bf.index.astype(str)
-        sfx = [c for c in ["sales","cost","ROAS","orders","clicks","CVR","avg_cpc"] if c in after_df.columns]
-        merged = bf.merge(after_df[["_kn_key"]+sfx], on="_kn_key", how="inner", suffixes=("_b","_a"))
-    if merged.empty:
-        st.info("マッチするキーワードが見つかりませんでした。"); return
-    merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
-    n_total  = len(merged)
-    n_kaizen = int((merged["_判定"]=="改善").sum())
-    n_akka   = int((merged["_判定"]=="悪化").sum())
-    n_henko  = int((merged["_判定"]=="変化なし").sum())
-    rate     = n_kaizen / n_total * 100 if n_total > 0 else 0
+    run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
+    if run_btn:
+        if af_file is None:
+            st.warning("CSVをアップロードしてください。"); return
+        with st.spinner("分析中..."):
+            df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
+            if not all([cc, sc, oc_]):
+                st.error("必要な列が見つかりません（キャンペーン名・売上・広告費）。"); return
+            if after_builder_type == "kw_add":
+                if not kc: st.error("「検索用語」列が見つかりません。"); return
+                after_df = _anls_build_kw_after(df_raw, kc, cc, sc, oc_, od, clk)
+            else:
+                kw_col_cpc = kwt if kwt else fcol(df_raw, ["ターゲティング","Targeting","targeting"])
+                after_df = _anls_build_cpc_after(df_raw, cc, sc, oc_, od, clk, kw_col_cpc)
+            if after_df.empty:
+                st.warning("Afterデータが取得できませんでした。"); return
+            bf = before_df.copy()
+            bf["_kn_key"] = bf["keyword"].apply(norm) if "keyword" in bf.columns else bf.index.astype(str)
+            sfx = [c for c in ["sales","cost","ROAS","orders","clicks","CVR","avg_cpc"] if c in after_df.columns]
+            merged = bf.merge(after_df[["_kn_key"]+sfx], on="_kn_key", how="inner", suffixes=("_b","_a"))
+        if merged.empty:
+            st.info("マッチするキーワードが見つかりませんでした。"); return
+        merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
+        n_total  = len(merged); n_kaizen = int((merged["_判定"]=="改善").sum())
+        n_akka   = int((merged["_判定"]=="悪化").sum()); n_henko = int((merged["_判定"]=="変化なし").sum())
+        rate     = n_kaizen / n_total * 100 if n_total > 0 else 0
+        st.session_state[f"{_sk}_result"] = {
+            "merged": merged, "camps": camps,
+            "stats": (n_total, n_kaizen, n_akka, n_henko, rate),
+            "hist_fname": hist_fname, "label": label,
+            "period_days": period_days, "n_before": len(before_df),
+        }
+    if f"{_sk}_result" not in st.session_state:
+        return
+    res      = st.session_state[f"{_sk}_result"]
+    merged   = res["merged"]
+    camps    = res["camps"]
+    n_total, n_kaizen, n_akka, n_henko, rate = res["stats"]
+    hist_fname = res["hist_fname"]
     st.markdown(_anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate), unsafe_allow_html=True)
-    sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"]+camps, key=f"_anls_{csv_key}_camp")
+    sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"]+camps, key=f"{_sk}_camp")
     view = merged if sel_camp == "全キャンペーン" else merged[merged["campaign_theme"]==sel_camp].copy()
     with st.expander("📊 キャンペーン別サマリー", expanded=True):
         st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
     st.markdown("#### 📋 対象一覧")
     _anls_render_list(view, "keyword")
-    if st.button("💾 分析結果を保存", key=f"_anls_{csv_key}_save"):
+    if st.button("💾 分析結果を保存", key=f"{_sk}_save"):
         _recs = _anls_load(hist_fname)
         _recs.append({"id":_anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
                       "saved_at":_anls_dt.date.today().isoformat(),"type":label,
-                      "period_days":period_days,"n_before":len(before_df),
-                      "n_matched":n_total,"n_kaizen":n_kaizen,"n_akka":n_akka,"n_henko":n_henko,
-                      "rate":round(rate,1),"camps":camps})
+                      "period_days":period_days,"n_before":res["n_before"],
+                      "n_matched":n_total,"n_kaizen":n_kaizen,"n_akka":n_akka,
+                      "n_henko":n_henko,"rate":round(rate,1),"camps":camps})
         _anls_save(hist_fname, _recs)
         st.success("✅ 分析結果を保存しました。")
     with st.expander("📂 保存済み分析履歴", expanded=False):
@@ -1314,56 +1357,79 @@ def _anls_render_kw_tab(before_df: pd.DataFrame, period_days: int,
 
 def _anls_render_asin_tab(before_df: pd.DataFrame, period_days: int,
                           hist_fname: str, csv_key: str, label: str, camp_pat: str):
+    _sk = f"_anls_{csv_key}"
     st.markdown(f"#### 📊 {label} 分析")
     st.info(f"📅 分析期間: **{period_days}日固定** — {period_days}日レポートCSVをアップロードしてください。")
     if before_df is None or before_df.empty:
         st.warning("先に「改善」タブで抽出実行を行ってください。"); return
-    camps = sorted(before_df["campaign_theme"].unique().tolist()) if "campaign_theme" in before_df.columns else []
+    camps  = sorted(before_df["campaign_theme"].unique().tolist()) if "campaign_theme" in before_df.columns else []
     id_col = "asin" if "asin" in before_df.columns else "keyword"
-    st.markdown(f"**③ 比較用 {period_days}日レポートCSVをアップロード**")
+    st.markdown(f"**比較用 {period_days}日レポートCSVをアップロード**")
     af_file = st.file_uploader(f"{period_days}日レポートCSV", type="csv", key=csv_key)
-    run_btn = st.button("🔍 分析実行", key=f"_anls_{csv_key}_run", type="primary")
-    if run_btn and af_file is None:
-        st.warning("CSVをアップロードしてください。"); return
-    if not run_btn: return
-    with st.spinner("分析中..."):
-        df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
-        if not all([cc, sc, oc_, tkc]):
-            st.error("必要な列が見つかりません（キャンペーン名・売上・広告費・ターゲティング）。"); return
-        after_df = _anls_build_asin_after(df_raw, cc, sc, oc_, od, clk, tkc, camp_pat)
-        if after_df.empty: st.warning("Afterデータが取得できませんでした。"); return
-        bf = before_df.copy()
-        sfx = [c for c in ["sales","cost","ROAS","orders","clicks","avg_cpc"] if c in after_df.columns]
-        if id_col not in after_df.columns:
-            st.error(f"After データに '{id_col}' 列がありません。"); return
-        merged = bf.merge(after_df[[id_col]+sfx], on=id_col, how="inner", suffixes=("_b","_a"))
-    if merged.empty: st.info("マッチするASINが見つかりませんでした。"); return
-    merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
-    n_total  = len(merged)
-    n_kaizen = int((merged["_判定"]=="改善").sum())
-    n_akka   = int((merged["_判定"]=="悪化").sum())
-    n_henko  = int((merged["_判定"]=="変化なし").sum())
-    rate     = n_kaizen / n_total * 100 if n_total > 0 else 0
+    run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
+    if run_btn:
+        if af_file is None:
+            st.warning("CSVをアップロードしてください。"); return
+        with st.spinner("分析中..."):
+            df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
+            if not all([cc, sc, oc_]):
+                st.error("必要な列が見つかりません。"); return
+            if not tkc:
+                st.error("「ターゲティング」列が見つかりません。"); return
+            after_df = _anls_build_asin_after(df_raw, cc, sc, oc_, od, clk, tkc, camp_pat)
+            if after_df.empty:
+                st.warning("Afterデータが取得できませんでした。"); return
+            bf = before_df.copy()
+            if "asin" in bf.columns:
+                bf["_kn_key"] = bf["asin"].apply(lambda x: str(x).upper().strip())
+            elif "keyword" in bf.columns:
+                bf["_kn_key"] = bf["keyword"].apply(lambda x: str(x).upper().strip())
+            else:
+                bf["_kn_key"] = bf.index.astype(str)
+            sfx = [c for c in ["sales","cost","ROAS","orders","clicks","CVR","avg_cpc"] if c in after_df.columns]
+            merged = bf.merge(after_df[["_kn_key"]+sfx], on="_kn_key", how="inner", suffixes=("_b","_a"))
+        if merged.empty:
+            st.info("マッチするASINが見つかりませんでした。"); return
+        merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
+        n_total  = len(merged); n_kaizen = int((merged["_判定"]=="改善").sum())
+        n_akka   = int((merged["_判定"]=="悪化").sum()); n_henko = int((merged["_判定"]=="変化なし").sum())
+        rate     = n_kaizen / n_total * 100 if n_total > 0 else 0
+        st.session_state[f"{_sk}_result"] = {
+            "merged": merged, "camps": camps, "id_col": id_col,
+            "stats": (n_total, n_kaizen, n_akka, n_henko, rate),
+            "hist_fname": hist_fname, "label": label,
+            "period_days": period_days, "n_before": len(before_df),
+        }
+    if f"{_sk}_result" not in st.session_state:
+        return
+    res      = st.session_state[f"{_sk}_result"]
+    merged   = res["merged"]
+    camps    = res["camps"]
+    id_col   = res["id_col"]
+    n_total, n_kaizen, n_akka, n_henko, rate = res["stats"]
+    hist_fname = res["hist_fname"]
     st.markdown(_anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate), unsafe_allow_html=True)
-    sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"]+camps, key=f"_anls_{csv_key}_camp")
+    sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"]+camps, key=f"{_sk}_camp")
     view = merged if sel_camp == "全キャンペーン" else merged[merged["campaign_theme"]==sel_camp].copy()
     with st.expander("📊 キャンペーン別サマリー", expanded=True):
         st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
     st.markdown("#### 📋 対象一覧")
     _anls_render_list(view, id_col)
-    if st.button("💾 分析結果を保存", key=f"_anls_{csv_key}_save"):
+    if st.button("💾 分析結果を保存", key=f"{_sk}_save"):
         _recs = _anls_load(hist_fname)
         _recs.append({"id":_anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
                       "saved_at":_anls_dt.date.today().isoformat(),"type":label,
-                      "period_days":period_days,"n_before":len(before_df),
-                      "n_matched":n_total,"n_kaizen":n_kaizen,"n_akka":n_akka,"n_henko":n_henko,
-                      "rate":round(rate,1),"camps":camps})
+                      "period_days":period_days,"n_before":res["n_before"],
+                      "n_matched":n_total,"n_kaizen":n_kaizen,"n_akka":n_akka,
+                      "n_henko":n_henko,"rate":round(rate,1),"camps":camps})
         _anls_save(hist_fname, _recs)
         st.success("✅ 分析結果を保存しました。")
     with st.expander("📂 保存済み分析履歴", expanded=False):
         _recs = _anls_load(hist_fname)
         if not _recs: st.info("保存済み分析はありません。")
         else: st.dataframe(pd.DataFrame(_recs[::-1]), use_container_width=True)
+
+
 
 
 def page_add_kw():
@@ -1460,7 +1526,7 @@ def page_add_kw():
             _dd["CVR"] = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
         st.dataframe(_dd, use_container_width=True)
     with _t_tab2:
-        _anls_render_kw_tab(dw,30,"kw_add_analysis.json","anls_kw_add_csv","キーワード追加","kw_add")
+        _anls_render_kw_tab(dw, 30, "kw_add_analysis.json", "anls_kw_add_csv", "キーワード追加", "kw_add")
 
 def page_del_kw():
     _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "< 0.8"), ("勝ちKW", "除外")])
@@ -1915,7 +1981,7 @@ def page_cpc():
             st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
                 file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
     with _t_tab2:
-        _anls_render_kw_tab(dc_cpc,7,"cpc_kw_analysis.json","anls_cpc_kw_csv","キーワードCPC調整","cpc_kw")
+        _anls_render_kw_tab(dc_cpc, 7, "cpc_kw_analysis.json", "anls_cpc_kw_csv", "キーワードCPC調整", "cpc_kw")
 
 def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
     """商品ターゲ CPC調整ページ共通レンダラー（page_cpc()と同一ロジック・UI）"""
@@ -2113,65 +2179,14 @@ def page_cpc_product():
     with _t_tab1:
         _render_pt_cpc_page(dc_cpc_product, "商品CPC調整", "cpc_product_sel")
     with _t_tab2:
-        _anls_render_asin_tab(dc_cpc_product,7,"cpc_product_analysis.json","anls_cpc_pt_csv","商品CPC調整","商品ターゲ")
+        _anls_render_asin_tab(dc_cpc_product, 7, "cpc_product_analysis.json", "anls_cpc_pt_csv", "商品CPC調整", "商品ターゲ")
 
 def page_cpc_video():
     _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
     with _t_tab1:
         _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel")
     with _t_tab2:
-        _anls_render_asin_tab(dc_cpc_video,7,"cpc_video_analysis.json","anls_cpc_vid_csv","動画CPC調整","動画")
-
-
-# ===================================================
-
-# ============================================================
-# 売れる予測KW TOP10 発見エンジン (_ddv4_) v5.1
-# 需要(45) + 商品関連性(35) + 競争強度(15) + 未使用KWボーナス(5) = 100点
-# 「今すぐAmazon検索語へ追加すべき有力KW」を抽出する実行ツール
-# ============================================================
-
-_DDV4_PRODUCTS = {
-    "\u72ac\u7528\u4e73\u9178\u83cc (B0DJ8Q95XZ)": [
-        "\u4e73\u9178\u83cc","\u8033\u6d3b","\u8033\u5185","\u5584\u7389\u83cc","\u4fbf","\u4fbf\u79d8","\u8edf\u4fbf","\u514d\u75ab","\u304a\u8179","\u6d88\u5316",
-        "\u30d7\u30ed\u30d0\u30a4\u30aa\u30c6\u30a3\u30af\u30b9","\u8033\u5185\u74b0\u5883","\u6574\u8033","\u6d88\u5316\u5668"],
-    "\u95a2\u7bc0\u30b5\u30dd\u30fc\u30c8 (B0DJ8QVCG1)": [
-        "\u95a2\u7bc0","\u30b0\u30eb\u30b3\u30b5\u30df\u30f3","\u30b3\u30f3\u30c9\u30ed\u30a4\u30c1\u30f3","msm","\u8db3\u8170","\u30b7\u30cb\u30a2\u72ac","\u6b69\u884c",
-        "\u8edf\u9aa8","\u95a2\u7bc0\u75db","\u8001\u72ac","\u8db3"],
-    "\u30a2\u30a4\u30b1\u30a2 (B0DSP22H5G)": [
-        "\u6d99\u3084\u3051","\u76ee","\u30eb\u30c6\u30a4\u30f3","\u30d6\u30eb\u30fc\u30d9\u30ea\u30fc","\u767d\u5185\u969c","\u8996\u529b",
-        "\u76ee\u3084\u306b","\u773c","\u30a2\u30a4","\u6d99"],
-    "\u30a2\u30df\u30ce\u9178\u30b7\u30e3\u30f3\u30d7\u30fc (B0GGGTYZTR)": [
-        "\u30b7\u30e3\u30f3\u30d7\u30fc","\u654f\u611f\u808c","\u4f4e\u5c01\u6fc3","\u4fdd\u6e7f","\u304b\u3086\u307f","\u76ae\u819a","\u30a2\u30df\u30ce\u9178",
-        "\u30d5\u30b1","\u6d88\u81ed","\u6bdb\u4e26\u307f","\u6d17\u6bdb","\u30b0\u30eb\u30fc\u30df\u30f3\u30b0","\u30dc\u30c7\u30a3"],
-}
-
-_DDV4_CATEGORY_TERMS = {
-    "\u72ac\u7528\u4e73\u9178\u83cc (B0DJ8Q95XZ)":        ["\u72ac","\u30da\u30c3\u30c8","\u30b5\u30d7\u30ea","\u30b5\u30d7\u30ea\u30e1\u30f3\u30c8","\u5065\u5eb7","\u72ac\u7528"],
-    "\u95a2\u7bc0\u30b5\u30dd\u30fc\u30c8 (B0DJ8QVCG1)":  ["\u72ac","\u30da\u30c3\u30c8","\u30b5\u30d7\u30ea","\u30b7\u30cb\u30a2","\u8001\u72ac","\u5065\u5eb7","\u72ac\u7528"],
-    "\u30a2\u30a4\u30b1\u30a2 (B0DSP22H5G)":                ["\u72ac","\u30da\u30c3\u30c8","\u30b5\u30d7\u30ea","\u30b5\u30d7\u30ea\u30e1\u30f3\u30c8","\u5065\u5eb7","\u72ac\u7528"],
-    "\u30a2\u30df\u30ce\u9178\u30b7\u30e3\u30f3\u30d7\u30fc (B0GGGTYZTR)": ["\u72ac","\u30da\u30c3\u30c8","\u30b7\u30e3\u30f3\u30d7\u30fc","\u30b0\u30eb\u30fc\u30df\u30f3\u30b0","\u30b1\u30a2","\u6d17","\u72ac\u7528"],
-}
-
-_DDV4_PRODUCT_ASINS = {
-    "\u72ac\u7528\u4e73\u9178\u83cc (B0DJ8Q95XZ)":        "B0DJ8Q95XZ",
-    "\u95a2\u7bc0\u30b5\u30dd\u30fc\u30c8 (B0DJ8QVCG1)": "B0DJ8QVCG1",
-    "\u30a2\u30a4\u30b1\u30a2 (B0DSP22H5G)":               "B0DSP22H5G",
-    "\u30a2\u30df\u30ce\u9178\u30b7\u30e3\u30f3\u30d7\u30fc (B0GGGTYZTR)": "B0GGGTYZTR",
-}
-
-_DDV4_PURCHASE_INTENT_WORDS = [
-    "\u304a\u3059\u3059\u3081","\u4eba\u6c17","\u30e9\u30f3\u30ad\u30f3\u30b0","\u6bd4\u8f03","\u53e3\u30b3\u30df","\u52b9\u679c"]
-
-# 競争強度ベーススコア (0-15スケール: 競争弱いほど高点)
-_DDV4_COMP_BASE_V51 = {
-    "very weak":   15,
-    "weak":        12,
-    "medium":       9,
-    "strong":       5,
-    "very strong":  2,
-}
-
+        _anls_render_asin_tab(dc_cpc_video, 7, "cpc_video_analysis.json", "anls_cpc_vid_csv", "動画CPC調整", "動画")
 
 def _ddv4_norm_kw(x):
     if x is None: return ""
@@ -2835,9 +2850,9 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key):
 def page_pt_add_manual():
     _t_tab1, _t_tab2 = st.tabs(["改善", "分析"])
     with _t_tab1:
-        _render_pt_page("df_pt_add_m", True,  "商品", "pt_add_m_sel")
+        _render_pt_page("df_pt_add_m", True, "商品", "pt_add_m_sel")
     with _t_tab2:
-        _anls_render_asin_tab(st.session_state.get("df_pt_add_m",pd.DataFrame()),30,"pt_add_m_analysis.json","anls_pt_add_m_csv","商品追加","商品ターゲ")
+        _anls_render_asin_tab(st.session_state.get("df_pt_add_m", pd.DataFrame()), 30, "pt_add_m_analysis.json", "anls_pt_add_m_csv", "商品追加", "商品ターゲ")
 
 def page_pt_del_manual():
     _render_pt_page("df_pt_del_m", False, "商品", "pt_del_m_sel")
@@ -2845,9 +2860,9 @@ def page_pt_del_manual():
 def page_pt_add_video():
     _t_tab1, _t_tab2 = st.tabs(["改善", "分析"])
     with _t_tab1:
-        _render_pt_page("df_pt_add_v", True,  "動画", "pt_add_v_sel")
+        _render_pt_page("df_pt_add_v", True, "動画", "pt_add_v_sel")
     with _t_tab2:
-        _anls_render_asin_tab(st.session_state.get("df_pt_add_v",pd.DataFrame()),30,"pt_add_v_analysis.json","anls_pt_add_v_csv","動画追加","動画")
+        _anls_render_asin_tab(st.session_state.get("df_pt_add_v", pd.DataFrame()), 30, "pt_add_v_analysis.json", "anls_pt_add_v_csv", "動画追加", "動画")
 
 def page_pt_del_video():
     _render_pt_page("df_pt_del_v", False, "動画", "pt_del_v_sel")
