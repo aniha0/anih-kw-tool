@@ -1096,10 +1096,10 @@ def page_add_kw():
                               if c in sel_df.columns]
         _kw_add_hist_df = sel_df.sort_values("ROAS", ascending=False)[_kw_add_hist_cols].copy()
         _kw_add_csv = _kw_add_hist_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+        _anls_save_kw_add_history(_kw_add_hist_df)
         st.download_button(
             f"📥 {kw_camp}_キーワード追加候補.csv", data=_kw_add_csv,
             file_name=f"{kw_camp}_キーワード追加候補.csv", mime="text/csv",
-            on_click=_anls_save_kw_add_history, args=(_kw_add_hist_df,),
         )
 
         # ⑤ 詳細テーブル
@@ -1383,42 +1383,40 @@ def page_auto_del_video():
 # 分析ヘルパー関数
 # ===================================================
 
+def _get_analysis_dir() -> _anls_plib.Path:
+    """History保存/読込で使用する唯一のディレクトリ解決関数。
+    __file__基準の絶対Pathに統一し、実行時のCWDに依存しない。"""
+    d = _anls_plib.Path(__file__).resolve().parent / "analysis_data"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def _anls_load(fname: str) -> list:
-    p = _anls_plib.Path("analysis_data") / fname
-    st.write("DEBUG[_anls_load] 読込開始")
-    st.write("DEBUG[_anls_load] 絶対パス:", str(p.resolve()))
-    st.write("DEBUG[_anls_load] cwd:", str(_anls_plib.Path.cwd()))
-    st.write("DEBUG[_anls_load] exists:", p.exists())
-    st.write("DEBUG[_anls_load] ファイルサイズ:", p.stat().st_size if p.exists() else None)
+    p = _get_analysis_dir() / fname
     if not p.exists():
         return []
     try:
-        _anls_load_result = _anls_json.loads(p.read_text(encoding="utf-8")).get("records", [])
-        st.write("DEBUG[_anls_load] records件数:", len(_anls_load_result))
-        return _anls_load_result
-    except Exception as e:
-        st.exception(e)
+        return _anls_json.loads(p.read_text(encoding="utf-8")).get("records", [])
+    except Exception:
         return []
 
 
-def _anls_save(fname: str, records: list):
+def _anls_save(fname: str, records: list) -> bool:
+    p = _get_analysis_dir() / fname
+    _tmp_p = p.with_name(p.name + ".tmp")
+    _tmp_p.write_text(
+        _anls_json.dumps({"records": records}, ensure_ascii=False, indent=2),
+        encoding="utf-8"
+    )
+    _tmp_p.replace(p)
     try:
-        p = _anls_plib.Path("analysis_data")
-        st.write("DEBUG[_anls_save] 保存開始")
-        st.write("DEBUG[_anls_save] 保存ファイル名:", fname)
-        st.write("DEBUG[_anls_save] 絶対パス:", str((p / fname).resolve()))
-        st.write("DEBUG[_anls_save] cwd:", str(_anls_plib.Path.cwd()))
-        st.write("DEBUG[_anls_save] records件数:", len(records))
-        p.mkdir(exist_ok=True)
-        (p / fname).write_text(
-            _anls_json.dumps({"records": records}, ensure_ascii=False, indent=2),
-            encoding="utf-8"
-        )
-        st.write("DEBUG[_anls_save] 保存成功")
-        st.write("DEBUG[_anls_save] ファイル存在:", (p / fname).exists())
-        st.write("DEBUG[_anls_save] ファイルサイズ:", (p / fname).stat().st_size if (p / fname).exists() else None)
-    except Exception as e:
-        st.exception(e)
+        _readback = _anls_json.loads(p.read_text(encoding="utf-8")).get("records", [])
+    except Exception:
+        _readback = None
+    if _readback is None or len(_readback) != len(records):
+        st.error(f"⚠️ History保存の検証に失敗しました（{fname}）。保存内容を確認してください。")
+        return False
+    return True
 
 
 def _anls_parse_csv(csv_file):
@@ -1674,6 +1672,22 @@ def _anls_detail_html(row, id_col):
             f'<thead><tr>{hd}</tr></thead><tbody>{rows_h}</tbody></table>')
 
 
+def _anls_normalize_entries(entries: list) -> list:
+    """NaN/None/pd.NAを""に正規化したコピーを返す。
+    比較用（既存History読込値の正規化）と、保存前のentries本体の正規化（非標準JSON出力防止）の両方で使用する。"""
+    normalized = []
+    for row in entries:
+        new_row = {}
+        for k, v in row.items():
+            try:
+                is_na = pd.isna(v)
+            except (TypeError, ValueError):
+                is_na = False
+            new_row[k] = "" if is_na is True else v
+        normalized.append(new_row)
+    return normalized
+
+
 def _anls_save_cpc_change_history(df_disp):
     save_cols = [c for c in ["campaign_name", "ad_group", "keyword",
                               "avg_cpc", "rec_cpc", "cpc_delta",
@@ -1681,9 +1695,11 @@ def _anls_save_cpc_change_history(df_disp):
                               "sales", "cost", "ROAS", "orders"] if c in df_disp.columns]
     record = {
         "exported_at": _anls_dt.datetime.now().isoformat(),
-        "entries": df_disp[save_cols].to_dict(orient="records"),
+        "entries": _anls_normalize_entries(df_disp[save_cols].to_dict(orient="records")),
     }
     existing = _anls_load("cpc_change_history.json")
+    if existing and _anls_normalize_entries(existing[-1].get("entries") or []) == _anls_normalize_entries(record.get("entries") or []):
+        return
     existing.append(record)
     _anls_save("cpc_change_history.json", existing)
 
@@ -1696,9 +1712,11 @@ def _anls_save_cpc_asin_history(df_disp, fname: str):
                               "sales", "cost", "ROAS", "orders"] if c in df_disp.columns]
     record = {
         "exported_at": _anls_dt.datetime.now().isoformat(),
-        "entries": df_disp[save_cols].to_dict(orient="records"),
+        "entries": _anls_normalize_entries(df_disp[save_cols].to_dict(orient="records")),
     }
     existing = _anls_load(fname)
+    if existing and _anls_normalize_entries(existing[-1].get("entries") or []) == _anls_normalize_entries(record.get("entries") or []):
+        return
     existing.append(record)
     _anls_save(fname, existing)
 
@@ -1708,9 +1726,11 @@ def _anls_save_kw_add_history(df_disp):
                               "orders", "clicks", "cost", "sales", "ROAS"] if c in df_disp.columns]
     record = {
         "exported_at": _anls_dt.datetime.now().isoformat(),
-        "entries": df_disp[save_cols].to_dict(orient="records"),
+        "entries": _anls_normalize_entries(df_disp[save_cols].to_dict(orient="records")),
     }
     existing = _anls_load("kw_add_history.json")
+    if existing and _anls_normalize_entries(existing[-1].get("entries") or []) == _anls_normalize_entries(record.get("entries") or []):
+        return
     existing.append(record)
     _anls_save("kw_add_history.json", existing)
 
@@ -1720,9 +1740,11 @@ def _anls_save_asin_add_history(df_disp, fname: str):
                               "orders", "clicks", "cost", "sales", "ROAS"] if c in df_disp.columns]
     record = {
         "exported_at": _anls_dt.datetime.now().isoformat(),
-        "entries": df_disp[save_cols].to_dict(orient="records"),
+        "entries": _anls_normalize_entries(df_disp[save_cols].to_dict(orient="records")),
     }
     existing = _anls_load(fname)
+    if existing and _anls_normalize_entries(existing[-1].get("entries") or []) == _anls_normalize_entries(record.get("entries") or []):
+        return
     existing.append(record)
     _anls_save(fname, existing)
 
@@ -1782,14 +1804,7 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
             bf = before_df.copy()
             n_history = None
             if mode == "cpc_kw":
-                _dbg_hist_fname = cpc_hist_fname or "cpc_change_history.json"
-                st.write("DEBUG[run_btn] historyファイル名:", _dbg_hist_fname)
-                st.write("DEBUG[run_btn] analysis_data一覧:", sorted(p_.name for p_ in _anls_plib.Path("analysis_data").glob("*")) if _anls_plib.Path("analysis_data").exists() else [])
-                st.write("DEBUG[run_btn] history絶対パス:", str((_anls_plib.Path("analysis_data") / _dbg_hist_fname).resolve()))
-                _cpc_hist = _anls_load(_dbg_hist_fname)
-                st.write("DEBUG[before_no_history_check] exists:", (_anls_plib.Path("analysis_data") / _dbg_hist_fname).exists())
-                st.write("DEBUG[before_no_history_check] records件数:", len(_cpc_hist))
-                st.write("DEBUG[before_no_history_check] read結果:", _cpc_hist)
+                _cpc_hist = _anls_load(cpc_hist_fname or "cpc_change_history.json")
                 if not _cpc_hist:
                     st.error("履歴がありません。先に「CPC調整タブ → 実行用CSVをダウンロード」してください。"); return
                 _last_entries = _cpc_hist[-1]["entries"]
@@ -1806,13 +1821,7 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                 bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
             elif mode == "cpc_asin":
                 if cpc_hist_fname:
-                    st.write("DEBUG[run_btn] historyファイル名:", cpc_hist_fname)
-                    st.write("DEBUG[run_btn] analysis_data一覧:", sorted(p_.name for p_ in _anls_plib.Path("analysis_data").glob("*")) if _anls_plib.Path("analysis_data").exists() else [])
-                    st.write("DEBUG[run_btn] history絶対パス:", str((_anls_plib.Path("analysis_data") / cpc_hist_fname).resolve()))
                     _asin_hist = _anls_load(cpc_hist_fname)
-                    st.write("DEBUG[before_no_history_check] exists:", (_anls_plib.Path("analysis_data") / cpc_hist_fname).exists())
-                    st.write("DEBUG[before_no_history_check] records件数:", len(_asin_hist))
-                    st.write("DEBUG[before_no_history_check] read結果:", _asin_hist)
                     if not _asin_hist:
                         st.error("履歴がありません。先に「CPC調整タブ → 実行用CSVをダウンロード」してください。"); return
                     _last_entries = _asin_hist[-1]["entries"]
@@ -1828,13 +1837,7 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                     bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
             elif mode == "asin_add":
                 if cpc_hist_fname:
-                    st.write("DEBUG[run_btn] historyファイル名:", cpc_hist_fname)
-                    st.write("DEBUG[run_btn] analysis_data一覧:", sorted(p_.name for p_ in _anls_plib.Path("analysis_data").glob("*")) if _anls_plib.Path("analysis_data").exists() else [])
-                    st.write("DEBUG[run_btn] history絶対パス:", str((_anls_plib.Path("analysis_data") / cpc_hist_fname).resolve()))
                     _asin_add_hist = _anls_load(cpc_hist_fname)
-                    st.write("DEBUG[before_no_history_check] exists:", (_anls_plib.Path("analysis_data") / cpc_hist_fname).exists())
-                    st.write("DEBUG[before_no_history_check] records件数:", len(_asin_add_hist))
-                    st.write("DEBUG[before_no_history_check] read結果:", _asin_add_hist)
                     if not _asin_add_hist:
                         st.error("履歴がありません。先に「追加候補タブ → CSVをダウンロード」してください。"); return
                     _last_entries = _asin_add_hist[-1]["entries"]
@@ -1850,13 +1853,7 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                     bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
             else:  # kw_add
                 if cpc_hist_fname:
-                    st.write("DEBUG[run_btn] historyファイル名:", cpc_hist_fname)
-                    st.write("DEBUG[run_btn] analysis_data一覧:", sorted(p_.name for p_ in _anls_plib.Path("analysis_data").glob("*")) if _anls_plib.Path("analysis_data").exists() else [])
-                    st.write("DEBUG[run_btn] history絶対パス:", str((_anls_plib.Path("analysis_data") / cpc_hist_fname).resolve()))
                     _kw_add_hist = _anls_load(cpc_hist_fname)
-                    st.write("DEBUG[before_no_history_check] exists:", (_anls_plib.Path("analysis_data") / cpc_hist_fname).exists())
-                    st.write("DEBUG[before_no_history_check] records件数:", len(_kw_add_hist))
-                    st.write("DEBUG[before_no_history_check] read結果:", _kw_add_hist)
                     if not _kw_add_hist:
                         st.error("履歴がありません。先に「追加候補タブ → CSVをダウンロード」してください。"); return
                     _last_entries = _kw_add_hist[-1]["entries"]
@@ -2106,9 +2103,9 @@ def page_cpc():
         _c1, _c2 = st.columns(2)
         with _c1:
             _dl_csv_adj = df_disp[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            _anls_save_cpc_change_history(df_disp[disp_cols].copy())
             st.download_button(f"📥 {cpc_camp}_CPC調整_実行用.csv", data=_dl_csv_adj,
-                file_name=f"{cpc_camp}_CPC調整_実行用.csv", mime="text/csv", use_container_width=True,
-                on_click=_anls_save_cpc_change_history, args=(df_disp[disp_cols].copy(),))
+                file_name=f"{cpc_camp}_CPC調整_実行用.csv", mime="text/csv", use_container_width=True)
         with _c2:
             _dl_csv_all = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
@@ -2304,10 +2301,9 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
     _dl_fname = f"{cpc_camp}_{page_title}_CPC調整表.csv"
     if hist_fname:
         _dl_csv = df_disp[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+        _anls_save_cpc_asin_history(df_disp[disp_cols].copy(), hist_fname)
         st.download_button(f"📥 {_dl_fname}", data=_dl_csv,
-            file_name=_dl_fname, mime="text/csv",
-            on_click=_anls_save_cpc_asin_history,
-            args=(df_disp[disp_cols].copy(), hist_fname))
+            file_name=_dl_fname, mime="text/csv")
     else:
         _dl_csv = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
         st.download_button(f"📥 {_dl_fname}", data=_dl_csv,
@@ -3044,10 +3040,9 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key, hist_fname: 
         _asin_add_hist_cols = [c for c in ["campaign_name", "ad_group", "asin",
                                             "orders", "clicks", "cost", "sales", "ROAS"]
                                 if c in _df.columns]
+        _anls_save_asin_add_history(_df[_asin_add_hist_cols].copy(), hist_fname)
         st.download_button(f"\U0001f4e5 {_fname}", data=_dl,
-            file_name=_fname, mime="text/csv", use_container_width=True,
-            on_click=_anls_save_asin_add_history,
-            args=(_df[_asin_add_hist_cols].copy(), hist_fname))
+            file_name=_fname, mime="text/csv", use_container_width=True)
     else:
         st.download_button(f"\U0001f4e5 {_fname}", data=_dl,
             file_name=_fname, mime="text/csv", use_container_width=True)
