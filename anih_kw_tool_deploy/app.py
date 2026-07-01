@@ -1844,16 +1844,17 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                      cpc_hist_fname: str = ""):
     _sk = f"_anls_{csv_key}"
     st.markdown(f"#### 📊 {label} 分析")
+    _disp_days = 30 if mode in ("kw_add", "asin_add") else period_days
     if mode in ("kw_add", "asin_add"):
-        st.info(f"📅 追加後の効果測定期間: **{period_days}日固定** — 追加候補を反映してから{period_days}日間のレポートCSVをアップロードしてください。")
+        st.info(f"📅 追加後の効果測定期間: **{_disp_days}日固定** — 追加候補を反映してから{_disp_days}日間のレポートCSVをアップロードしてください。")
     else:
         st.info(f"📅 分析期間: **{period_days}日固定** — {period_days}日レポートCSVをアップロードしてください。")
     if before_df is None or before_df.empty:
         st.warning("先に「改善」タブで抽出実行を行ってください。抽出対象が分析対象になります。")
         return
     camps = sorted(before_df["campaign_theme"].unique().tolist()) if "campaign_theme" in before_df.columns else []
-    st.markdown(f"**比較用 {period_days}日レポートCSVをアップロード**")
-    af_file = st.file_uploader(f"{period_days}日レポートCSV", type="csv", key=csv_key)
+    st.markdown(f"**比較用 {_disp_days}日レポートCSVをアップロード**")
+    af_file = st.file_uploader(f"{_disp_days}日レポートCSV", type="csv", key=csv_key)
     run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
     if run_btn:
         if af_file is None:
