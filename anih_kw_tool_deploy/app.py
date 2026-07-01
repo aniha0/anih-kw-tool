@@ -1,3573 +1,673 @@
-"""ANIHA 勝ちKW抽出ツール 最終確定版"""
-from __future__ import annotations
-import io, re, unicodedata, zipfile
-from typing import Optional
-import pandas as pd
-import streamlit as st
-
-
-# ===================================================
-# 定数
-# ===================================================
-ASIN_RE = re.compile(r"^B0[A-Z0-9]{8}$", re.IGNORECASE)
-
-def is_asin_kn(kn: str) -> bool:
-    """ASIN判定の単一基準。ファイル全体でこの関数のみを使用する。"""
-    kn = str(kn)
-    return bool(ASIN_RE.match(kn)) or kn.startswith("asin:")
-
-def is_category_kn(kn: str) -> bool:
-    """category判定の単一基準。ファイル全体でこの関数のみを使用する。"""
-    return str(kn).startswith("category:")
-
-DEFAULT_BRANDS = "アニハ\nANIHA\nゾイック\nノルバサン\nマラセブ"
-
-CAMPAIGNS = [
-    "液体", "涙やけ", "イヤー", "ジェル", "ふりかけ犬",
-    "グルーミング", "お口周り", "乳酸菌猫", "ダニ捕り", "肉球",
-    "ふりかけ猫", "除菌消臭", "シャンプー", "アイケア", "関節",
-    "乳酸菌犬", "肉球S",
-]
-
-PRICES = {
-    "ふりかけ犬": 2450, "お口周り": 1480, "ふりかけ猫": 2380,
-    "アイケア": 1880, "イヤー": 1480, "グルーミング": 1980,
-    "シャンプー": 1880, "ジェル": 1980, "ダニ捕り": 1480,
-    "乳酸菌犬": 1880, "乳酸菌猫": 1880, "涙やけ": 1480,
-    "液体": 1980, "肉球": 1450, "肉球S": 1480,
-    "関節": 1880, "除菌消臭": 1980,
-}
-
-RENAME = {
-    "campaign_theme": "キャンペーン名", "keyword": "検索語句",
-    "ROAS": "ROAS", "sales": "売上",
-    "cost": "広告費", "orders": "注文数",
-    "CVR": "CVR", "clicks": "クリック数", "impressions": "インプレ",
-}
-
-# ===================================================
-# 同一意図KW統合関数群
-# ===================================================
-def _k2h(t: str) -> str:
-    return "".join(chr(ord(c) - 0x60) if "ァ" <= c <= "ヶ" else c for c in t)
-
-def canonical_keyword(kw: str) -> str:
-    """全角半角・カナひら・記号・助詞の差異を吸収した正規化形式を返す。"""
-    t = unicodedata.normalize("NFKC", str(kw)).lower()
-    t = _k2h(t)
-    t = re.sub(r"[-・/／\\｜〜～·]", " ", t)
-    t = re.sub(r"\s*(の|用|向け|専用|対応|ための?|への?|にも?|での?)\s*", " ", t)
-    return re.sub(r"\s+", " ", t).strip()
-
-def grouping_key(kw: str) -> str:
-    """語順を正規化したグルーピングキー。"""
-    can = canonical_keyword(kw)
-    return "".join(sorted(t for t in can.split() if t))
-
-def _compact(kw: str) -> str:
-    return re.sub(r"\s+", "", canonical_keyword(kw))
-
-def same_intent_keyword(kw1: str, kw2: str) -> bool:
-    """2KWが同一検索意図かどうか判定する。"""
-    return grouping_key(kw1) == grouping_key(kw2) or _compact(kw1) == _compact(kw2)
-
-def rank_keyword_cluster(df: pd.DataFrame) -> pd.Series:
-    """クラスタ内で最も強い代表KWを選定する（①インプレ②売上③注文④ROAS）。"""
-    cols = [c for c in ["impressions", "orders", "sales", "ROAS"] if c in df.columns]
-    return df.sort_values(cols or ["ROAS"], ascending=False).iloc[0]
-
-def deduplicate_keyword_intent(df: pd.DataFrame) -> pd.DataFrame:
-    """同一意図KWを統合し代表KW1件のみに絞り込む（2段階グループ化）。"""
-    if df.empty:
-        return df
-    d = df.copy()
-    d["_gs"] = d["keyword"].apply(grouping_key)
-    d["_gc"] = d["keyword"].apply(_compact)
-    r1 = pd.DataFrame([rank_keyword_cluster(g) for _, g in d.groupby("_gs", sort=False)]).reset_index(drop=True)
-    r1["_gc2"] = r1["keyword"].apply(_compact)
-    r2 = pd.DataFrame([rank_keyword_cluster(g) for _, g in r1.groupby("_gc2", sort=False)]).reset_index(drop=True)
-    return r2.drop(columns=[c for c in ["_gs", "_gc", "_gc2"] if c in r2.columns], errors="ignore")
-
-# ===================================================
-# ユーティリティ
-# ===================================================
-def norm(x) -> str:
-    if x is None or (isinstance(x, float) and x != x): return ""
-    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", str(x)).strip().lower())
-
-def get_theme(name: str) -> str:
-    m = re.search(r"「(.*?)」|【(.*?)】", str(name))
-    return (m.group(1) or m.group(2)) if m else ""
-
-def official(t: str) -> str:
-    if not t: return "未分類"
-    if t in CAMPAIGNS: return t
-    for c in CAMPAIGNS:
-        if c in t: return c
-    for c in CAMPAIGNS:
-        if t in c: return c
-    return "未分類"
-
-def fcol(df: pd.DataFrame, cands: list) -> Optional[str]:
-    for c in cands:
-        if c in df.columns: return c
-    low = {col.lower(): col for col in df.columns}
-    for c in cands:
-        if c.lower() in low: return low[c.lower()]
-    return None
-
-def rcsv(file) -> pd.DataFrame:
-    r = file.read(); file.seek(0)
-    if r[:2] in (b"\xff\xfe", b"\xfe\xff"):
-        return pd.read_csv(io.BytesIO(r), encoding="utf-16", sep="\t")
-    try:
-        return pd.read_csv(io.BytesIO(r), encoding="utf-8-sig")
-    except Exception:
-        return pd.read_csv(io.BytesIO(r), encoding="cp932")
-
-def covered(kw: str, reg: set) -> bool:
-    return any(r in kw for r in reg if len(r.split()) >= 2)
-
-def is_code(kw: str) -> bool:
-    s = re.sub(r"[\s\-]", "", kw)
-    return bool(
-        ASIN_RE.match(kw.strip()) or
-        re.match(r"^\d{8,}$", s) or
-        re.match(r"^[a-zA-Z0-9]{8,}$", s)
-    )
-
-def is_title(kw: str) -> bool:
-    return bool(re.search(r"[「」『』（）()]", kw)) or len(kw) >= 20 or kw.count(" ") >= 3
-
-def tonum(s: pd.Series) -> pd.Series:
-    return pd.to_numeric(
-        s.astype(str).str.replace(",", "").str.replace("¥", ""),
-        errors="coerce"
-    ).fillna(0)
-
-def clear():
-    for k in ["has_results", "df_win", "df_del", "df_cpc", "df_cpc_product", "df_cpc_video",
-              "df_pt_add", "df_pt_del", "stats", "dbg",
-              "df_auto_del_kw_keyword", "df_auto_del_kw_product", "df_auto_del_kw_video",
-              "df_auto_del_product", "df_auto_del_video"]:
-        st.session_state.pop(k, None)
-
-# ===================================================
-# CSV / ZIP
-# ===================================================
-def bcols(df: pd.DataFrame, ex: list = []) -> list:
-    base = ["campaign_theme", "keyword", "ROAS", "sales", "cost"]
-    for c in ["orders", "CVR", "clicks"] + ex:
-        if c in df.columns: base.append(c)
-    return [c for c in base if c in df.columns]
-
-def to_csv(df: pd.DataFrame, ex: list = []) -> bytes:
-    d = df[bcols(df, ex)].copy().sort_values("ROAS", ascending=False)
-    d["ROAS"] = d["ROAS"].round(2)
-    d = d.rename(columns=RENAME)
-    if "CVR" in d.columns:
-        d["CVR"] = d["CVR"].apply(lambda x: f"{x:.1f}%")
-    return d.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-
-def all_zip(df: pd.DataFrame) -> bytes:
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for c in CAMPAIGNS:
-            dc = df[df["campaign_theme"] == c]
-            if dc.empty: continue
-            zf.writestr(
-                f"winner_{c}.csv",
-                dc.sort_values("ROAS", ascending=False)[["keyword"]]
-                .rename(columns={"keyword": "検索語句"})
-                .to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-            )
-    return buf.getvalue()
-
-def del_camp_zip(df_del: pd.DataFrame) -> bytes:
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for c in CAMPAIGNS:
-            dc = df_del[df_del["campaign_theme"] == c]
-            if dc.empty: continue
-            kws = dc.sort_values("cost", ascending=False)["keyword"].tolist()
-            csv_content = "keyword\n" + "\n".join(kws)
-            zf.writestr(f"{c}_削除KW.csv", csv_content.encode("utf-8-sig"))
-    return buf.getvalue()
-
-# ===================================================
-# CPC調整ロジック
-# ===================================================
-CPC_RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
-
-def assign_cpc_rank(cost: float, orders: float, roas: float, price: float):
-    """STEP1→STEP2→STEP3→STEP4 の順で CPC ランクを返す。(rank, action, delta)"""
-    orders = orders or 0
-    if price <= 1500:
-        del_thresh = 3000
-    elif price <= 2000:
-        del_thresh = 4000
-    else:
-        del_thresh = 5000
-    if cost < 3000 and orders < 4:
-        return ("判断保留", "変更なし", 0)
-    if orders >= 20 and roas >= 4.0:
-        rank, action, delta = "SS+", "CPC上げ", 5
-    elif orders >= 20 and roas >= 2.0:
-        rank, action, delta = "SS", "現状維持", 0
-    elif roas >= 4.0:
-        rank, action, delta = "S", "CPC上げ", 5
-    elif roas >= 3.0:
-        rank, action, delta = "A", "現状維持", 0
-    elif roas >= 1.8:
-        rank, action, delta = "B", "現状維持", 0
-    elif roas >= 1.5:
-        rank, action, delta = "C", "CPC下げ", -5
-    else:
-        rank, action, delta = "D", "CPC下げ", -10
-    if cost >= del_thresh and roas < 0.8:
-        rank, action, delta = "即削除", "即削除", 0
-    return (rank, action, delta)
-
-def build_cpc_df(df: pd.DataFrame) -> pd.DataFrame:
-    """agg（price付き）から CPC 調整テーブルを生成する。"""
-    if df.empty:
-        return df
-    d = df.copy()
-    results = d.apply(
-        lambda r: assign_cpc_rank(
-            r.get("cost", 0) or 0,
-            r.get("orders", 0) or 0,
-            r.get("ROAS", 0) or 0,
-            r.get("price", 3000) or 3000,
-        ), axis=1
-    )
-    d["cpc_rank"]   = results.apply(lambda x: x[0])
-    d["cpc_action"] = results.apply(lambda x: x[1])
-    d["cpc_delta"]  = results.apply(lambda x: x[2])
-    avg_cpc = (d["cost"] / d["clicks"].replace(0, float("nan"))).round(0) if "clicks" in d.columns else None
-    if avg_cpc is not None:
-        d["avg_cpc"]  = avg_cpc.fillna(0).astype(int)
-        d["rec_cpc"]  = (d["avg_cpc"] + d["cpc_delta"]).clip(lower=1)
-    return d
-
-def cpc_camp_zip(df_cpc: pd.DataFrame) -> bytes:
-    buf = io.BytesIO()
-    cols_out = [c for c in ["campaign_name","ad_group","keyword","ROAS","cost","sales","orders",
-                             "avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_cpc.columns]
-    rename_map = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","keyword":"KWテキスト",
-                  "cost":"広告費","sales":"売上","orders":"購入数","avg_cpc":"現在CPC",
-                  "cpc_rank":"判定ランク","cpc_action":"推奨アクション","cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for c in CAMPAIGNS:
-            dc = df_cpc[df_cpc["campaign_theme"] == c]
-            if dc.empty: continue
-            out = dc[cols_out].rename(columns=rename_map)
-            zf.writestr(f"{c}_CPC調整表.csv", out.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"))
-    return buf.getvalue()
-
-# ===================================================
-# Streamlit アプリ
-# ===================================================
-
-st.set_page_config(
-    page_title="ANIHA Command Center",
-    page_icon="🚀",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-st.write("APP VERSION CHECK")
-st.write(__file__)
-
-st.markdown("""<style>
-/* ── サイドバー ── */
-[data-testid="stSidebar"] {
-    background: #F7FAFC;
-    border-right: 1px solid #E2E8F0;
-}
-[data-testid="stSidebar"] .stRadio label {
-    font-size: .92rem;
-    color: #4A5568;
-    padding: 6px 0;
-    cursor: pointer;
-}
-[data-testid="stSidebar"] .stRadio label:hover { color: #1A202C; }
-
-/* ── KPIカード ── */
-.kpi-card {
-    border-radius: 10px;
-    padding: 14px 16px;
-    text-align: center;
-    border: 1px solid #E2E8F0;
-    margin-bottom: 4px;
-}
-.kpi-icon { font-size: 1.3rem; }
-.kpi-label {
-    font-size: .68rem;
-    color: #718096;
-    text-transform: uppercase;
-    letter-spacing: .07em;
-    margin-top: 3px;
-}
-.kpi-value {
-    font-size: 1.7rem;
-    font-weight: 700;
-    line-height: 1.15;
-    margin-top: 2px;
-}
-.kpi-sub { font-size: .68rem; color: #A0AEC0; margin-top: 3px; }
-
-/* ── 条件バー ── */
-.cond-bar {
-    background: #EBF4FF;
-    border: 1px solid #BEE3F8;
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: .78rem;
-    color: #2C5282;
-    margin-bottom: 12px;
-    display: flex;
-    gap: 18px;
-    flex-wrap: wrap;
-}
-.cond-item { display: flex; align-items: center; gap: 4px; }
-.cond-check { color: #3182CE; font-weight: 700; }
-
-/* ── セクションヘッダー ── */
-.section-header {
-    font-size: .75rem;
-    font-weight: 700;
-    color: #718096;
-    text-transform: uppercase;
-    letter-spacing: .1em;
-    padding: 4px 0 4px;
-    border-bottom: 1px solid #E2E8F0;
-    margin-bottom: 10px;
-}
-
-/* ── 件数バッジ ── */
-.count-badge {
-    background: #EBF4FF;
-    border: 1px solid #90CDF4;
-    border-left: 4px solid #3182CE;
-    border-radius: 6px;
-    padding: 8px 14px;
-    margin: 6px 0 10px;
-    font-size: .85rem;
-    color: #2C5282;
-}
-</style>""", unsafe_allow_html=True)
-
-import pathlib as _pl, base64 as _b64
-def _load_logo(width_px: int = 180) -> str:
-    for p in [_pl.Path("assets/logo.png"), _pl.Path("logo.png")]:
-        if p.exists():
-            b64 = _b64.b64encode(p.read_bytes()).decode()
-            return '<img src="data:image/png;base64,' + b64 + '" width="' + str(width_px) + '" style="object-fit:contain;">'
-    return ""
-
-def _cond_bar(items: list):
-    parts = "".join(
-        f'<span class="cond-item"><span class="cond-check">✓</span> {l}: <b>{v}</b></span>'
-        for l, v in items
-    )
-    st.markdown(f'<div class="cond-bar">{parts}</div>', unsafe_allow_html=True)
-
-# ─── 固定パラメータ（デフォルト値で固定）──────────────────────
-brands   = [norm(b) for b in DEFAULT_BRANDS.strip().splitlines() if b.strip()]
-min_ord  = 3
-min_clk  = 5
-min_cost = 300
-
-# ─── Sidebar ツリーナビゲーション ─────────────────────
-_VALID_PAGES = {
-    "📋 キーワード追加", "📊 DateDive売れる予測KW",
-    "🚫 キーワード削除", "📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整",
-    "➕ 商品追加", "🗑️ 商品削除",
-    "📹 動画追加",     "📹 動画削除",
-    "📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除",
-    "📥 ダウンロード", "📖 取扱説明書",
-}
-_ADD_PAGES = {"📋 キーワード追加", "➕ 商品追加", "📹 動画追加"}
-_DEL_PAGES = {"🚫 キーワード削除", "🗑️ 商品削除", "📹 動画削除"}
-_AUTO_DEL_PAGES = {"📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除"}
-_CPC_PAGES = {"📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整"}
-
-if "current_page" not in st.session_state or st.session_state["current_page"] not in _VALID_PAGES:
-    st.session_state["current_page"] = "📋 キーワード追加"
-_cp = st.session_state["current_page"]
-
-def _nav_btn(label: str, page_key: str, icon: str = "") -> None:
-    is_active = st.session_state["current_page"] == page_key
-    _lbl = f"{'▶' if is_active else '　'} {icon}{label}" if icon else f"{'▶' if is_active else '　'} {label}"
-    if st.button(_lbl, key=f"_nav_{hash(page_key) & 0xFFFFFF}",
-                 use_container_width=True,
-                 type="primary" if is_active else "secondary"):
-        st.session_state["current_page"] = page_key
-
-with st.sidebar:
-    # ── 追加
-    with st.expander("➕  キーワード追加", expanded=(_cp in _ADD_PAGES)):
-        _nav_btn("キーワード",  "📋 キーワード追加",               "📋 ")
-        _nav_btn("商品",        "➕ 商品追加", "🎯 ")
-        _nav_btn("動画",        "📹 動画追加",       "📹 ")
-    # ── 削除
-    with st.expander("🚫  キーワード削除", expanded=(_cp in _DEL_PAGES)):
-        _nav_btn("キーワード",  "🚫 キーワード削除",               "📋 ")
-        _nav_btn("商品",        "🗑️ 商品削除", "🎯 ")
-        _nav_btn("動画",        "📹 動画削除",        "📹 ")
-    # ── CPC調整
-    with st.expander("📈  CPC調整", expanded=(_cp in _CPC_PAGES)):
-        _nav_btn("キーワード",  "📈 キーワードCPC調整",   "📋 ")
-        _nav_btn("商品",        "🎯 商品CPC調整", "🎯 ")
-        _nav_btn("動画",        "📹 動画CPC調整", "📹 ")
-    # ── オート除外KW
-    with st.expander("🧹  オート除外KW", expanded=(_cp in _AUTO_DEL_PAGES)):
-        _nav_btn("キーワード",  "📄 オートKW削除",    "📄 ")
-        _nav_btn("商品",        "🎯 オート商品削除",  "🎯 ")
-        _nav_btn("動画",        "🎥 オート動画削除",  "🎥 ")
-    # ── その他
-    st.markdown("---")
-    _nav_btn("DateDive売れる予測KW",  "📊 DateDive売れる予測KW", "📊 ")
-    _nav_btn("ダウンロード",           "📥 ダウンロード",          "📥 ")
-    _nav_btn("取扱説明書",             "📖 取扱説明書",            "📖 ")
-    st.markdown("---")
-    # 💲 売価マスタ
-    st.markdown('<p class="section-header">💲 売価マスタ</p>', unsafe_allow_html=True)
-    for _c, _p in PRICES.items(): st.caption(f"{_c}：¥{_p:,}")
-    st.markdown("---")
-    st.caption("ANIHA Command Center v2.0")
-
-current_page = st.session_state["current_page"]
-
-# ─── Header ─────────────────────────────────────────
-_h_logo = _load_logo(190)
-_h1, _h2 = st.columns([1, 4])
-with _h1:
-    if _h_logo: st.markdown(_h_logo, unsafe_allow_html=True)
-    else: st.markdown('<div style="font-size:2.8rem;">🐾</div>', unsafe_allow_html=True)
-with _h2:
-    st.markdown("""<div style="padding-top:6px;">
-        <div style="font-size:1.55rem;font-weight:800;color:#1A202C;letter-spacing:-.01em;">
-            🚀 ANIHA Command Center</div>
-        <div style="font-size:.9rem;color:#4A5568;margin-top:3px;">
-            Amazon Advertising Intelligence Platform</div>
-        <div style="font-size:.78rem;color:#718096;margin-top:2px;">
-            ANIHA専用のAmazon広告運用分析プラットフォーム</div>
-    </div>""", unsafe_allow_html=True)
-st.markdown("---")
-
-# ─── File Upload ────────────────────────────────────
-_u1, _u2 = st.columns([7, 2])
-with _u1:
-    st.markdown("""<div style="font-size:.88rem;font-weight:600;color:#4A5568;margin-bottom:4px;">
-        📊 Amazon検索用語レポート
-        <span style="font-weight:400;color:#718096;">※「検索用語」と「ターゲティング」列を含めて出力してください</span>
-    </div>""", unsafe_allow_html=True)
-    sf = st.file_uploader("検索用語レポート", type="csv", key="sf", on_change=clear, label_visibility="collapsed")
-    if sf: st.success(f"✓ {sf.name}")
-with _u2:
-    st.markdown("**　**")
-    run = st.button("🔍 抽出実行", type="primary", use_container_width=True)
-st.markdown("---")
-
-# ─── Processing ─────────────────────────────────────
-if run:
-    if not sf:
-        st.error("検索用語レポートをアップロードしてください"); st.stop()
-    with st.spinner("分析中..."):
-        dfs = rcsv(sf)
-        kc  = fcol(dfs, ["検索用語", "カスタマーの検索用語", "Customer Search Term", "search term"])
-        cc  = fcol(dfs, ["キャンペーン名", "Campaign Name", "campaign name"])
-        sc  = fcol(dfs, ["売上", "売上額", "合計売上", "広告費売上高", "7日間の総売上高", "Attributed Sales", "Sales"])
-        oc_ = fcol(dfs, ["合計費用", "費用", "広告費", "コスト", "Cost", "Spend", "spend"])
-        od  = fcol(dfs, ["商品購入数", "注文数", "注文された商品点数", "Orders", "Purchases"])
-        clk = fcol(dfs, ["クリック数", "クリック", "Clicks", "clicks"])
-        imp = fcol(dfs, ["インプレッション数", "インプレッション", "Impressions", "impressions"])
-        tkc = fcol(dfs, ["ターゲティング", "ターゲッティング", "キーワード", "Targeting", "targeting", "Keyword", "keyword"])
-        # CPC用: Keyword Text列を最優先 / なければ tkc（ターゲティング）にフォールバック
-        kwt_col = fcol(dfs, ["Keyword Text", "Keyword text", "keyword text", "キーワードテキスト"])
-        cpc_kw_col = kwt_col if kwt_col else tkc   # Keyword Text優先・Targeting フォールバック
-        agn = fcol(dfs, ["Ad Group Name", "広告グループ名", "Ad Group", "広告グループ", "ad group"])
-        ttype = fcol(dfs, ["Campaign Targeting Type", "ターゲティングタイプ", "Targeting Type", "targeting type"])
-        miss = [n for v, n in [(kc,"検索用語"),(cc,"キャンペーン名"),(sc,"売上"),(oc_,"広告費")] if not v]
-        if miss: st.error(f"列が見つかりません: {miss}"); st.write(list(dfs.columns)); st.stop()
-        if not tkc:
-            st.error("「ターゲティング」列が見つかりません。レポート出力時にターゲティング列を含めてください。")
-            st.write("検出された列:", list(dfs.columns)); st.stop()
-        dfs[sc]  = tonum(dfs[sc])
-        dfs[oc_] = tonum(dfs[oc_])
-        for _col in [od, clk, imp]:
-            if _col: dfs[_col] = tonum(dfs[_col])
-        dfs["kn"] = dfs[kc].apply(norm)
-        dfs["ct"] = dfs[cc].apply(lambda x: official(get_theme(str(x))))
-        mask   = dfs[cc].str.contains("オート|auto", case=False, na=False)
-        n_auto = int(mask.sum())
-        d0     = dfs[mask].copy()
-        reg  = set(dfs[tkc].apply(norm)); reg.discard("")
-        n_ex = int(d0["kn"].isin(reg).sum())
-        d0   = d0[~d0["kn"].isin(reg)]
-        n_pt = int(d0["kn"].apply(lambda k: covered(k, reg)).sum())
-        d0   = d0[~d0["kn"].apply(lambda k: covered(k, reg))]
-        n_ar = len(d0)
-        n_br = int(d0["kn"].apply(lambda k: any(b in k for b in brands)).sum())
-        d0   = d0[~d0["kn"].apply(lambda k: any(b in k for b in brands))]
-        n_cd = int(d0["kn"].apply(is_code).sum())
-        d0   = d0[~d0["kn"].apply(is_code)]
-        n_tl = int(d0[kc].apply(is_title).sum())
-        d0   = d0[~d0[kc].apply(is_title)]
-        n_ae = len(d0)
-        agg_d = {
-            "keyword":        (kc,   "first"),
-            "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
-            "sales":          (sc,   "sum"),
-            "cost":           (oc_,  "sum"),
-        }
-        if od:  agg_d["orders"]      = (od,  "sum")
-        if clk: agg_d["clicks"]      = (clk, "sum")
-        if imp: agg_d["impressions"] = (imp, "sum")
-        agg = d0.groupby("kn").agg(**agg_d).reset_index(drop=True)
-        agg["ROAS"] = agg.apply(
-            lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
-        if "clicks" in agg.columns and "orders" in agg.columns:
-            agg["CVR"] = agg.apply(
-                lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0, axis=1)
-        agg["price"] = agg["campaign_theme"].map(PRICES)
-        agg = agg[agg["price"].notna()].copy()
-        n_pre    = len(agg)
-        n_sl     = int((agg["sales"] >= agg["price"] * 2).sum())
-        d1       = agg[agg["sales"] >= agg["price"] * 2].copy()
-        n_ro     = int((d1["ROAS"] >= 2.0).sum())
-        d1       = d1[d1["ROAS"] >= 2.0].copy()
-        if "orders" in d1.columns:
-            n_of = int((d1["orders"] < min_ord).sum())
-            d1   = d1[d1["orders"] >= min_ord].copy()
-        else: n_of = 0
-        if "clicks" in d1.columns:
-            n_clk_f = int((d1["clicks"] < min_clk).sum())
-            d1 = d1[d1["clicks"] >= min_clk].copy()
-        else: n_clk_f = 0
-        n_cost_f = int((d1["cost"] < min_cost).sum())
-        d1 = d1[d1["cost"] >= min_cost].copy()
-        n_af = len(d1)
-        d1.drop(columns=["price"], inplace=True, errors="ignore")
-        dw = deduplicate_keyword_intent(d1)
-        nf = len(dw)
-        win_kws = set(dw["keyword"].tolist())
-        # ── キーワード削除用: マニュアルキャンペーンのみを母集団にして集計 ──
-        # オートキャンペーンを含まない行のみ抽出（オート除外KWとは完全に別ロジック）
-        _del_manual_mask = ~dfs[cc].str.contains("オート|auto", case=False, na=False)
-        _del_d0 = dfs[_del_manual_mask].copy()
-        # ── ASIN / asin: / category: を groupby前に除外（検索語のみ残す）──
-        _del_d0 = _del_d0[~_del_d0["kn"].apply(
-            lambda k: is_asin_kn(k) or is_category_kn(k)
-        )].copy()
-        _del_agg_d = {
-            "keyword":        (kc,   "first"),
-            "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
-            "sales":          (sc,   "sum"),
-            "cost":           (oc_,  "sum"),
-        }
-        if od:  _del_agg_d["orders"]      = (od,  "sum")
-        if clk: _del_agg_d["clicks"]      = (clk, "sum")
-        if imp: _del_agg_d["impressions"] = (imp, "sum")
-        _del_agg = _del_d0.groupby("kn").agg(**_del_agg_d).reset_index(drop=True)
-        _del_agg["ROAS"] = _del_agg.apply(
-            lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
-        if "clicks" in _del_agg.columns and "orders" in _del_agg.columns:
-            _del_agg["CVR"] = _del_agg.apply(
-                lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0, axis=1)
-        _del_agg["price"] = _del_agg["campaign_theme"].map(PRICES)
-        _del_agg = _del_agg[_del_agg["price"].notna()].copy()
-        del_mask = (_del_agg["cost"] >= _del_agg["price"] * 2) & (_del_agg["ROAS"] < 0.8)
-        df_del_ = _del_agg[del_mask].copy()
-        df_del_ = df_del_[~df_del_["keyword"].isin(win_kws)].copy()
-        df_del_.drop(columns=["price"], inplace=True, errors="ignore")
-        # ── CPC用: Manual KWのみ抽出（Customer Search Termではなく Keyword Text単位）
-        import re as _re
-        _cpc_raw = dfs.copy()
-        _cpc_raw["ct"] = _cpc_raw[cc].apply(lambda x: official(get_theme(str(x))))
-
-        # ⓪ SP広告(マニュアル) KWキャンペーンのみ抽出
-        # 対象: SP広告(マニュアル) のみ
-        # 除外: SB広告(動画) / SP広告(動画) / 商品ターゲ / 動画ターゲ / その他
-        _sp_manual_mask = (
-            _cpc_raw[cc].str.contains("SP広告.*マニュアル|SP.*manual", case=False, na=False)
-            & ~_cpc_raw[cc].str.contains("商品ターゲ|動画ターゲ", case=False, na=False)
-        )
-        _cpc_raw = _cpc_raw[_sp_manual_mask].copy()
-
-        # ①Auto除外
-        _auto_mask = _cpc_raw[cc].str.contains("オート|auto", case=False, na=False)
-        if ttype:
-            _auto_mask = _auto_mask | _cpc_raw[ttype].str.contains("auto", case=False, na=False)
-        n_cpc_auto = int(_auto_mask.sum())
-        _cpc_raw = _cpc_raw[~_auto_mask].copy()
-
-        # ②Product Targeting除外 (ASIN/category/asin:/complement/substitute)
-        def _is_pt(s):
-            kn = norm(s)
-            return (is_asin_kn(kn)
-                    or is_category_kn(kn)
-                    or "complement" in kn
-                    or "substitute" in kn)
-        if cpc_kw_col:
-            _pt_mask = _cpc_raw[cpc_kw_col].apply(_is_pt)
-        else:
-            _pt_mask = pd.Series(False, index=_cpc_raw.index)
-        n_cpc_pt = int(_pt_mask.sum())
-        _cpc_raw = _cpc_raw[~_pt_mask].copy()
-
-        # ③Keyword Text空欄除外
-        if cpc_kw_col:
-            _empty_mask = _cpc_raw[cpc_kw_col].isna() | (_cpc_raw[cpc_kw_col].astype(str).str.strip() == "")
-        else:
-            _empty_mask = pd.Series(True, index=_cpc_raw.index)
-        n_cpc_empty = int(_empty_mask.sum())
-        _cpc_raw = _cpc_raw[~_empty_mask].copy()
-
-        # ④ ブランドKW除外（アニハ・あには・アニは を含む語を除外）
-        _BRAND_KW = ["アニハ", "あには", "アニは"]
-        if cpc_kw_col:
-            _brand_mask = _cpc_raw[cpc_kw_col].astype(str).str.contains(
-                "|".join(_BRAND_KW), na=False
-            )
-            _cpc_raw = _cpc_raw[~_brand_mask].copy()
-
-        n_cpc_manual = len(_cpc_raw)
-
-        # Keyword Text単位で集計 (Keyword Text優先 / Targeting フォールバック)
-        if cpc_kw_col and not _cpc_raw.empty:
-            _cpc_raw["_kw_norm"] = _cpc_raw[cpc_kw_col].apply(norm)
-            _agg_cpc_d = {
-                "keyword":        (cpc_kw_col, "first"),
-                "campaign_name":  (cc,  "first"),
-                "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
-                "sales":          (sc,  "sum"),
-                "cost":           (oc_, "sum"),
-            }
-            if od:  _agg_cpc_d["orders"] = (od, "sum")
-            if clk: _agg_cpc_d["clicks"] = (clk, "sum")
-            if agn: _agg_cpc_d["ad_group"] = (agn, "first")
-            _agg_cpc = _cpc_raw.groupby(["ct", "_kw_norm"]).agg(**_agg_cpc_d).reset_index(drop=True)
-            _agg_cpc["ROAS"] = _agg_cpc.apply(
-                lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
-            _agg_cpc["price"] = _agg_cpc["campaign_theme"].map(PRICES)
-            _agg_cpc = _agg_cpc[_agg_cpc["price"].notna()].copy()
-            df_cpc_ = build_cpc_df(_agg_cpc)
-        else:  # cpc_kw_col が取得できなかった場合
-            df_cpc_ = pd.DataFrame()
-            n_cpc_auto = n_cpc_pt = n_cpc_empty = n_cpc_manual = 0
-
-        # ── 商品ターゲ分析: マニュアル / 動画 を分離抽出 ──────────────
-        import re as _re_asin
-
-        def _extract_asin(s):
-            """asin="B0...", asin-expanded="B0...", 裸の B0... からASINを抽出"""
-            m = _re_asin.search(r'B0[A-Z0-9]{8}', str(s), _re_asin.IGNORECASE)
-            return m.group(0).upper() if m else ""
-
-        def _build_pt_dfs(camp_mask):
-            """camp_mask で絞った行から追加/削除候補DataFrameを返す"""
-            _d = _mpt_base[camp_mask].copy()
-            if _d.empty or not tkc:
-                return pd.DataFrame(), pd.DataFrame()
-            _d["_asin_clean"] = _d[tkc].apply(_extract_asin)
-            _d = _d[_d["_asin_clean"] != ""].copy()
-            if _d.empty:
-                return pd.DataFrame(), pd.DataFrame()
-            _d["_asin_key"] = _d["_asin_clean"]
-            _agg_d = {
-                "asin":           ("_asin_clean", "first"),
-                "campaign_name":  (cc, "first"),
-                "campaign_theme": ("ct", lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
-                "sales":          (sc, "sum"),
-                "cost":           (oc_, "sum"),
-            }
-            if od:  _agg_d["orders"]   = (od,  "sum")
-            if clk: _agg_d["clicks"]   = (clk, "sum")
-            if agn: _agg_d["ad_group"] = (agn, "first")
-            _agg = _d.groupby("_asin_key").agg(**_agg_d).reset_index(drop=True)
-            _agg["ROAS"]  = _agg.apply(
-                lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
-            _agg["price"] = _agg["campaign_theme"].map(PRICES)
-            _agg = _agg[_agg["price"].notna()].copy()
-            # 追加: 信頼度フィルター + 条件
-            _tr = _agg.copy()
-            if "orders" in _tr.columns: _tr = _tr[_tr["orders"] >= 3]
-            if "clicks" in _tr.columns: _tr = _tr[_tr["clicks"] >= 5]
-            _tr = _tr[_tr["cost"] >= 300].copy()
-            _add = _tr[(_tr["sales"] >= _tr["price"] * 2) & (_tr["ROAS"] >= 2.0)].copy()
-            _sc2 = [c for c in ["ROAS","sales","orders"] if c in _add.columns]
-            _add = _add.sort_values(_sc2, ascending=[False]*len(_sc2)).reset_index(drop=True)
-            # 削除: 条件
-            _del = _agg[(_agg["cost"] >= _agg["price"] * 2) & (_agg["ROAS"] < 0.8)].copy()
-            _ds2 = [c for c in ["cost","ROAS"] if c in _del.columns]
-            _del = _del.sort_values(_ds2, ascending=[False, True]).reset_index(drop=True)
-            return (_add.drop(columns=["price"], errors="ignore"),
-                    _del.drop(columns=["price"], errors="ignore"))
-
-        _mpt_base = dfs.copy()
-        _mpt_base["ct"] = _mpt_base[cc].apply(lambda x: official(get_theme(str(x))))
-
-        # マニュアル: 「商品ターゲ」含む AND「動画」含まない AND「オート」含まない
-        _mask_m = (
-            _mpt_base[cc].str.contains("商品ターゲ", na=False) &
-            ~_mpt_base[cc].str.contains("動画", na=False) &
-            ~_mpt_base[cc].str.contains("オート|auto", case=False, na=False)
-        )
-        # 動画: 「商品ターゲ」含む AND「動画」含む
-        _mask_v = (
-            _mpt_base[cc].str.contains("商品ターゲ", na=False) &
-            _mpt_base[cc].str.contains("動画", na=False)
-        )
-
-        df_pt_add_m_, df_pt_del_m_ = _build_pt_dfs(_mask_m)
-        df_pt_add_v_, df_pt_del_v_ = _build_pt_dfs(_mask_v)
-
-        n_mpt_add = len(df_pt_add_m_) + len(df_pt_add_v_)
-        n_mpt_del = len(df_pt_del_m_) + len(df_pt_del_v_)
-        n_mpt_auto_ex = int((~_mask_m & ~_mask_v).sum())
-        n_mpt_kw_ex = 0; n_mpt_dup_ex = 0
-
-        # ── 商品ターゲ CPC調整用 DataFrame ────────────────────────────
-        def _build_pt_cpc_df(camp_mask):
-            """商品ターゲデータをASIN単位で集計してCPC調整DataFrameを返す"""
-            _d = _mpt_base[camp_mask].copy()
-            if _d.empty or not tkc:
-                return pd.DataFrame()
-            _d["_asin_clean"] = _d[tkc].apply(_extract_asin)
-            _d = _d[_d["_asin_clean"] != ""].copy()
-            if _d.empty:
-                return pd.DataFrame()
-            _d["_asin_key"] = _d["_asin_clean"]
-            _agg_d2 = {
-                "asin":           ("_asin_clean", "first"),
-                "campaign_name":  (cc, "first"),
-                "campaign_theme": ("ct", lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
-                "sales":          (sc, "sum"),
-                "cost":           (oc_, "sum"),
-            }
-            if od:  _agg_d2["orders"]   = (od,  "sum")
-            if clk: _agg_d2["clicks"]   = (clk, "sum")
-            if agn: _agg_d2["ad_group"] = (agn, "first")
-            _agg2 = _d.groupby("_asin_key").agg(**_agg_d2).reset_index(drop=True)
-            _agg2["ROAS"]  = _agg2.apply(
-                lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
-            _agg2["price"] = _agg2["campaign_theme"].map(PRICES)
-            _agg2 = _agg2[_agg2["price"].notna()].copy()
-            return build_cpc_df(_agg2)
-
-        df_cpc_product_ = _build_pt_cpc_df(_mask_m)
-        df_cpc_video_   = _build_pt_cpc_df(_mask_v)
-
-        # ── オート除外KW用 DataFrame ───────────────────────────────
-        # キーワード / 商品(ASIN) / 動画(category:) を最初から独立して生成する
-        if kc and tkc:
-            _auto_kw_base = dfs[dfs[cc].str.contains("オート|auto", case=False, na=False)].copy()
-            _n_akw1 = len(_auto_kw_base)                                       # ① オート広告抽出（行数）
-            def _ct_auto(name):
-                s = str(name)
-                r = official(get_theme(s))
-                if r != "未分類": return r
-                for c in CAMPAIGNS:
-                    if c in s: return c
-                return "未分類"
-            _auto_kw_base["ct"] = _auto_kw_base[cc].apply(_ct_auto)
-            _auto_kw_base["kn"] = _auto_kw_base[kc].apply(norm)
-            _manual_mask_kw = ~dfs[cc].str.contains("オート|auto", case=False, na=False)
-            _manual_reg_kw = set(dfs[_manual_mask_kw][tkc].apply(norm)); _manual_reg_kw.discard("")
-            _dup_kw = _auto_kw_base["kn"].isin(_manual_reg_kw)
-            _auto_kw_base = _auto_kw_base[~_dup_kw].copy()
-            _n_akw2 = len(_auto_kw_base)                                       # ② マニュアル重複除外後（行数）
-
-            # 共通agg定義ビルダー（商品・動画専用。keyword列を含む）
-            def _make_agg_d():
-                _d = {
-                    "keyword":        (kc,   "first"),
-                    "campaign_theme": ("ct", lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
-                    "sales":          (sc,   "sum"),
-                    "cost":           (oc_,  "sum"),
-                }
-                if od:  _d["orders"]   = (od,  "sum")
-                if agn: _d["ad_group"] = (agn, "first")
-                return _d
-
-            # キーワード専用agg定義ビルダー（keyword列を含めない。kn由来でしか作らない）
-            def _make_agg_d_kw():
-                _d = {
-                    "campaign_theme": ("ct", lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
-                    "sales":          (sc,   "sum"),
-                    "cost":           (oc_,  "sum"),
-                }
-                if od:  _d["orders"]   = (od,  "sum")
-                if agn: _d["ad_group"] = (agn, "first")
-                return _d
-
-            def _apply_del_filter(df_agg):
-                df_agg["ROAS"]  = df_agg.apply(
-                    lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
-                df_agg["price"] = df_agg["campaign_theme"].map(PRICES)
-                df_agg = df_agg[df_agg["price"].notna()].copy()
-                result = df_agg[
-                    (df_agg["cost"] >= df_agg["price"] * 2) & (df_agg["ROAS"] <= 0.8)
-                ].copy()
-                result.drop(columns=["price"], errors="ignore", inplace=True)
-                return result
-
-            # ── キーワード専用DataFrame: ASIN / asin: / category: をgroupby前に除外 ──
-            _base_kw = _auto_kw_base[~_auto_kw_base["kn"].apply(
-                lambda k: is_asin_kn(k) or is_category_kn(k)
-            )].copy()
-
-            _agg_kw = (
-                _base_kw
-                .groupby("kn", as_index=False)
-                .agg(**_make_agg_d_kw())
-            )
-            _agg_kw.insert(0, "keyword", _agg_kw["kn"])
-
-            df_auto_del_kw_keyword_ = _apply_del_filter(_agg_kw)
-
-            # ── 商品専用DataFrame: ASINのみ残す ──
-            _base_pt = _auto_kw_base[_auto_kw_base["kn"].apply(
-                lambda k: is_asin_kn(k)
-            )].copy()
-            _agg_pt = _base_pt.groupby("kn").agg(**_make_agg_d()).reset_index(drop=True)
-            df_auto_del_kw_product_ = _apply_del_filter(_agg_pt)
-
-            # ── 動画専用DataFrame: category: のみ残す ──
-            _base_vid = _auto_kw_base[_auto_kw_base["kn"].apply(
-                lambda k: is_category_kn(k)
-            )].copy()
-            _agg_vid = _base_vid.groupby("kn").agg(**_make_agg_d()).reset_index(drop=True)
-            df_auto_del_kw_video_ = _apply_del_filter(_agg_vid)
-
-            _n_akw3 = len(_agg_kw)
-            _n_akw7 = len(df_auto_del_kw_keyword_)
-            _dbg_auto_kw_ = {"n1":_n_akw1,"n2":_n_akw2,"n3":_n_akw3,"n4":_n_akw3,
-                             "n5":_n_akw7,"n6":_n_akw7,"n7":_n_akw7}
-        else:
-            df_auto_del_kw_keyword_ = pd.DataFrame()
-            df_auto_del_kw_product_ = pd.DataFrame()
-            df_auto_del_kw_video_   = pd.DataFrame()
-            _dbg_auto_kw_ = {"n1":0,"n2":0,"n3":0,"n4":0,"n5":0,"n6":0,"n7":0}
-
-        # 商品/動画: オートASIN中、マニュアルASINと重複しない出血ASIN
-        def _build_auto_asin_del(camp_mask, manual_mask):
-            _zero = {"n1":0,"n2":0,"n3":0,"n4":0,"n5":0,"n6":0,"n7":0}
-            _d = _mpt_base[camp_mask].copy()
-            if _d.empty or not tkc: return pd.DataFrame(), _zero
-            _d["_asin_clean"] = _d[tkc].apply(_extract_asin)
-            _d = _d[_d["_asin_clean"] != ""].copy()
-            _c1 = len(_d)                                                          # ① オート抽出（ASIN有効行数）
-            if _d.empty: return pd.DataFrame(), {**_zero, "n1":_c1}
-            _manual_asins = set(_mpt_base[manual_mask][tkc].apply(_extract_asin)); _manual_asins.discard("")
-            _d = _d[~_d["_asin_clean"].isin(_manual_asins)].copy()
-            _c2 = len(_d)                                                          # ② マニュアル重複除外後（行数）
-            if _d.empty: return pd.DataFrame(), {**_zero, "n1":_c1, "n2":_c2}
-            _d["_asin_key"] = _d["_asin_clean"]
-            _agg_d3 = {
-                "asin":           ("_asin_clean", "first"),
-                "campaign_name":  (cc,            "first"),
-                "campaign_theme": ("ct",           lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"),
-                "sales":          (sc,             "sum"),
-                "cost":           (oc_,            "sum"),
-            }
-            if od:  _agg_d3["orders"]   = (od,  "sum")
-            if agn: _agg_d3["ad_group"] = (agn, "first")
-            _agg3 = _d.groupby("_asin_key").agg(**_agg_d3).reset_index(drop=True)
-            _c3 = len(_agg3)                                                       # ③ groupby後ASIN数
-            _agg3["ROAS"]  = _agg3.apply(
-                lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
-            _agg3["price"] = _agg3["campaign_theme"].map(PRICES)
-            _agg3 = _agg3[_agg3["price"].notna()].copy()
-            _c4 = len(_agg3)                                                       # ④ price取得成功数
-            _c5 = int((_agg3["cost"] >= _agg3["price"] * 2).sum())                # ⑤ 広告費条件通過
-            _c6 = int((_agg3["ROAS"] <= 0.8).sum())                               # ⑥ ROAS条件通過
-            _result = _agg3[
-                (_agg3["cost"] >= _agg3["price"] * 2) & (_agg3["ROAS"] <= 0.8)
-            ].copy()
-            _result.drop(columns=["price"], errors="ignore", inplace=True)
-            _c7 = len(_result)                                                     # ⑦ 最終表示件数
-            return _result, {"n1":_c1,"n2":_c2,"n3":_c3,"n4":_c4,"n5":_c5,"n6":_c6,"n7":_c7}
-
-        _mask_auto_pt_del = (
-            _mpt_base[cc].str.contains("商品ターゲ", na=False) &
-            _mpt_base[cc].str.contains("オート|auto", case=False, na=False) &
-            ~_mpt_base[cc].str.contains("動画", na=False)
-        )
-        _mask_auto_vid_del = (
-            _mpt_base[cc].str.contains("動画", na=False) &
-            _mpt_base[cc].str.contains("オート|auto", case=False, na=False)
-        )
-        df_auto_del_product_, _dbg_auto_pt_  = _build_auto_asin_del(_mask_auto_pt_del, _mask_m)
-        df_auto_del_video_,   _dbg_auto_vid_ = _build_auto_asin_del(_mask_auto_vid_del, _mask_v)
-
-        # ── オートKW集計でASIN/category判定された行を、商品/動画ページ側へ合流 ──
-        # 「📄 オートKW削除」はキーワードのみを表示するため、ここで分離する。
-        if not df_auto_del_kw_product_.empty:
-            _kw_as_pt = df_auto_del_kw_product_.rename(columns={"keyword": "asin"}).copy()
-            df_auto_del_product_ = pd.concat(
-                [df_auto_del_product_, _kw_as_pt], ignore_index=True
-            )
-
-        if not df_auto_del_kw_video_.empty:
-            _kw_as_vid = df_auto_del_kw_video_.rename(columns={"keyword": "asin"}).copy()
-            df_auto_del_video_ = pd.concat(
-                [df_auto_del_video_, _kw_as_vid], ignore_index=True
-            )
-        # ────────────────────────────────────────────────────────────
-
-        st.session_state.update({
-            "has_results": True, "df_win": dw,
-            "df_del": df_del_, "df_cpc": df_cpc_,
-            "df_pt_add_m": df_pt_add_m_, "df_pt_del_m": df_pt_del_m_,
-            "df_pt_add_v": df_pt_add_v_, "df_pt_del_v": df_pt_del_v_,
-            "df_cpc_product": df_cpc_product_, "df_cpc_video": df_cpc_video_,
-            "df_auto_del_kw_keyword": df_auto_del_kw_keyword_,
-            "df_auto_del_product": df_auto_del_product_,
-            "df_auto_del_video":   df_auto_del_video_,
-            "dbg_auto_kw": _dbg_auto_kw_,
-            "dbg_auto_pt": _dbg_auto_pt_,
-            "dbg_auto_vid": _dbg_auto_vid_,
-            "stats": {
-                "n_auto":n_auto,"n_ex":n_ex,"n_pt":n_pt,"n_ar":n_ar,
-                "n_br":n_br,"n_cd":n_cd,"n_tl":n_tl,"n_ae":n_ae,
-                "n_sl":n_sl,"n_ro":n_ro,"n_of":n_of,
-                "n_clk_f":n_clk_f,"n_cost_f":n_cost_f,
-                "n_pre":n_pre,"n_af":n_af,"nf":nf,
-                "mo":int(min_ord),"mc":int(min_clk),"mco":int(min_cost),
-                "n_cpc_auto":n_cpc_auto,"n_cpc_pt":n_cpc_pt,
-                "n_cpc_empty":n_cpc_empty,"n_cpc_manual":n_cpc_manual,
-                "n_mpt_auto_ex":n_mpt_auto_ex,"n_mpt_kw_ex":n_mpt_kw_ex,
-                "n_mpt_dup_ex":n_mpt_dup_ex,"n_mpt_add":n_mpt_add,"n_mpt_del":n_mpt_del,
-            },
-            "dbg":{"kc":kc,"sc":sc,"oc_":oc_,"od":od,
-                   "clk":clk,"imp":imp,"rn":len(reg),"br":brands},
-        })
-        st.write("keyword rows", len(df_auto_del_kw_keyword_))
-        st.write("product rows", len(df_auto_del_kw_product_))
-        st.write("video rows", len(df_auto_del_kw_video_))
-
-# ─── No results: placeholder ─────────────────────────
-if not st.session_state.get("has_results"):
-    st.markdown("""<div style="text-align:center;padding:80px 20px;">
-        <div style="font-size:3.5rem;">📂</div>
-        <p style="font-size:1.1rem;font-weight:600;color:#2D3748;margin-top:16px;">
-            Amazon検索用語レポートをアップロードして「抽出実行」を押してください</p>
-        <p style="color:#718096;font-size:.875rem;">「検索用語」と「ターゲティング」列を含めたレポートが必要です</p>
-    </div>""", unsafe_allow_html=True)
-    st.stop()
-
-# ─── Retrieve session data ───────────────────────────
-dw:  pd.DataFrame = st.session_state["df_win"]
-dd:  pd.DataFrame = st.session_state.get("df_del", pd.DataFrame())
-dc_cpc:         pd.DataFrame = st.session_state.get("df_cpc",         pd.DataFrame())
-dc_cpc_product: pd.DataFrame = st.session_state.get("df_cpc_product", pd.DataFrame())
-dc_cpc_video:   pd.DataFrame = st.session_state.get("df_cpc_video",   pd.DataFrame())
-sv = st.session_state["stats"]
-df_auto_del_product: pd.DataFrame = st.session_state.get("df_auto_del_product", pd.DataFrame())
-df_auto_del_video:   pd.DataFrame = st.session_state.get("df_auto_del_video",   pd.DataFrame())
-nw = len(dw)
-
-# ─── KPIカード ヘルパー ──────────────────────────────
-def kpi(col, icon: str, label: str, value: str, sub: str = "",
-        bg: str = "#F4F6F8", color: str = "#718096"):
-    col.markdown(f'''<div class="kpi-card" style="background:{bg};">
-        <div class="kpi-icon">{icon}</div>
-        <div class="kpi-label">{label}</div>
-        <div class="kpi-value" style="color:{color};">{value}</div>
-        <div class="kpi-sub">{sub}</div>
-    </div>''', unsafe_allow_html=True)
-
-
-# ─── 判定ロジック表示ヘルパー ────────────────────────────
-_LOGIC_BOX_STYLE = (
-    "background:#F8FBFF;border:1px solid #D9E8FF;"
-    "border-radius:8px;padding:16px 20px;line-height:1.7;"
-)
-def render_logic_section(title: str, content_html: str):
-    """📖 判定ロジックを見る — 各ページ共通の折りたたみ式ロジック表示エリア。
-    title        : 表示タイトル（例: "📋 キーワード追加 判定ロジック"）
-    content_html : ロジック本文（HTML文字列）
-    """
-    with st.expander("📖 判定ロジックを見る", expanded=False):
-        st.markdown(
-            f'''<div style="{_LOGIC_BOX_STYLE}">
-<div style="font-weight:700;font-size:.92rem;color:#1A365D;margin-bottom:12px;">{title}</div>
-{content_html}
-</div>''',
-            unsafe_allow_html=True,
-        )
-
-# ===================================================
-# ページ関数
-# ===================================================
-
-import datetime as _anls_dt
-import pathlib as _anls_plib
-
-# ===================================================
-# 分析ヘルパー関数
-# ===================================================
-
-def _anls_load(fname: str) -> list:
-    p = _anls_plib.Path("analysis_data") / fname
-    if not p.exists():
-        return []
-    try:
-        import json
-        return json.loads(p.read_text(encoding="utf-8")).get("records", [])
-    except Exception:
-        return []
-
-def _anls_save(fname: str, records: list):
-    import json
-    p = _anls_plib.Path("analysis_data")
-    p.mkdir(exist_ok=True)
-    (p / fname).write_text(json.dumps({"records": records}, ensure_ascii=False, indent=2), encoding="utf-8")
-
-def _anls_parse_csv(csv_file):
-    df = rcsv(csv_file)
-    kc  = fcol(df, ["検索用語", "Search Term", "Customer Search Term"])
-    cc  = fcol(df, ["キャンペーン名", "Campaign Name", "campaign_name"])
-    sc  = fcol(df, ["売上", "Sales", "売上金額", "7日間の合計売上高", "14日間の合計売上高", "合計売上高"])
-    oc_ = fcol(df, ["広告費", "Cost", "Spend", "費用", "合計費用"])
-    od  = fcol(df, ["注文数", "Orders", "購入数", "7日間の総注文数", "14日間の総注文数", "合計注文数"])
-    clk = fcol(df, ["クリック数", "Clicks"])
-    imp = fcol(df, ["インプレッション数", "Impressions", "表示回数"])
-    tkc = fcol(df, ["ターゲティング", "Targeting"])
-    kwt = fcol(df, ["キーワードテキスト", "Keyword Text", "キーワード"])
-    agn = fcol(df, ["広告グループ名", "Ad Group Name", "広告グループ"])
-    return df, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn
-
-def _anls_build_kw_after(df, kc, cc, sc, oc_, od, clk) -> pd.DataFrame:
-    if not kc or not cc or not sc or not oc_:
-        return pd.DataFrame()
-    d = df.copy()
-    d["_cost_n"] = tonum(d[oc_])
-    d = d[d["_cost_n"] > 0].copy()
-    d["ct"] = d[cc].apply(lambda x: official(get_theme(str(x))))
-    d["_kn_key"] = d[kc].apply(norm)
-    d["_sc_n"]  = tonum(d[sc])
-    d["_oc_n"]  = tonum(d[oc_])
-    agg_d = {"_sc_n": "sum", "_oc_n": "sum",
-             "ct": lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"}
-    if od:  d["_od_n"]  = tonum(d[od]);  agg_d["_od_n"]  = "sum"
-    if clk: d["_clk_n"] = tonum(d[clk]); agg_d["_clk_n"] = "sum"
-    out = d.groupby("_kn_key", as_index=True).agg(agg_d).reset_index()
-    out = out.rename(columns={"_sc_n":"sales","_oc_n":"cost","ct":"campaign_theme"})
-    if "_od_n"  in out.columns: out = out.rename(columns={"_od_n":"orders"})
-    if "_clk_n" in out.columns: out = out.rename(columns={"_clk_n":"clicks"})
-    out["ROAS"] = out.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
-    if "orders" in out.columns and "clicks" in out.columns:
-        out["CVR"] = out.apply(lambda r: round(r["orders"]/r["clicks"]*100,1) if r["clicks"]>0 else 0.0, axis=1)
-    if "clicks" in out.columns:
-        out["avg_cpc"] = out.apply(lambda r: round(r["cost"]/r["clicks"],0) if r["clicks"]>0 else 0, axis=1)
-    return out
-
-def _anls_build_cpc_after(df, cc, sc, oc_, od, clk, kwt_col) -> pd.DataFrame:
-    if not cc or not sc or not oc_:
-        return pd.DataFrame()
-    d = df.copy()
-    d["_cost_n"] = tonum(d[oc_])
-    d = d[d["_cost_n"] > 0].copy()
-    d["ct"] = d[cc].apply(lambda x: official(get_theme(str(x))))
-    kc2 = kwt_col if kwt_col else fcol(d, ["ターゲティング","Targeting","キーワードテキスト","Keyword Text"])
-    if not kc2:
-        return pd.DataFrame()
-    d["_kn_key"] = d[kc2].apply(norm)
-    d["_sc_n"]  = tonum(d[sc])
-    d["_oc_n"]  = tonum(d[oc_])
-    agg_d = {"_sc_n": "sum", "_oc_n": "sum",
-             "ct": lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"}
-    if od:  d["_od_n"]  = tonum(d[od]);  agg_d["_od_n"]  = "sum"
-    if clk: d["_clk_n"] = tonum(d[clk]); agg_d["_clk_n"] = "sum"
-    out = d.groupby("_kn_key", as_index=True).agg(agg_d).reset_index()
-    out = out.rename(columns={"_sc_n":"sales","_oc_n":"cost","ct":"campaign_theme"})
-    if "_od_n"  in out.columns: out = out.rename(columns={"_od_n":"orders"})
-    if "_clk_n" in out.columns: out = out.rename(columns={"_clk_n":"clicks"})
-    out["ROAS"] = out.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
-    if "orders" in out.columns and "clicks" in out.columns:
-        out["CVR"] = out.apply(lambda r: round(r["orders"]/r["clicks"]*100,1) if r["clicks"]>0 else 0.0, axis=1)
-    if "clicks" in out.columns:
-        out["avg_cpc"] = out.apply(lambda r: round(r["cost"]/r["clicks"],0) if r["clicks"]>0 else 0, axis=1)
-    return out
-
-def _anls_build_asin_after(df, cc, sc, oc_, od, clk, tkc, camp_pat) -> pd.DataFrame:
-    if not cc or not sc or not oc_ or not tkc:
-        return pd.DataFrame()
-    d = df.copy()
-    d["_cost_n"] = tonum(d[oc_])
-    d = d[d["_cost_n"] > 0].copy()
-    if camp_pat:
-        d = d[d[cc].apply(lambda x: camp_pat in str(x))].copy()
-    d["ct"] = d[cc].apply(lambda x: official(get_theme(str(x))))
-    def _ext_asin(v):
-        m = re.search(r'B0[A-Z0-9]{8}', str(v), re.IGNORECASE)
-        return m.group(0).upper() if m else ""
-    d["_kn_key"] = d[tkc].apply(_ext_asin)
-    d = d[d["_kn_key"] != ""].copy()
-    if d.empty:
-        return pd.DataFrame()
-    d["_sc_n"]  = tonum(d[sc])
-    d["_oc_n"]  = tonum(d[oc_])
-    agg_d = {"_sc_n": "sum", "_oc_n": "sum",
-             "ct": lambda x: x.dropna().mode()[0] if len(x.dropna()) > 0 else "未分類"}
-    if od:  d["_od_n"]  = tonum(d[od]);  agg_d["_od_n"]  = "sum"
-    if clk: d["_clk_n"] = tonum(d[clk]); agg_d["_clk_n"] = "sum"
-    out = d.groupby("_kn_key", as_index=True).agg(agg_d).reset_index()
-    out = out.rename(columns={"_sc_n":"sales","_oc_n":"cost","ct":"campaign_theme"})
-    if "_od_n"  in out.columns: out = out.rename(columns={"_od_n":"orders"})
-    if "_clk_n" in out.columns: out = out.rename(columns={"_clk_n":"clicks"})
-    out["ROAS"] = out.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
-    if "orders" in out.columns and "clicks" in out.columns:
-        out["CVR"] = out.apply(lambda r: round(r["orders"]/r["clicks"]*100,1) if r["clicks"]>0 else 0.0, axis=1)
-    if "clicks" in out.columns:
-        out["avg_cpc"] = out.apply(lambda r: round(r["cost"]/r["clicks"],0) if r["clicks"]>0 else 0, axis=1)
-    return out
-
-def _anls_judge(b, a, higher_ok=True):
-    try:
-        b = float(b or 0); a = float(a or 0)
-    except Exception:
-        return "→ 変化なし"
-    if b == 0 and a == 0:
-        return "→ 変化なし"
-    if b == 0:
-        return ("↑ 改善 (+∞%)" if higher_ok else "↓ 悪化 (+∞%)")
-    pct = (a - b) / abs(b) * 100
-    if abs(pct) < 3.0:
-        return "→ 変化なし"
-    if pct > 0:
-        return (f"↑ 改善 (+{pct:.1f}%)" if higher_ok else f"↓ 悪化 (+{pct:.1f}%)")
-    else:
-        return (f"↓ 悪化 ({pct:.1f}%)" if higher_ok else f"↑ 改善 ({pct:.1f}%)")
-
-def _anls_pct_str(b, a):
-    try:
-        b = float(b or 0); a = float(a or 0)
-        if b == 0: return "ー"
-        return f"{(a-b)/abs(b)*100:+.0f}%"
-    except Exception:
-        return "ー"
-
-def _anls_diff_str(b, a, unit=""):
-    try:
-        return f"{float(a or 0)-float(b or 0):+.0f}{unit}"
-    except Exception:
-        return "ー"
-
-def _anls_row_judge(row):
-    try:
-        b = float(row.get("ROAS_b", 0) or 0)
-        a = float(row.get("ROAS_a", 0) or 0)
-        if b == 0 and a == 0: return "変化なし"
-        if b == 0: return "改善"
-        pct = (a - b) / abs(b) * 100
-        if abs(pct) < 3.0: return "変化なし"
-        return "改善" if pct > 0 else "悪化"
-    except Exception:
-        return "変化なし"
-
-def _anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate):
-    def _card(bg, brd, lc, vc, label, val):
-        return (f'<div style="background:{bg};border:1px solid {brd};border-radius:10px;'
-                f'padding:12px 20px;text-align:center;min-width:90px;">'
-                f'<div style="font-size:.7rem;color:{lc};font-weight:700;letter-spacing:.05em;">{label}</div>'
-                f'<div style="font-size:1.55rem;font-weight:800;color:{vc};margin-top:2px;">{val}</div>'
-                f'</div>')
-    cards = (
-        _card("#EBF8FF","#90CDF4","#2C5282","#2B6CB0","分析対象",f"{n_total}件") +
-        _card("#F0FFF4","#9AE6B4","#276749","#276749","🟢 改善",f"{n_kaizen}件") +
-        _card("#FFF5F5","#FEB2B2","#C53030","#C53030","🔴 悪化",f"{n_akka}件") +
-        _card("#FFFFF0","#F6E05E","#744210","#744210","🟡 変化なし",f"{n_henko}件") +
-        _card("#FAF5FF","#D6BCFA","#553C9A","#553C9A","改善率",f"{rate:.0f}%")
-    )
-    return f'<div style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap;">{cards}</div>'
-
-def _anls_camp_table_html(merged):
-    rows_html = ""
-    for ct, grp in merged.groupby("campaign_theme"):
-        n  = len(grp)
-        nk = int((grp["_判定"]=="改善").sum())
-        na = int((grp["_判定"]=="悪化").sum())
-        nv = int((grp["_判定"]=="変化なし").sum())
-        rate = f"{nk/n*100:.0f}%" if n > 0 else "ー"
-        def _avg_pct(col_b, col_a, _grp=grp):
-            if col_b not in _grp.columns or col_a not in _grp.columns: return "ー"
-            return _anls_pct_str(_grp[col_b].mean(), _grp[col_a].mean())
-        roas_chg = _avg_pct("ROAS_b","ROAS_a")
-        cvr_chg  = (f"{grp['CVR_a'].mean()-grp['CVR_b'].mean():+.1f}pt"
-                    if "CVR_b" in grp.columns and "CVR_a" in grp.columns else "ー")
-        if "cost_b" in grp.columns and "clicks_b" in grp.columns and grp["clicks_b"].sum()>0:
-            cpc_b = grp["cost_b"].sum()/grp["clicks_b"].sum()
-            cpc_a = grp["cost_a"].sum()/grp["clicks_a"].sum() if "clicks_a" in grp.columns and grp["clicks_a"].sum()>0 else 0
-            cpc_chg = f"{cpc_a-cpc_b:+.0f}円"
-        else:
-            cpc_chg = "ー"
-        rows_html += (
-            f'<tr><td style="padding:7px 10px;border:1px solid #E2E8F0;font-weight:600;">{ct}</td>'
-            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;color:#276749;text-align:center;">🟢 {nk}件</td>'
-            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;color:#C53030;text-align:center;">🔴 {na}件</td>'
-            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;color:#744210;text-align:center;">🟡 {nv}件</td>'
-            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;text-align:center;font-weight:700;">{rate}</td>'
-            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;text-align:center;">{roas_chg}</td>'
-            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;text-align:center;">{cvr_chg}</td>'
-            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;text-align:center;">{cpc_chg}</td>'
-            f'</tr>'
-        )
-    hd = "".join(
-        f'<th style="padding:7px 10px;border:1px solid #E2E8F0;background:#EBF4FF;text-align:center;font-size:.8rem;">{c}</th>'
-        for c in ["キャンペーン","改善","悪化","変化なし","改善率","ROAS変化","CVR変化","CPC変化"])
-    return (f'<table style="width:100%;border-collapse:collapse;font-size:.82rem;">'
-            f'<thead><tr>{hd}</tr></thead><tbody>{rows_html}</tbody></table>')
-
-def _anls_detail_html(row, id_col):
-    metrics = [
-        ("売上",    "sales_b",  "sales_a",  "¥{:,.0f}", True),
-        ("広告費",  "cost_b",   "cost_a",   "¥{:,.0f}", False),
-        ("ROAS",    "ROAS_b",   "ROAS_a",   "{:.2f}",   True),
-        ("CVR",     "CVR_b",    "CVR_a",    "{:.1f}%",  True),
-        ("注文数",  "orders_b", "orders_a", "{:.0f}件", True),
-        ("クリック","clicks_b", "clicks_a", "{:.0f}",   True),
-    ]
-    cpc_b = (float(row.get("cost_b",0) or 0)/float(row.get("clicks_b",1) or 1)
-             if float(row.get("clicks_b",0) or 0) > 0 else None)
-    cpc_a = (float(row.get("cost_a",0) or 0)/float(row.get("clicks_a",1) or 1)
-             if float(row.get("clicks_a",0) or 0) > 0 else None)
-    def _fmt(val, fmt):
-        try: return fmt.format(float(val))
-        except Exception: return "ー"
-    def _jclr(b, a, higher_ok=True):
-        j = _anls_judge(float(b or 0), float(a or 0), higher_ok)
-        return ("#276749" if "改善" in j else "#C53030" if "悪化" in j else "#718096"), j
-    rows_h = ""
-    for lbl, cb, ca, fmt, hok in metrics:
-        bv = row.get(cb); av = row.get(ca)
-        if bv is None and av is None: continue
-        clr, jt = _jclr(bv or 0, av or 0, hok)
-        rows_h += (
-            f'<tr><td style="padding:6px 10px;border:1px solid #E2E8F0;font-weight:600;">{lbl}</td>'
-            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{_fmt(bv,fmt)}</td>'
-            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{_fmt(av,fmt)}</td>'
-            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:center;color:{clr};font-weight:700;">{jt}</td>'
-            f'</tr>')
-    if cpc_b is not None or cpc_a is not None:
-        bvs = f"¥{cpc_b:.0f}" if cpc_b else "ー"
-        avs = f"¥{cpc_a:.0f}" if cpc_a else "ー"
-        clr, jt = _jclr(cpc_b or 0, cpc_a or 0, False)
-        rows_h += (
-            f'<tr><td style="padding:6px 10px;border:1px solid #E2E8F0;font-weight:600;">CPC</td>'
-            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{bvs}</td>'
-            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{avs}</td>'
-            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:center;color:{clr};font-weight:700;">{jt}</td>'
-            f'</tr>')
-    hd = "".join(f'<th style="padding:7px 10px;border:1px solid #E2E8F0;background:#EBF4FF;text-align:center;">{c}</th>'
-                 for c in ["指標","Before","After","判定"])
-    return (f'<table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:6px;">'
-            f'<thead><tr>{hd}</tr></thead><tbody>{rows_h}</tbody></table>')
-
-def _anls_render_list(merged, id_col):
-    _ICON = {"改善":"🟢","悪化":"🔴","変化なし":"🟡"}
-    _CLR  = {"改善":"#276749","悪化":"#C53030","変化なし":"#744210"}
-    for _, row in merged.iterrows():
-        j    = row.get("_判定","変化なし")
-        icon = _ICON.get(j,"🟡")
-        clr  = _CLR.get(j,"#718096")
-        kw   = str(row.get(id_col, ""))
-        kw_disp = kw[:40] + ("…" if len(kw) > 40 else "")
-        st.markdown("---")
-        st.markdown(f"**{icon} {kw_disp}**")
-        st.markdown(f'　<span style="color:{clr};font-weight:700;">{j}</span>', unsafe_allow_html=True)
-        with st.expander("▶ 詳細", expanded=False):
-            st.markdown(_anls_detail_html(row, id_col), unsafe_allow_html=True)
-
-def _anls_render_kw_tab(before_df: pd.DataFrame, period_days: int,
-                        hist_fname: str, csv_key: str, label: str,
-                        after_builder_type: str):
-    _sk = f"_anls_{csv_key}"
-    st.markdown(f"#### 📊 {label} 分析")
-    st.info(f"📅 分析期間: **{period_days}日固定** — {period_days}日レポートCSVをアップロードしてください。")
-    if before_df is None or before_df.empty:
-        st.warning("先に「改善」タブで抽出実行を行ってください。抽出対象が分析対象になります。")
-        return
-    camps = sorted(before_df["campaign_theme"].unique().tolist()) if "campaign_theme" in before_df.columns else []
-    st.markdown(f"**比較用 {period_days}日レポートCSVをアップロード**")
-    af_file = st.file_uploader(f"{period_days}日レポートCSV", type="csv", key=csv_key)
-    run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
-    if run_btn:
-        if af_file is None:
-            st.warning("CSVをアップロードしてください。"); return
-        with st.spinner("分析中..."):
-            df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
-            if not all([cc, sc, oc_]):
-                st.error("必要な列が見つかりません（キャンペーン名・売上・広告費）。"); return
-            if after_builder_type == "kw_add":
-                if not kc: st.error("「検索用語」列が見つかりません。"); return
-                after_df = _anls_build_kw_after(df_raw, kc, cc, sc, oc_, od, clk)
-            else:
-                kw_col_cpc = kwt if kwt else fcol(df_raw, ["ターゲティング","Targeting","targeting"])
-                after_df = _anls_build_cpc_after(df_raw, cc, sc, oc_, od, clk, kw_col_cpc)
-            if after_df.empty:
-                st.warning("Afterデータが取得できませんでした。"); return
-            bf = before_df.copy()
-            bf["_kn_key"] = bf["keyword"].apply(norm) if "keyword" in bf.columns else bf.index.astype(str)
-            sfx = [c for c in ["sales","cost","ROAS","orders","clicks","CVR","avg_cpc"] if c in after_df.columns]
-            merged = bf.merge(after_df[["_kn_key"]+sfx], on="_kn_key", how="inner", suffixes=("_b","_a"))
-        if merged.empty:
-            st.info("マッチするキーワードが見つかりませんでした。"); return
-        merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
-        n_total  = len(merged); n_kaizen = int((merged["_判定"]=="改善").sum())
-        n_akka   = int((merged["_判定"]=="悪化").sum()); n_henko = int((merged["_判定"]=="変化なし").sum())
-        rate     = n_kaizen / n_total * 100 if n_total > 0 else 0
-        st.session_state[f"{_sk}_result"] = {
-            "merged": merged, "camps": camps,
-            "stats": (n_total, n_kaizen, n_akka, n_henko, rate),
-            "hist_fname": hist_fname, "label": label,
-            "period_days": period_days, "n_before": len(before_df),
-        }
-    if f"{_sk}_result" not in st.session_state:
-        return
-    res      = st.session_state[f"{_sk}_result"]
-    merged   = res["merged"]
-    camps    = res["camps"]
-    n_total, n_kaizen, n_akka, n_henko, rate = res["stats"]
-    hist_fname = res["hist_fname"]
-    st.markdown(_anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate), unsafe_allow_html=True)
-    sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"]+camps, key=f"{_sk}_camp")
-    view = merged if sel_camp == "全キャンペーン" else merged[merged["campaign_theme"]==sel_camp].copy()
-    with st.expander("📊 キャンペーン別サマリー", expanded=True):
-        st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
-    st.markdown("#### 📋 対象一覧")
-    _anls_render_list(view, "keyword")
-    if st.button("💾 分析結果を保存", key=f"{_sk}_save"):
-        _recs = _anls_load(hist_fname)
-        _recs.append({"id":_anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
-                      "saved_at":_anls_dt.date.today().isoformat(),"type":label,
-                      "period_days":period_days,"n_before":res["n_before"],
-                      "n_matched":n_total,"n_kaizen":n_kaizen,"n_akka":n_akka,
-                      "n_henko":n_henko,"rate":round(rate,1),"camps":camps})
-        _anls_save(hist_fname, _recs)
-        st.success("✅ 分析結果を保存しました。")
-    with st.expander("📂 保存済み分析履歴", expanded=False):
-        _recs = _anls_load(hist_fname)
-        if not _recs: st.info("保存済み分析はありません。")
-        else: st.dataframe(pd.DataFrame(_recs[::-1]), use_container_width=True)
-
-def _anls_render_asin_tab(before_df: pd.DataFrame, period_days: int,
-                          hist_fname: str, csv_key: str, label: str, camp_pat: str):
-    _sk = f"_anls_{csv_key}"
-    st.markdown(f"#### 📊 {label} 分析")
-    st.info(f"📅 分析期間: **{period_days}日固定** — {period_days}日レポートCSVをアップロードしてください。")
-    if before_df is None or before_df.empty:
-        st.warning("先に「改善」タブで抽出実行を行ってください。"); return
-    camps  = sorted(before_df["campaign_theme"].unique().tolist()) if "campaign_theme" in before_df.columns else []
-    id_col = "asin" if "asin" in before_df.columns else "keyword"
-    st.markdown(f"**比較用 {period_days}日レポートCSVをアップロード**")
-    af_file = st.file_uploader(f"{period_days}日レポートCSV", type="csv", key=csv_key)
-    run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
-    if run_btn:
-        if af_file is None:
-            st.warning("CSVをアップロードしてください。"); return
-        with st.spinner("分析中..."):
-            df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
-            if not all([cc, sc, oc_]):
-                st.error("必要な列が見つかりません。"); return
-            if not tkc:
-                st.error("「ターゲティング」列が見つかりません。"); return
-            after_df = _anls_build_asin_after(df_raw, cc, sc, oc_, od, clk, tkc, camp_pat)
-            if after_df.empty:
-                st.warning("Afterデータが取得できませんでした。"); return
-            bf = before_df.copy()
-            if "asin" in bf.columns:
-                bf["_kn_key"] = bf["asin"].apply(lambda x: str(x).upper().strip())
-            elif "keyword" in bf.columns:
-                bf["_kn_key"] = bf["keyword"].apply(lambda x: str(x).upper().strip())
-            else:
-                bf["_kn_key"] = bf.index.astype(str)
-            sfx = [c for c in ["sales","cost","ROAS","orders","clicks","CVR","avg_cpc"] if c in after_df.columns]
-            merged = bf.merge(after_df[["_kn_key"]+sfx], on="_kn_key", how="inner", suffixes=("_b","_a"))
-        if merged.empty:
-            st.info("マッチするASINが見つかりませんでした。"); return
-        merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
-        n_total  = len(merged); n_kaizen = int((merged["_判定"]=="改善").sum())
-        n_akka   = int((merged["_判定"]=="悪化").sum()); n_henko = int((merged["_判定"]=="変化なし").sum())
-        rate     = n_kaizen / n_total * 100 if n_total > 0 else 0
-        st.session_state[f"{_sk}_result"] = {
-            "merged": merged, "camps": camps, "id_col": id_col,
-            "stats": (n_total, n_kaizen, n_akka, n_henko, rate),
-            "hist_fname": hist_fname, "label": label,
-            "period_days": period_days, "n_before": len(before_df),
-        }
-    if f"{_sk}_result" not in st.session_state:
-        return
-    res      = st.session_state[f"{_sk}_result"]
-    merged   = res["merged"]
-    camps    = res["camps"]
-    id_col   = res["id_col"]
-    n_total, n_kaizen, n_akka, n_henko, rate = res["stats"]
-    hist_fname = res["hist_fname"]
-    st.markdown(_anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate), unsafe_allow_html=True)
-    sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"]+camps, key=f"{_sk}_camp")
-    view = merged if sel_camp == "全キャンペーン" else merged[merged["campaign_theme"]==sel_camp].copy()
-    with st.expander("📊 キャンペーン別サマリー", expanded=True):
-        st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
-    st.markdown("#### 📋 対象一覧")
-    _anls_render_list(view, id_col)
-    if st.button("💾 分析結果を保存", key=f"{_sk}_save"):
-        _recs = _anls_load(hist_fname)
-        _recs.append({"id":_anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
-                      "saved_at":_anls_dt.date.today().isoformat(),"type":label,
-                      "period_days":period_days,"n_before":res["n_before"],
-                      "n_matched":n_total,"n_kaizen":n_kaizen,"n_akka":n_akka,
-                      "n_henko":n_henko,"rate":round(rate,1),"camps":camps})
-        _anls_save(hist_fname, _recs)
-        st.success("✅ 分析結果を保存しました。")
-    with st.expander("📂 保存済み分析履歴", expanded=False):
-        _recs = _anls_load(hist_fname)
-        if not _recs: st.info("保存済み分析はありません。")
-        else: st.dataframe(pd.DataFrame(_recs[::-1]), use_container_width=True)
-
-
-
-
-def page_add_kw():
-    _t_tab1, _t_tab2 = st.tabs(["改善", "分析"])
-    with _t_tab1:
-        _cond_bar([
-            ("最小注文数",  f'{sv["mo"]}件'),
-            ("最小クリック数", f'{sv["mc"]}回'),
-            ("最小広告費",  f'¥{sv["mco"]:,}'),
-        ])
-
-        render_logic_section(
-            "📋 キーワード追加 判定ロジック",
-            '''
-    <table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
-    <thead>
-      <tr style="background:#DBEAFE;">
-        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>
-        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr style="background:#F1F5F9;">
-        <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【目的】</td>
-      </tr>
-      <tr>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;" colspan="2">
-          オート広告で成果が出た検索語句を、手動広告（部分一致）のマニュアルキーワードへ追加する候補を抽出します。
-        </td>
-      </tr>
-      <tr style="background:#F1F5F9;">
-        <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【抽出条件】</td>
-      </tr>
-      <tr>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">信頼度フィルター</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-          注文数 ≥ 3件 <b>かつ</b> クリック数 ≥ 5 <b>かつ</b> 広告費 ≥ ¥300<br>
-          <span style="font-size:.8rem;color:#718096;">サイドバーで変更可能</span>
-        </td>
-      </tr>
-      <tr style="background:#F0FFF4;">
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">採用条件</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">売上 ≥ 売価 × 2 <b>かつ</b> ROAS ≥ 2.0</td>
-      </tr>
-    </tbody>
-    </table>
-    <p style="font-size:.78rem;color:#718096;margin-top:10px;">
-      ▶ 同一意図KW統合: 語順・表記ゆれが同じKWは代表1件に集約<br>
-      ▶ ブランドワード・商品コード・タイトル文字列は自動除外
-    </p>''',
-        )
-        st.markdown("")
-        # ② キャンペーン選択
-        _c1, _c3 = st.columns([3, 2])
-        with _c1:
-            kw_camp = st.selectbox(
-                "キャンペーン",
-                ["全キャンペーン"] + CAMPAIGNS,
-                label_visibility="visible",
-                key="add_camp_sel",
-            )
-        sel_df = dw.copy()
-
-        if kw_camp != "全キャンペーン":
-            sel_df = sel_df[sel_df["campaign_theme"] == kw_camp].copy()
-
-        n_sel = len(sel_df)
-
-        # 件数表示
-        st.markdown(
-            f'<div class="count-badge">該当件数: <b style="font-size:1.1rem;">{n_sel}件</b>'
-            f'　<span style="color:#718096;font-size:.8rem;">キャンペーン: {kw_camp}</span></div>',
-            unsafe_allow_html=True,
-        )
-
-        if sel_df.empty:
-            st.info("条件に合うキーワードはありません。")
-            return
-
-        # ④ コピー用KW一覧
-        kw_list = "\n".join(sel_df.sort_values("ROAS", ascending=False)["keyword"].tolist())
-        st.markdown("**📋 Amazon広告登録用KW一覧**（右上のコピーボタンでコピー）")
-        st.code(kw_list, language=None)
-
-        # ⑤ 詳細テーブル
-        st.markdown("##### KW詳細テーブル")
-        _dd = sel_df[bcols(sel_df)].copy().sort_values("ROAS", ascending=False).reset_index(drop=True)
-        _dd.index = _dd.index + 1
-        _dd = _dd.rename(columns=RENAME)
-        _dd["売上"]  = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
-        _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
-        _dd["ROAS"]  = _dd["ROAS"].round(2)
-        if "CVR" in _dd.columns:
-            _dd["CVR"] = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
-        st.dataframe(_dd, use_container_width=True)
-    with _t_tab2:
-        _anls_render_kw_tab(dw, 30, "kw_add_analysis.json", "anls_kw_add_csv", "キーワード追加", "kw_add")
-
-def page_del_kw():
-    _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "< 0.8"), ("勝ちKW", "除外")])
-    render_logic_section(
-        "🚫 キーワード削除 判定ロジック",
-        '''
-<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
-<thead>
-  <tr style="background:#DBEAFE;">
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>
-  </tr>
-</thead>
-<tbody>
-  <tr style="background:#F1F5F9;">
-    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【対象】</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">分析対象</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">オート広告の検索語句のみ</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【削除条件】</td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">🚫 削除対象</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      広告費 ≥ 売価 × 2 <b>かつ</b> ROAS &lt; 0.8<br>
-      <span style="font-size:.8rem;color:#718096;">→ 完全一致で除外登録することを推奨</span>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#718096;">⚪ データ不足</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      上記条件を満たさない場合<br>
-      <span style="font-size:.8rem;color:#718096;">→ 変更なし（経過観察）</span>
-    </td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【除外ルール】</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">勝ちKW除外</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      追加用KW（勝ちKW）と重複するものは削除対象から除外<br>
-      <span style="font-size:.8rem;color:#718096;">→ 勝ちKWを誤って削除しないための保護処理</span>
-    </td>
-  </tr>
-</tbody>
-</table>
-<p style="font-size:.78rem;color:#718096;margin-top:10px;">
-  ▶ 基本思想: 売価の2倍以上広告費を使っても売上が立たない検索語句を除外する<br>
-  ▶ ダウンロードページからキャンペーン別ZIPで出力可能
-</p>''',
-    )
-    st.markdown("")
-    _del_camps = ["全キャンペーン"] + CAMPAIGNS
-    _sc4, _ = st.columns([3, 2])
-    with _sc4:
-        del_camp = st.selectbox("キャンペーン（削除用KW）",
-            _del_camps, label_visibility="visible", key="del_camp_sel")
-    sel_dd = dd.copy()
-    if del_camp != "全キャンペーン" and "campaign_theme" in sel_dd.columns:
-        sel_dd = sel_dd[sel_dd["campaign_theme"] == del_camp].copy()
-    n_del = len(sel_dd)
-    st.markdown(
-        f'<div class="count-badge" style="border-left-color:#E53E3E;">削除対象件数: '
-        f'<b style="font-size:1.1rem;color:#C53030;">{n_del}件</b></div>',
-        unsafe_allow_html=True,
-    )
-    if not sel_dd.empty:
-        kw_list_del = "\n".join(sel_dd["keyword"].tolist())
-        st.markdown("**📋 削除対象KW一覧**（右上のコピーボタンでコピー）")
-        st.code(kw_list_del, language=None)
-        st.markdown("##### 削除KW詳細テーブル")
-        _disp_cols = [c for c in ["keyword", "campaign_theme", "ROAS", "cost", "sales"] if c in sel_dd.columns]
-        _dd2 = sel_dd[_disp_cols].copy().sort_values("ROAS", ascending=True).reset_index(drop=True)
-        _dd2.index = _dd2.index + 1
-        _rn2 = {"keyword": "KW", "campaign_theme": "キャンペーン", "cost": "広告費", "sales": "売上"}
-        _dd2 = _dd2.rename(columns=_rn2)
-        if "広告費" in _dd2.columns: _dd2["広告費"] = _dd2["広告費"].apply(lambda x: f"¥{x:,.0f}")
-        if "売上"   in _dd2.columns: _dd2["売上"]   = _dd2["売上"].apply(lambda x: f"¥{x:,.0f}")
-        if "ROAS"   in _dd2.columns: _dd2["ROAS"]   = _dd2["ROAS"].round(2)
-        st.dataframe(_dd2, use_container_width=True)
-    else:
-        st.info("削除対象キーワードはありません。")
-
-
-
-
-def _classify_auto_kw_type(kraw):
-    """オートKW種別を判定する（is_asin_kn / is_category_kn と完全同一基準）。
-
-    対応関係:
-        is_asin_kn(kn)     → 戻り値 "商品"
-        is_category_kn(kn) → 戻り値 "動画"
-        else                → 戻り値 "キーワード"
-
-    is_asin_kn() / is_category_kn(): モジュールレベル関数を共有
-        （_base_kw / _base_pt / _base_vid と同一の判定基準）。
-    norm()  : モジュールレベル関数を共有（_auto_kw_base["kn"]=norm(kc) と同一処理）。
-
-    Parameters
-    ----------
-    kraw : str  keyword 列の値（元値）
-
-    Returns
-    -------
-    str : "商品" | "動画" | "キーワード"
-    """
-    kn = norm(str(kraw))                          # _auto_kw_base["kn"] = apply(norm) と同一正規化
-    if is_asin_kn(kn): return "商品"              # _base_kw / _base_pt と同一基準
-    if is_category_kn(kn): return "動画"          # _base_kw / _base_vid と同一基準
-    return "キーワード"                            # 上記いずれにも該当しない場合
-
-
-def _render_del_kw_block(df, badge_label, list_label, table_label,
-                         camp_label, camp_key,
-                         empty_msg=None, csv_fname=None, dl_key=None):
-    """page_del_kw() と完全に同一のUIコンポーネント・レイアウト・スタイルで1ブロックを描画する。
-
-    page_del_kw() の描画コードを共通関数として抽出したもの。
-    page_auto_del_kw() の各セクション（キーワード/商品/動画）がこの関数を呼び出す。
-    この関数は渡された df を表示するだけで、分類は一切行わない。
-
-    Parameters
-    ----------
-    df          : pd.DataFrame  表示対象 DataFrame（呼び出し側で分類済みのものを渡すこと）
-    badge_label : str  カウントバッジのラベル
-    list_label  : str  コードブロックのヘッダー
-    table_label : str  詳細テーブルのヘッダー
-    camp_label  : str  selectbox のラベル
-    camp_key    : str  selectbox の key
-    empty_msg   : str  空のときの st.info メッセージ
-    csv_fname   : str  CSVファイル名（None なら DL ボタンなし）
-    dl_key      : str  download_button の key
-    """
-    _rn = {"keyword": "KW", "campaign_theme": "キャンペーン",
-           "cost": "広告費", "sales": "売上"}
-    _del_camps = ["全キャンペーン"] + CAMPAIGNS
-    _sc, _ = st.columns([3, 2])
-    with _sc:
-        _sel = st.selectbox(camp_label, _del_camps,
-                            label_visibility="visible", key=camp_key)
-    _sec = df.copy()
-    if _sel != "全キャンペーン" and "campaign_theme" in _sec.columns:
-        _sec = _sec[_sec["campaign_theme"] == _sel].copy()
-    n = len(_sec)
-    st.markdown(
-        f'<div class="count-badge" style="border-left-color:#E53E3E;">{badge_label}: '
-        f'<b style="font-size:1.1rem;color:#C53030;">{n}件</b></div>',
-        unsafe_allow_html=True,
-    )
-    if not _sec.empty:
-        kw_list = "\n".join(_sec["keyword"].tolist())
-        st.markdown(f"**📋 {list_label}**（右上のコピーボタンでコピー）")
-        st.code(kw_list, language=None)
-        st.markdown(f"##### {table_label}")
-        _disp = [c for c in ["keyword", "campaign_theme", "ROAS", "cost", "sales"]
-                 if c in _sec.columns]
-        _dd = _sec[_disp].copy().sort_values("ROAS", ascending=True).reset_index(drop=True)
-        _dd.index = _dd.index + 1
-        _dd = _dd.rename(columns=_rn)
-        if "広告費" in _dd.columns: _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
-        if "売上"   in _dd.columns: _dd["売上"]   = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
-        if "ROAS"   in _dd.columns: _dd["ROAS"]   = _dd["ROAS"].round(2)
-        st.dataframe(_dd, use_container_width=True)
-        if csv_fname and dl_key:
-            _rn_csv = {**_rn, "orders": "購入数", "ad_group": "広告グループ"}
-            _all = [c for c in ["keyword", "campaign_theme", "cost", "ROAS",
-                                 "sales", "orders", "ad_group"] if c in _sec.columns]
-            _csv = _sec[_all].rename(columns=_rn_csv).to_csv(
-                index=False, encoding="utf-8-sig").encode("utf-8-sig")
-            st.download_button(f"📥 {csv_fname}", data=_csv,
-                               file_name=csv_fname, mime="text/csv", key=dl_key)
-    else:
-        st.info(empty_msg or "削除対象キーワードはありません。")
-
-def page_auto_del_kw():
-    # ── session_stateからキーワードDataFrameを取得（商品/動画は別ページへ合流済み）──
-    df_auto_del_kw_keyword = st.session_state.get("df_auto_del_kw_keyword", pd.DataFrame())
-
-    if df_auto_del_kw_keyword.empty:
-        st.info("除外候補のキーワードはありません。（オートKWで出血中かつマニュアル未登録のものなし）")
-        return
-
-    # ── 件数検証（必須）─────────────────────────────────────────────────
-    n_kw = len(df_auto_del_kw_keyword)
-    st.metric("📄 キーワード件数", f"{n_kw}件")
-
-    # ── キーワードセクション ─────────────────────────────────────────────
-    st.markdown("### 📄 キーワード")
-    _render_del_kw_block(
-        df_auto_del_kw_keyword,
-        badge_label="キーワード除外候補",
-        list_label="除外対象KW一覧",
-        table_label="除外KW詳細テーブル",
-        camp_label="キャンペーン（キーワード）",
-        camp_key="auto_kw_camp_kw",
-        empty_msg="除外候補のキーワードはありません。",
-        csv_fname="auto_negative_keyword.csv",
-        dl_key="dl_akw_kw",
-    )
-
-def page_auto_del_product():
-    df = st.session_state.get("df_auto_del_product", pd.DataFrame())
-    if df.empty:
-        st.info("除外候補の商品ASINはありません。（オート商品広告で出血中かつマニュアル未登録のものなし）")
-        return
-    st.metric("🎯 商品件数", f"{len(df)}件")
-    _del_camps = ["全キャンペーン"] + CAMPAIGNS
-    _sc, _ = st.columns([3, 2])
-    with _sc:
-        _sel = st.selectbox("キャンペーン（商品）", _del_camps,
-                            label_visibility="visible", key="auto_pt_camp_sel")
-    if _sel != "全キャンペーン" and "campaign_theme" in df.columns:
-        df = df[df["campaign_theme"] == _sel].copy()
-    if df.empty:
-        st.info("除外候補の商品ASINはありません。")
-        return
-    st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.8 / マニュアル商品重複除外済み")
-    _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
-    _rn = {"asin":"ASIN","campaign_theme":"キャンペーン","cost":"広告費",
-           "sales":"売上","orders":"購入数","campaign_name":"キャンペーン名","ad_group":"広告グループ"}
-    _d = df[_dcols].rename(columns=_rn).copy()
-    if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
-    if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
-    st.dataframe(_d, use_container_width=True)
-    _csv = df[_dcols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    st.download_button("📥 除外商品ASIN候補.csv", data=_csv, file_name="除外商品ASIN候補.csv", mime="text/csv")
-
-def page_auto_del_video():
-    df = st.session_state.get("df_auto_del_video", pd.DataFrame())
-    if df.empty:
-        st.info("除外候補の動画ASINはありません。（オート動画広告で出血中かつマニュアル未登録のものなし）")
-        return
-    st.metric("🎬 動画件数", f"{len(df)}件")
-    _del_camps = ["全キャンペーン"] + CAMPAIGNS
-    _sc, _ = st.columns([3, 2])
-    with _sc:
-        _sel = st.selectbox("キャンペーン（動画）", _del_camps,
-                            label_visibility="visible", key="auto_vid_camp_sel")
-    if _sel != "全キャンペーン" and "campaign_theme" in df.columns:
-        df = df[df["campaign_theme"] == _sel].copy()
-    if df.empty:
-        st.info("除外候補の動画ASINはありません。")
-        return
-    st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.8 / マニュアル動画重複除外済み")
-    _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
-    _rn = {"asin":"ASIN","campaign_theme":"キャンペーン","cost":"広告費",
-           "sales":"売上","orders":"購入数","campaign_name":"キャンペーン名","ad_group":"広告グループ"}
-    _d = df[_dcols].rename(columns=_rn).copy()
-    if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
-    if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
-    st.dataframe(_d, use_container_width=True)
-    _csv = df[_dcols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    st.download_button("📥 除外動画ASIN候補.csv", data=_csv, file_name="除外動画ASIN候補.csv", mime="text/csv")
-
-def page_cpc():
-    _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
-    with _t_tab1:
-        _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
-        _RC = {
-            "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
-            "A":   "#2C7A7B", "B": "#2B6CB0", "C": "#C05621",
-            "D":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
-        }
-        _cond_bar([("CPC調整ルール", "適用"), ("最小クリック数", f"{sv['mc']}回")])
-        render_logic_section(
-            "📈 CPC調整ロジック",
-            '''
-    <table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
-    <thead>
-      <tr style="background:#DBEAFE;">
-        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:15%;">ランク</th>
-        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:45%;">判定条件</th>
-        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">アクション</th>
-        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">CPC変更幅</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr style="background:#F1F5F9;">
-        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-          【STEP 1】 データ不足判定（最優先）
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#4A5568;">判断保留</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>かつ</b> 購入数 &lt; 4件</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">変更なし</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-      </tr>
-      <tr style="background:#F1F5F9;">
-        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-          【STEP 2】 高実績ランク（購入数 ≥ 20件）
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#D69E2E;">SS+</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> ROAS ≥ 4.0</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
-      </tr>
-      <tr style="background:#FFFBEB;">
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#B7791F;">SS</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> 2.0 ≤ ROAS &lt; 4.0</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-      </tr>
-      <tr style="background:#F1F5F9;">
-        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-          【STEP 3】 ROASベースランク
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#553C9A;">S</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS ≥ 4.0</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
-      </tr>
-      <tr style="background:#F0FFF4;">
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2C7A7B;">A</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">3.0 ≤ ROAS &lt; 4.0</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-      </tr>
-      <tr>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2B6CB0;">B</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.8 ≤ ROAS &lt; 3.0</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-      </tr>
-      <tr style="background:#FFF5F5;">
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">C</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 1.8</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
-      </tr>
-      <tr style="background:#FFF5F5;">
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">D</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS &lt; 1.5</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
-      </tr>
-      <tr style="background:#F1F5F9;">
-        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-          【STEP 4】 即削除判定（広告費過多 × 低ROAS）
-        </td>
-      </tr>
-      <tr style="background:#FFF5F5;">
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#742A2A;">即削除</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-          ROAS &lt; 0.8 <b>かつ</b> 広告費が閾値以上<br>
-          <span style="font-size:.8rem;color:#718096;">
-            売価 ≤¥1,500 → 広告費 ≥¥3,000 ／
-            売価 ≤¥2,000 → 広告費 ≥¥4,000 ／
-            売価 &gt;¥2,000 → 広告費 ≥¥5,000
-          </span>
-        </td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#742A2A;font-weight:700;">即削除</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">—</td>
-      </tr>
-    </tbody>
-    </table>
-    <p style="font-size:.78rem;color:#718096;margin-top:10px;">
-      ▶ 判定順序: STEP1（データ不足）→ STEP2（購入数優先） → STEP3（ROASベース） → STEP4（即削除）<br>
-      ▶ 基本思想: ROASだけでなく、広告費と購入数を重視した複合判定
-    </p>''',
-        )
-        if dc_cpc.empty:
-            st.info("分析を実行してください。")
-            return
-        sel_options = ["全商品"] + [c for c in CAMPAIGNS if not dc_cpc[dc_cpc["campaign_theme"] == c].empty]
-        _sc, _ = st.columns([3, 2])
-        with _sc:
-            cpc_camp = st.selectbox("商品選択（キーワードCPC調整）", sel_options, label_visibility="visible", key="cpc_camp_sel")
-        if cpc_camp == "全商品":
-            df_c = dc_cpc.copy()
-        else:
-            df_c = dc_cpc[dc_cpc["campaign_theme"] == cpc_camp].copy()
-        cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
-        st.markdown("---")
-        kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
-        kc_ = st.columns(len(kpi_rks))
-        for _col, rk in zip(kc_, kpi_rks):
-            bg_map = {
-                "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
-                "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
-            }
-            _col.markdown(f'''<div class="kpi-card" style="background:{bg_map.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
-                <div class="kpi-label">{rk}</div>
-                <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{cnt[rk]}</div>
-                <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-        if cnt["判断保留"] > 0:
-            st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
-        # ── 本日調整対象ブロック ──────────────────────────────────
-        _n_up   = int((df_c["cpc_delta"] > 0).sum())
-        _n_down = int((df_c["cpc_delta"] < 0).sum())
-        _n_adj  = _n_up + _n_down
-        st.markdown("---")
-        st.caption("📅 本日調整対象")
-        _bc1, _bc2, _bc3 = st.columns(3)
-        _bc1.markdown(f'''<div class="kpi-card" style="background:#E6FFFA;border-top:3px solid #276749;">
-            <div class="kpi-label">🔺 CPC上げ</div>
-            <div class="kpi-value" style="color:#276749;font-size:1.5rem;">{_n_up}</div>
-            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-        _bc2.markdown(f'''<div class="kpi-card" style="background:#FFF5F5;border-top:3px solid #C53030;">
-            <div class="kpi-label">🔻 CPC下げ</div>
-            <div class="kpi-value" style="color:#C53030;font-size:1.5rem;">{_n_down}</div>
-            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-        _bc3.markdown(f'''<div class="kpi-card" style="background:#EBF8FF;border-top:3px solid #2B6CB0;">
-            <div class="kpi-label">📊 変更対象合計</div>
-            <div class="kpi-value" style="color:#2B6CB0;font-size:1.5rem;">{_n_adj}</div>
-            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-        st.markdown("---")
-        disp_cols = [c for c in ["campaign_name","ad_group","keyword","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
-        _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","keyword":"KWテキスト",
-               "cost":"広告費","sales":"売上","orders":"購入数",
-               "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
-               "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
-        cat_t = pd.CategoricalDtype(categories=_RANK_ORDER, ordered=True)
-        df_c["_r"] = df_c["cpc_rank"].astype(cat_t)
-        df_c = df_c.sort_values(["_r","ROAS"], ascending=[True, False]).drop(columns=["_r"]).reset_index(drop=True)
-        df_c.index = df_c.index + 1
-        # ③ 変更対象のみ表示（cpc_delta != 0）
-        df_disp = df_c[df_c["cpc_delta"] != 0].copy()
-        df_disp.index = range(1, len(df_disp) + 1)
-        _d = df_disp[disp_cols].rename(columns=_rn).copy()
-        if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
-        if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
-        if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
-        if "変更幅" in _d.columns: _d["変更幅"] = _d["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
-        if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-        if "推奨CPC" in _d.columns: _d["推奨CPC"] = _d["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-        def _cr(row):
-            c = _RC.get(row.get("判定ランク", ""), "")
-            return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
-        if df_disp.empty:
-            st.info("変更幅が発生するキーワードはありません（全件 現状維持 または 判断保留）。")
-        else:
-            st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
-        # ④ CSV: 実行用（変更対象のみ）+ 全件
-        _c1, _c2 = st.columns(2)
-        with _c1:
-            _dl_csv_adj = df_disp[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-            st.download_button(f"📥 {cpc_camp}_CPC調整_実行用.csv", data=_dl_csv_adj,
-                file_name=f"{cpc_camp}_CPC調整_実行用.csv", mime="text/csv", use_container_width=True)
-        with _c2:
-            _dl_csv_all = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-            st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
-                file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
-    with _t_tab2:
-        _anls_render_kw_tab(dc_cpc, 7, "cpc_kw_analysis.json", "anls_cpc_kw_csv", "キーワードCPC調整", "cpc_kw")
-
-def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
-    """商品ターゲ CPC調整ページ共通レンダラー（page_cpc()と同一ロジック・UI）"""
-    _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
-    _RC = {
-        "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
-        "A":   "#2C7A7B", "B": "#2B6CB0", "C": "#C05621",
-        "D":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
+# ANIHA Amazon広告分析ツール — 開発仕様書
+
+> **対象読者:** Claude / ChatGPT / Gemini および人間の開発者・運用者  
+> **目的:** ANIHA の設計・実装・運用ルールを一元管理し、引継ぎ・継続開発の基準とする  
+> **最終更新:** Ver1 確定時点  
+> **ステータス:** Ver1 完成・実運用開始
+
+---
+
+## 1. Ver1 完成宣言
+
+ANIHA Amazon広告分析ツール Ver1 は正式に完成した。
+
+| 項目 | 内容 |
+|------|------|
+| 完成ファイル | `app_v1_final.py` |
+| 総行数 | 3612行 |
+| 構文検証 | `python3 -m py_compile` SYNTAX OK |
+| 実装完了機能 | CPC調整（7日分析）/ キーワード追加（30日分析） |
+| 開発フェーズ | Phase4（実運用・データ蓄積）へ移行 |
+
+Ver1 はこの時点で凍結する。以後の変更は本仕様書に定めるルールに従う。
+
+---
+
+## 2. 現在のシステム構成
+
+### 2-1. フレームワーク
+
+```
+Streamlit アプリケーション（シングルファイル構成）
+Python 3.x / pandas / streamlit
+```
+
+### 2-2. ファイル構成
+
+```
+app_v1_final.py          # メインアプリ（本番ファイル）
+analysis_data/
+  cpc_change_history.json    # CPC変更履歴（ダウンロード時に自動保存）
+  cpc_kw_analysis.json       # CPC分析レポート蓄積
+  kw_add_analysis.json       # キーワード追加分析レポート蓄積
+  cpc_product_analysis.json  # 商品CPC分析レポート
+```
+
+### 2-3. 画面構成（サイドバー）
+
+サイドバーは `_nav_btn()` / `_VALID_PAGES` / `_PAGE_FUNCS` で管理。  
+変更禁止。
+
+### 2-4. 主要 Session State 変数
+
+| 変数名 | 内容 |
+|--------|------|
+| `dw` | キーワード追加用 DataFrame |
+| `dc_cpc` | キーワード CPC 調整用 DataFrame |
+| `dc_cpc_product` | 商品 CPC 調整用 DataFrame |
+| `dc_cpc_video` | 動画 CPC 調整用 DataFrame |
+| `df_pt_add_m` | 手動商品ターゲ追加用 DataFrame |
+| `df_pt_add_v` | 動画商品ターゲ追加用 DataFrame |
+
+### 2-5. 主要ユーティリティ関数
+
+| 関数名 | 役割 |
+|--------|------|
+| `fcol(df, candidates)` | 列名候補リストから実在する列名を返す |
+| `rcsv(file)` | CSV 読み込み（エンコーディング自動判定） |
+| `norm(s)` | キーワード正規化（全角→半角、大文字→小文字、空白除去） |
+| `tonum(series)` | ¥ / カンマ付き文字列を numeric に変換 |
+| `get_theme(name)` | キャンペーン名からテーマを抽出 |
+| `official(theme)` | テーマを正式名称に統一 |
+| `assign_cpc_rank(row)` | CPC ランク判定（戻り値: rank, action, delta） |
+| `build_cpc_df(df)` | CPC 調整列を付与した DataFrame を生成 |
+
+---
+
+## 3. Ver1 凍結ルール
+
+以下の項目は Ver1 において **変更禁止** とする。不具合修正のみ許可。
+
+| カテゴリ | 凍結内容 |
+|----------|----------|
+| 分析ロジック | Before/After 比較方法、集計単位 |
+| CSV 読込 | `rcsv()` / `_anls_parse_csv()` の処理内容 |
+| CSV 出力 | 列名・列順・エンコーディング（UTF-8 BOM） |
+| 履歴保存方式 | JSON 形式・保存タイミング・保存先 |
+| 一致キー | Campaign / Ad Group / Keyword の 3 キー構成 |
+| merge 処理 | `how="inner"`、`suffixes=("_b","_a")` |
+| UI 構成 | サイドバー / 5 カード / 一覧 / 詳細 / タブ構成 |
+| Session State | キー名・更新タイミング |
+| analysis_reports | JSON スキーマ |
+| 改善判定ロジック | ROAS ±3% 閾値による 3 分類 |
+
+---
+
+## 4. Ver1.1 開発方針
+
+### 4-1. 目的
+
+**分析精度の改善のみ。** 新規画面・設計変更・アーキテクチャ変更は行わない。
+
+### 4-2. 開始条件
+
+実データによる運用結果を蓄積してから開始する。  
+推測による閾値変更は禁止。
+
+### 4-3. 調整対象（Ver1.1 で変更してよいもの）
+
+- ROAS 判定閾値（現在: ±3%）
+- CVR 判定閾値
+- CTR 判定閾値
+- CPC 評価基準
+- 改善 / 悪化 / 変化なし の判定ロジック
+- 改善率の計算方法
+- 一覧表示の並び順
+
+### 4-4. 完成条件
+
+実運用で改善判定・悪化判定が運用者の感覚と十分に一致した時点で Ver1.1 完成とする。
+
+---
+
+## 5. CPC 分析ロジック
+
+### 5-1. 分析対象の定義
+
+**「CPC 調整 実行用 CSV をダウンロードしたキーワード」のみ。**
+
+推奨キーワード全件を分析対象にしない。  
+`cpc_delta != 0` の全件を分析対象にしない。
+
+### 5-2. 処理フロー
+
+```
+① CPC 調整実行（build_cpc_df によりランク・delta 付与）
+↓
+② 変更対象（cpc_delta != 0）のみ df_disp に絞り込み
+↓
+③ 「CPC 調整 実行用.csv」ダウンロードボタン押下
+↓
+④ on_click で _anls_save_cpc_change_history(df_disp[disp_cols].copy()) 実行
+↓
+⑤ analysis_data/cpc_change_history.json へ追記
+↓
+⑥ Amazon へ CSV アップロード・CPC 変更実施
+↓
+⑦ 7 日後レポート CSV をアップロード
+↓
+⑧ 履歴の最終エントリを読み込み
+↓
+⑨ 履歴キーに一致した before_df 行のみ抽出
+↓
+⑩ 7 日後 CSV と inner join（一致キーで結合）
+↓
+⑪ 改善 / 悪化 / 変化なし 判定
+↓
+⑫ analysis_data/cpc_kw_analysis.json へ保存（任意）
+```
+
+### 5-3. 履歴保存仕様
+
+```python
+# page_cpc() 内
+_dl_csv_adj = df_disp[disp_cols].rename(columns=_rn).to_csv(...)
+st.download_button(...,
+    on_click=_anls_save_cpc_change_history,
+    args=(df_disp[disp_cols].copy(),))
+```
+
+保存関数:
+
+```python
+def _anls_save_cpc_change_history(df_disp):
+    save_cols = [c for c in ["campaign_name","ad_group","keyword",
+                              "avg_cpc","rec_cpc","cpc_delta",
+                              "cpc_rank","cpc_action",
+                              "sales","cost","ROAS","orders"] if c in df_disp.columns]
+    record = {
+        "exported_at": datetime.now().isoformat(),
+        "entries": df_disp[save_cols].to_dict(orient="records"),
     }
-    _cond_bar([("CPC調整ルール", "適用"), ("対象", page_title)])
-    render_logic_section(
-        "📈 CPC調整ロジック",
-        '''
-<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
-<thead>
-  <tr style="background:#DBEAFE;">
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:15%;">ランク</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:45%;">判定条件</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">アクション</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">CPC変更幅</th>
-  </tr>
-</thead>
-<tbody>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 1】 データ不足判定（最優先）
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#4A5568;">判断保留</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>かつ</b> 購入数 &lt; 4件</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">変更なし</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 2】 高実績ランク（購入数 ≥ 20件）
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#D69E2E;">SS+</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> ROAS ≥ 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
-  </tr>
-  <tr style="background:#FFFBEB;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#B7791F;">SS</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> 2.0 ≤ ROAS &lt; 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 3】 ROASベースランク
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#553C9A;">S</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS ≥ 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
-  </tr>
-  <tr style="background:#F0FFF4;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2C7A7B;">A</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">3.0 ≤ ROAS &lt; 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2B6CB0;">B</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.8 ≤ ROAS &lt; 3.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">C</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 1.8</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">D</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS &lt; 1.5</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 4】 即削除判定（広告費過多 × 低ROAS）
-    </td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#742A2A;">即削除</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      ROAS &lt; 0.8 <b>かつ</b> 広告費が閾値以上<br>
-      <span style="font-size:.8rem;color:#718096;">
-        売価 ≤¥1,500 → 広告費 ≥¥3,000 ／
-        売価 ≤¥2,000 → 広告費 ≥¥4,000 ／
-        売価 &gt;¥2,000 → 広告費 ≥¥5,000
-      </span>
-    </td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#742A2A;font-weight:700;">即削除</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">—</td>
-  </tr>
-</tbody>
-</table>
-<p style="font-size:.78rem;color:#718096;margin-top:10px;">
-  ▶ 判定順序: STEP1（データ不足）→ STEP2（購入数優先） → STEP3（ROASベース） → STEP4（即削除）<br>
-  ▶ 基本思想: ROASだけでなく、広告費と購入数を重視した複合判定
-</p>''',
-    )
-    if dc_pt.empty:
-        st.info("分析を実行してください。")
-        return
-    # ② 商品選択プルダウン（全商品 + データあり商品一覧）
-    sel_options = ["全商品"] + [c for c in CAMPAIGNS if not dc_pt[dc_pt["campaign_theme"] == c].empty]
-    _sc, _ = st.columns([3, 2])
-    with _sc:
-        cpc_camp = st.selectbox(f"商品選択（{page_title}）", sel_options,
-                                label_visibility="visible", key=sel_key)
-    if cpc_camp == "全商品":
-        df_c = dc_pt.copy()
-    else:
-        df_c = dc_pt[dc_pt["campaign_theme"] == cpc_camp].copy()
-    cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
-    st.markdown("---")
-    kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
-    kc_ = st.columns(len(kpi_rks))
-    for _col, rk in zip(kc_, kpi_rks):
-        bg_map = {
-            "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
-            "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
-        }
-        _col.markdown(f'''<div class="kpi-card" style="background:{bg_map.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
-            <div class="kpi-label">{rk}</div>
-            <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{cnt[rk]}</div>
-            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    if cnt["判断保留"] > 0:
-        st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
-    # ── 本日調整対象ブロック ──────────────────────────────────
-    _n_up   = int((df_c["cpc_delta"] > 0).sum())
-    _n_down = int((df_c["cpc_delta"] < 0).sum())
-    _n_adj  = _n_up + _n_down
-    st.markdown("---")
-    st.caption("📅 本日調整対象")
-    _bc1, _bc2, _bc3 = st.columns(3)
-    _bc1.markdown(f'''<div class="kpi-card" style="background:#E6FFFA;border-top:3px solid #276749;">
-        <div class="kpi-label">🔺 CPC上げ</div>
-        <div class="kpi-value" style="color:#276749;font-size:1.5rem;">{_n_up}</div>
-        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    _bc2.markdown(f'''<div class="kpi-card" style="background:#FFF5F5;border-top:3px solid #C53030;">
-        <div class="kpi-label">🔻 CPC下げ</div>
-        <div class="kpi-value" style="color:#C53030;font-size:1.5rem;">{_n_down}</div>
-        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    _bc3.markdown(f'''<div class="kpi-card" style="background:#EBF8FF;border-top:3px solid #2B6CB0;">
-        <div class="kpi-label">📊 変更対象合計</div>
-        <div class="kpi-value" style="color:#2B6CB0;font-size:1.5rem;">{_n_adj}</div>
-        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    st.markdown("---")
-    disp_cols = [c for c in ["campaign_name","ad_group","asin","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
-    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","asin":"ASIN",
-           "cost":"広告費","sales":"売上","orders":"購入数",
-           "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
-           "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
-    cat_t = pd.CategoricalDtype(categories=_RANK_ORDER, ordered=True)
-    df_c["_r"] = df_c["cpc_rank"].astype(cat_t)
-    df_c = df_c.sort_values(["_r","ROAS"], ascending=[True, False]).drop(columns=["_r"]).reset_index(drop=True)
-    df_c.index = df_c.index + 1
-    # ① 一覧テーブルは変更幅≠0（CPC上げ・CPC下げ）のみ表示
-    df_disp = df_c[df_c["cpc_delta"] != 0].copy()
-    df_disp.index = range(1, len(df_disp) + 1)
-    _d = df_disp[disp_cols].rename(columns=_rn).copy()
-    if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
-    if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
-    if "変更幅" in _d.columns: _d["変更幅"] = _d["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
-    if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-    if "推奨CPC" in _d.columns: _d["推奨CPC"] = _d["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-    def _cr(row):
-        c = _RC.get(row.get("判定ランク", ""), "")
-        return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
-    if df_disp.empty:
-        st.info("変更幅が発生するASINはありません（全件 現状維持 または 判断保留）。")
-    else:
-        st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
-    # CSV は全件出力（±0含む）
-    _dl_fname = f"{cpc_camp}_{page_title}_CPC調整表.csv"
-    _dl_csv = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    st.download_button(f"📥 {_dl_fname}", data=_dl_csv,
-        file_name=_dl_fname, mime="text/csv")
-
-
-def page_cpc_product():
-    _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
-    with _t_tab1:
-        _render_pt_cpc_page(dc_cpc_product, "商品CPC調整", "cpc_product_sel")
-    with _t_tab2:
-        _anls_render_asin_tab(dc_cpc_product, 7, "cpc_product_analysis.json", "anls_cpc_pt_csv", "商品CPC調整", "商品ターゲ")
-
-def page_cpc_video():
-    _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
-    with _t_tab1:
-        _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel")
-    with _t_tab2:
-        _anls_render_asin_tab(dc_cpc_video, 7, "cpc_video_analysis.json", "anls_cpc_vid_csv", "動画CPC調整", "動画")
-
-def _ddv4_norm_kw(x):
-    if x is None: return ""
-    import unicodedata
-    x = unicodedata.normalize("NFKC", str(x)).lower()
-    result = []
-    for c in x:
-        cp = ord(c)
-        if 0x30A1 <= cp <= 0x30F6:
-            result.append(chr(cp - 0x60))
-        else:
-            result.append(c)
-    return " ".join("".join(result).split())
-
-def _ddv4_compact_kw(kw):
-    return "".join(_ddv4_norm_kw(kw).split())
-
-def _ddv4_strip_particles(kw):
-    import re
-    return re.sub(r"(の|に|は|を|が|で|と|から|まで|より|へ|や|も)\s*", "", _ddv4_norm_kw(kw))
-
-def _ddv4_is_excluded(kw, existing_set):
-    if not existing_set: return False
-    variants = {_ddv4_norm_kw(kw), _ddv4_compact_kw(kw), _ddv4_strip_particles(kw)}
-    return bool(variants & existing_set)
-
-def _ddv4_partial_used(kw, existing_set):
-    if not existing_set: return False
-    kn = _ddv4_norm_kw(kw)
-    tokens = kn.split()
-    if len(tokens) <= 1: return False
-    for t in tokens:
-        if len(t) >= 2 and any(t in e for e in existing_set):
-            return True
-    return False
-
-def _ddv4_read_csv_bytes(raw):
-    import pandas as pd, io
-    for enc in ("utf-8-sig","utf-8","cp932","shift_jis"):
-        try:
-            return pd.read_csv(io.BytesIO(raw), encoding=enc)
-        except Exception:
-            continue
-    return pd.read_csv(io.BytesIO(raw), encoding="utf-8", errors="replace")
-
-def _ddv4_find_col(df, cands):
-    for c in df.columns:
-        for cand in cands:
-            if str(c).strip().lower() == cand.strip().lower():
-                return c
-    return None
-
-def _ddv4_to_float(v):
-    if v is None: return None
-    try:
-        return float(str(v).replace(",","").strip())
-    except (ValueError, TypeError):
-        return None
-
-def _ddv4_load_keywords_csv(kw_file):
-    try:
-        raw = kw_file.read(); kw_file.seek(0)
-        df = _ddv4_read_csv_bytes(raw)
-        df.columns = [str(c).strip() for c in df.columns]
-        kw_col = _ddv4_find_col(df, [
-            "Search Terms","SearchTerms","Keyword",
-            "キーワード","検索語句","検索用語"])
-        if kw_col is None and len(df.columns) > 0:
-            kw_col = df.columns[0]
-        if kw_col is None:
-            return None, None, None, None, "Keyword列が見つかりません"
-        sv_col  = _ddv4_find_col(df, ["SV","Search Volume","sv","search_volume"])
-        rel_col = _ddv4_find_col(df, ["Relevancy","relevancy","Relevance","relevance","関連性"])
-        df["_kw"] = df[kw_col].fillna("").astype(str)
-        return df, kw_col, sv_col, rel_col, None
-    except Exception as e:
-        return None, None, None, None, str(e)
-
-def _ddv4_load_amazon_search_csv(sf_file):
-    if sf_file is None: return set()
-    try:
-        raw = sf_file.read(); sf_file.seek(0)
-        df  = _ddv4_read_csv_bytes(raw)
-        df.columns = [str(c).strip() for c in df.columns]
-        col = _ddv4_find_col(df, [
-            "Customer Search Term","Search Term","検索用語",
-            "Keyword","キーワード","SearchTerm"])
-        if col is None and len(df.columns) > 0:
-            col = df.columns[0]
-        if col is None: return set()
-        result = set()
-        for kw in df[col].fillna("").astype(str).tolist():
-            result.add(_ddv4_norm_kw(kw))
-            result.add(_ddv4_compact_kw(kw))
-            result.add(_ddv4_strip_particles(kw))
-        return result
-    except Exception:
-        return set()
-
-def _ddv4_load_asin_comp_dict(comp_file):
-    try:
-        raw = comp_file.read(); comp_file.seek(0)
-        df  = _ddv4_read_csv_bytes(raw)
-        df.columns = [str(c).strip() for c in df.columns]
-        asin_col = _ddv4_find_col(df, ["ASIN","asin","商品コード","ProductASIN"])
-        if asin_col is None: asin_col = df.columns[0]
-        str_col  = _ddv4_find_col(df, ["Strength","strength"])
-        var_col  = _ddv4_find_col(df, ["Variations","variations","バリエーション"])
-        rev_col  = _ddv4_find_col(df, ["Review Count","ReviewCount","レビュー数","reviewcount"])
-        result = {}
-        for _, row in df.iterrows():
-            asin_raw = str(row[asin_col]).strip().upper()
-            if not asin_raw or asin_raw.lower() in ("nan",""): continue
-            s_raw = row[str_col] if str_col else None
-            s_val = (str(s_raw).strip()
-                     if s_raw is not None and str(s_raw).strip().lower() not in ("nan","")
-                     else None)
-            result[asin_raw] = {
-                "strength":     s_val,
-                "variations":   _ddv4_to_float(row[var_col]) if var_col else None,
-                "review_count": _ddv4_to_float(row[rev_col]) if rev_col else None,
-            }
-        return result
-    except Exception as e:
-        return {"_error": str(e)}
-
-
-# ─── スコア算出関数 v5.1 ─────────────────────────────────────
-
-def _ddv4_sv_score_v51(sv):
-    """① 需要スコア 0-45点"""
-    try: v = float(str(sv).replace(",",""))
-    except (ValueError, TypeError): return 10
-    if v >= 10000: return 45
-    if v >= 5000:  return 38
-    if v >= 1000:  return 30
-    if v >= 300:   return 20
-    if v >= 100:   return 10
-    return 3
-
-def _ddv4_fit_score_v51(kw, product_label, relevancy_raw=None):
-    """② 商品関連性 0-35点
-    Relevancy(0-14) + 商品辞書(0-12) + カテゴリ語(0-7) + 購買意図(0-2)
-    """
-    kn = _ddv4_norm_kw(kw)
-    score = 0
-    # Relevancy (0-14)
-    if relevancy_raw is not None:
-        try:
-            rel = float(str(relevancy_raw).replace("%","").strip())
-            if rel > 1: rel = rel / 100.0
-            score += min(14, round(rel * 14))
-        except (ValueError, TypeError):
-            pass
-    # 商品辞書マッチ (0-12)
-    prod_kws = _DDV4_PRODUCTS.get(product_label, [])
-    matches  = sum(1 for w in prod_kws if _ddv4_norm_kw(w) in kn)
-    score += min(12, matches * 6)
-    # カテゴリ語マッチ (0-7)
-    cat_kws     = _DDV4_CATEGORY_TERMS.get(product_label, [])
-    cat_matches = sum(1 for w in cat_kws if _ddv4_norm_kw(w) in kn)
-    score += min(7, cat_matches * 3)
-    # 購買意図語 (0-2)
-    for word in _DDV4_PURCHASE_INTENT_WORDS:
-        if word in kn:
-            score += 2
-            break
-    return min(35, score)
-
-def _ddv4_comp_score_v51(asin_dict, product_asin):
-    """③ 競争強度スコア 0-15点
-    競争弱い=高点（参入しやすい） / 競争強い=低点（参入困難）
-    RC: 単独加点禁止 / 単独減点禁止 / 参考表示のみ
-    Keyword単位参照禁止 → ASIN単位で算出し全KWへ一律適用
-    """
-    if not asin_dict or not product_asin:
-        return 9   # データなし=中程度
-    entry = asin_dict.get(product_asin.upper())
-    if not entry or not isinstance(entry, dict):
-        return 9
-    key  = str(entry.get("strength","")).strip().lower()
-    base = _DDV4_COMP_BASE_V51.get(key, 9)
-    # Variations補正 (±2): バリエーション少=競合多様化なし=余地あり
-    var_adj = 0
-    variations = entry.get("variations")
-    if variations is not None:
-        try:
-            v = int(float(str(variations)))
-            if   v <= 5:  var_adj =  2
-            elif v <= 15: var_adj =  1
-            elif v <= 30: var_adj =  0
-            elif v <= 60: var_adj = -1
-            else:         var_adj = -2
-        except (ValueError, TypeError):
-            pass
-    # RC: 取得するがscoreには加算しない（表示用のみ）
-    return max(0, min(15, base + var_adj))
-
-def _ddv4_comp_label_v51(score):
-    """競争強度ラベル"""
-    if   score >= 13: return "低"
-    elif score >= 7:  return "中"
-    return "高"
-
-def _ddv4_unused_bonus_v51(kw, existing_set):
-    """④ 未使用KWボーナス 0-5点
-    未使用: +5 / 部分使用: +2 / 使用中: 0
-    """
-    if not existing_set:
-        return 5   # Amazon検索語CSV未投入=全KW未使用扱い
-    if _ddv4_is_excluded(kw, existing_set):
-        return 0   # 使用中
-    if _ddv4_partial_used(kw, existing_set):
-        return 2   # 部分使用
-    return 5       # 未使用
-
-def _ddv4_unused_label_v51(bonus):
-    if bonus >= 5: return "未使用"
-    if bonus >= 2: return "部分使用"
-    return "使用中"
-
-def _ddv4_make_reason_v51(s_demand, s_fit, s_comp, s_unused, u_label):
-    """採用理由 最低3項目"""
-    parts = []
-    # 需要
-    if   s_demand >= 38: parts.append("検索需要が非常に高い（SV>=5,000）")
-    elif s_demand >= 30: parts.append("検索需要が高い（SV>=1,000）")
-    elif s_demand >= 20: parts.append("検索需要がある（SV>=300）")
-    elif s_demand >= 10: parts.append("検索需要が中程度（SV>=100）")
-    else:                parts.append("検索需要が低い")
-    # 商品関連性
-    if   s_fit >= 28: parts.append("商品との関連性が非常に高い")
-    elif s_fit >= 18: parts.append("商品との関連性が高い")
-    elif s_fit >= 9:  parts.append("商品との関連性がある")
-    else:             parts.append("商品との関連性が低い")
-    # 競争強度
-    lbl = _ddv4_comp_label_v51(s_comp)
-    if   lbl == "低": parts.append("競争強度が比較的低い（参入しやすい）")
-    elif lbl == "中": parts.append("競争強度は中程度")
-    else:             parts.append("競争強度が高い（参入しにくい）")
-    # 未使用
-    if u_label == "未使用":
-        parts.append("現在未使用KWである（今すぐ追加できる）")
-    elif u_label == "部分使用":
-        parts.append("部分的に使用中（拡張余地あり）")
-    # 総合
-    total = s_demand + s_fit + s_comp + s_unused
-    if   total >= 80: parts.append("追加優先度が高い")
-    elif total >= 65: parts.append("追加を検討すべきKWである")
-    return " / ".join(parts)
-
-def _ddv4_calculate_sellable_kw(cands_df, sv_col, rel_col, product_label,
-                                  asin_dict, product_asin, existing_set):
-    """売れる予測KW スコアリングエンジン v5.1
-    需要(45)+商品関連性(35)+競争強度(15)+未使用ボーナス(5) = 100点
-    RC: 単独加点禁止 / 単独減点禁止
-    Keyword単位competitors参照禁止 → ASIN単位で全KW一律適用
-    """
-    import pandas as pd
-    s_comp   = _ddv4_comp_score_v51(asin_dict, product_asin)
-    comp_lbl = _ddv4_comp_label_v51(s_comp)
-    results  = []
-    for _, row in cands_df.iterrows():
-        kw_raw  = str(row["_kw"])
-        sv_val  = row.get(sv_col, 0)    if sv_col  and sv_col  in cands_df.columns else 0
-        rel_val = row.get(rel_col, None) if rel_col and rel_col in cands_df.columns else None
-        s_demand = _ddv4_sv_score_v51(sv_val)
-        s_fit    = _ddv4_fit_score_v51(kw_raw, product_label, rel_val)
-        s_unused = _ddv4_unused_bonus_v51(kw_raw, existing_set)
-        u_label  = _ddv4_unused_label_v51(s_unused)
-        final    = max(0, min(100, s_demand + s_fit + s_comp + s_unused))
-        results.append({
-            "_kw":        kw_raw,
-            "_sv_raw":    sv_val,
-            "_rel_raw":   rel_val,
-            "_s_demand":  s_demand,
-            "_s_fit":     s_fit,
-            "_s_comp":    s_comp,
-            "_s_unused":  s_unused,
-            "未使用判定": u_label,
-            "売れる予測スコア": final,
-            "採用理由":   _ddv4_make_reason_v51(s_demand, s_fit, s_comp, s_unused, u_label),
-        })
-    return (
-        pd.DataFrame(results)
-        .sort_values("売れる予測スコア", ascending=False)
-        .reset_index(drop=True)
-    )
-
-
-
-def _ddv4_render_sellable_top10():
-    st.markdown("### \U0001f3af 売れる予測KW TOP10")
-    st.caption("今すぐAmazon検索語へ追加すべき有力KWを抽出する実行ツール")
-    st.markdown("---")
-
-    st.markdown("##### \U0001f4cc 分析対象商品を選択")
-    prod_opts  = ["― 選択してください ―"] + list(_DDV4_PRODUCTS.keys())
-    prod_label = st.selectbox("商品選択", prod_opts, key="ddv4_prod",
-                              label_visibility="collapsed")
-    if prod_label == "― 選択してください ―":
-        st.info("\U0001f4cc 分析対象商品を選択してください。")
-        return
-    st.success(f"✅ {prod_label}")
-    st.markdown("")
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("##### \U0001f4c4 DateDive Keywords CSV")
-        ddv4_kw = st.file_uploader("keywords.csv", type="csv",
-                                   key="ddv4_kw_csv", label_visibility="collapsed")
-        if ddv4_kw: st.success(f"✅ {ddv4_kw.name}")
-        else: st.caption("niche-XXXX-keywords.csv をアップロード（Search Terms / SV / Relevancy）")
-    with c2:
-        st.markdown("##### \U0001f4c4 DateDive Competitors CSV")
-        ddv4_comp = st.file_uploader("competitors.csv", type="csv",
-                                     key="ddv4_comp_csv", label_visibility="collapsed")
-        if ddv4_comp: st.success(f"✅ {ddv4_comp.name}")
-        else: st.caption("niche-XXXX-competitors.csv をアップロード（Strength / Variations / RC）")
-    st.markdown("")
-    st.markdown("##### \U0001f4c4 Amazon検索語CSV（現在使用中KW判定用）")
-    ddv4_amz = st.file_uploader("Amazon検索語CSV", type="csv",
-                                  key="ddv4_amz_csv", label_visibility="collapsed")
-    if ddv4_amz: st.success(f"✅ {ddv4_amz.name}")
-    else: st.caption("未投入の場合は全KWを未使用（+5点）で処理")
-    st.markdown("")
-
-    exec_btn = st.button("\U0001f3af 売れる予測KW TOP10を抽出", type="primary",
-                         use_container_width=True, key="ddv4_exec_btn")
-    if not exec_btn:
-        return
-
-    if ddv4_kw is None:
-        st.error("❌ keywords.csv が未投入です"); return
-    if ddv4_comp is None:
-        st.error("❌ competitors.csv が未投入です"); return
-
-    with st.spinner("keywords.csv 読み込み中..."):
-        kw_df, kw_col, sv_col, rel_col, kw_err = _ddv4_load_keywords_csv(ddv4_kw)
-    if kw_err: st.error(f"❌ {kw_err}"); return
-
-    with st.spinner("Amazon検索語CSV 読み込み中..."):
-        existing_set = _ddv4_load_amazon_search_csv(ddv4_amz)
-
-    with st.spinner("competitors.csv 読み込み中..."):
-        asin_dict = _ddv4_load_asin_comp_dict(ddv4_comp)
-    if asin_dict.get("_error"):
-        st.warning("competitors.csv 読み込みエラー（競争強度=中で続行）")
-        asin_dict = {}
-
-    product_asin = _DDV4_PRODUCT_ASINS.get(prod_label, "")
-
-    with st.spinner("スコアリング中..."):
-        scored = _ddv4_calculate_sellable_kw(
-            kw_df, sv_col, rel_col, prod_label, asin_dict, product_asin, existing_set)
-
-    top10     = scored.head(10).reset_index(drop=True)
-    n_total   = len(scored)
-    n_unused  = int((scored["未使用判定"] == "未使用").sum())
-    avg_score = round(float(scored["売れる予測スコア"].mean()), 1) if not scored.empty else 0.0
-    top_score = int(scored["売れる予測スコア"].max()) if not scored.empty else 0
-    s_comp    = _ddv4_comp_score_v51(asin_dict, product_asin)
-    comp_lbl  = _ddv4_comp_label_v51(s_comp)
-
-    entry    = asin_dict.get(product_asin.upper(), {}) if product_asin else {}
-    _str_disp= str(entry.get("strength","")).title() if isinstance(entry, dict) and entry.get("strength") else "取得不可"
-    _var_disp= f"{int(entry.get('variations',0))}件" if isinstance(entry, dict) and entry.get("variations") is not None else "取得不可"
-    _rc_disp = f"{int(entry.get('review_count',0)):,}" if isinstance(entry, dict) and entry.get("review_count") is not None else "取得不可"
-
-    st.markdown("---")
-    _k1,_k2,_k3,_k4,_k5 = st.columns(5)
-    kpi(_k1,"\U0001f3af","売れる予測KW数", f"{n_total}件", "スコア算出済全KW","#F3ECFF","#6B46C1")
-    kpi(_k2,"\U0001f4a1","未使用KW数",     f"{n_unused}件","今すぐ追加できるKW","#EAF7EF","#2F855A")
-    kpi(_k3,"\U0001f3c6","最高スコア",     f"{top_score}点","TOP1のスコア","#EAF2FF","#3B82F6")
-    kpi(_k4,"\U0001f4ca","平均スコア",     f"{avg_score}点","全KW平均","#F4F6F8","#718096")
-    kpi(_k5,"\U0001f4a5","市場競争度",     comp_lbl,        f"Strength={_str_disp}","#FFFAF0","#D97706")
-    st.markdown("")
-
-    _pcol = "#C53030" if comp_lbl == "高" else "#2F855A" if comp_lbl == "低" else "#718096"
-    st.markdown(
-        f"<div style='background:#F0FFF4;border:1px solid #9AE6B4;"
-        f"border-left:4px solid #38A169;border-radius:8px;padding:12px 16px;margin-bottom:12px;'>"
-        f"<div style='font-weight:700;font-size:.88rem;color:#22543D;margin-bottom:6px;'>"
-        f"\U0001f3ea 競合情報 — {prod_label}（ASIN: {product_asin}）</div>"
-        f"<div style='display:flex;gap:24px;flex-wrap:wrap;font-size:.84rem;'>"
-        f"<span><b style='color:#276749;'>Strength:</b> {_str_disp}</span>"
-        f"<span><b style='color:#276749;'>Variations:</b> {_var_disp}</span>"
-        f"<span><b style='color:#276749;'>Review Count:</b> {_rc_disp}"
-        f"<span style='color:#718096;font-size:.78rem;'>（参考表示のみ・スコア非寄与）</span></span>"
-        f"<span><b style='color:#276749;'>市場競争度:</b> "
-        f"<b style='color:{_pcol};'>{comp_lbl}</b>（{s_comp}/15点）</span>"
-        f"</div></div>",
-        unsafe_allow_html=True,
-    )
-
-    _logic = (
-        "<table style='width:100%;border-collapse:collapse;font-size:.82rem;'>"
-        "<thead><tr style='background:#DBEAFE;'>"
-        "<th style='padding:6px 10px;border:1px solid #BFDBFE;width:22%;'>スコア軸</th>"
-        "<th style='padding:6px 10px;border:1px solid #BFDBFE;width:9%;'>配点</th>"
-        "<th style='padding:6px 10px;border:1px solid #BFDBFE;'>算出方法</th>"
-        "</tr></thead><tbody>"
-        "<tr style='background:#EAF2FF;'>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#3B82F6;'>① 需要</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>0-45点</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;'>"
-        "SV&gt;=10k:45 / &gt;=5k:38 / &gt;=1k:30 / &gt;=300:20 / &gt;=100:10 / &lt;100:3</td></tr>"
-        "<tr style='background:#EAF7EF;'>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2F855A;'>② 商品関連性</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>0-35点</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;'>"
-        "Relevancy(0-14)+商品辞書(0-12)+カテゴリ(0-7)+購買意図(0-2)</td></tr>"
-        "<tr style='background:#FFFAF0;'>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#D97706;'>③ 競争強度</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>0-15点</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;'>"
-        "Strengthベース(VW15/W12/M9/S5/VS2)+Variations補正(±2) RC単独加減点禁止</td></tr>"
-        "<tr style='background:#FFF0F5;'>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#9B2C2C;'>④ 未使用ボーナス</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>0-5点</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;'>"
-        "未使用:+5 / 部分使用:+2 / 使用中:0</td></tr>"
-        "<tr><td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>売れる予測スコア</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>0-100点</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;'>"
-        "需要+商品関連性+競争強度+未使用ボーナス → スコア降順TOP10を出力</td></tr>"
-        "</tbody></table>"
-    )
-    render_logic_section("\U0001f4ca 売れる予測KW スコアロジック（v5.1）", _logic)
-
-    _cond_bar([
-        ("対象商品", prod_label[:20]),
-        ("ASIN",      product_asin or "未設定"),
-        ("全KW数",    f"{n_total:,}件"),
-        ("未使用KW",  f"{n_unused}件"),
-        ("市場競争度", comp_lbl),
-    ])
-    st.markdown("---")
-
-    st.markdown("**\U0001f4cb Amazon小分類広告 検索語登録用（コピーして貼り付け）**")
-    kw_list_text = "\n".join(top10["_kw"].astype(str).tolist())
-    st.code(kw_list_text, language=None)
-
-    st.markdown("##### \U0001f4cb 売れる予測KW TOP10")
-    disp = pd.DataFrame(index=range(1, len(top10)+1))
-    disp["売れる予測KW"]    = top10["_kw"].astype(str).values
-    disp["Search Volume"]   = top10["_sv_raw"].values
-    disp["売れる予測スコア"] = top10["売れる予測スコア"].values
-    disp["未使用判定"]      = top10["未使用判定"].values
-    disp["採用理由"]        = top10["採用理由"].astype(str).values
-    disp.index.name = "順位"
-    st.dataframe(disp, use_container_width=True)
-
-    dl_csv = (disp.reset_index()
-                  .to_csv(index=False, encoding="utf-8-sig")
-                  .encode("utf-8-sig"))
-    st.download_button("\U0001f4e5 売れる予測KW_TOP10.csv", data=dl_csv,
-                       file_name=f"売れる予測KW_{prod_label[:10]}.csv",
-                       mime="text/csv", use_container_width=True)
-
-    with st.expander("\U0001f50d スコア内訳（TOP10）", expanded=False):
-        dbg = pd.DataFrame({
-            "順位":           range(1, len(top10)+1),
-            "Keyword":        top10["_kw"].astype(str).values,
-            "SV":             top10["_sv_raw"].values,
-            "需要(0-45)":     top10["_s_demand"].values,
-            "関連性(0-35)":   top10["_s_fit"].values,
-            "競争強度(0-15)": top10["_s_comp"].values,
-            "未使用(0-5)":    top10["_s_unused"].values,
-            "スコア":         top10["売れる予測スコア"].values,
-            "未使用判定":     top10["未使用判定"].values,
-        }).set_index("順位")
-        st.dataframe(dbg, use_container_width=True)
-
-    with st.expander(f"\U0001f4c3 全スコア一覧（{n_total}件）", expanded=False):
-        all_disp = pd.DataFrame({
-            "順位":          range(1, len(scored)+1),
-            "売れる予測KW":  scored["_kw"].astype(str).values,
-            "SV":            scored["_sv_raw"].values,
-            "需要":          scored["_s_demand"].values,
-            "関連性":        scored["_s_fit"].values,
-            "競争強度":      scored["_s_comp"].values,
-            "未使用":        scored["_s_unused"].values,
-            "スコア":        scored["売れる予測スコア"].values,
-            "未使用判定":    scored["未使用判定"].values,
-        }).set_index("順位")
-        st.dataframe(all_disp, use_container_width=True)
-        dl_all = (all_disp.reset_index()
-                          .to_csv(index=False, encoding="utf-8-sig")
-                          .encode("utf-8-sig"))
-        st.download_button("\U0001f4e5 全KWスコア.csv", data=dl_all,
-                           file_name=f"全KWスコア_{prod_label[:10]}.csv",
-                           mime="text/csv", use_container_width=True)
-
-
-
-def _render_pt_page(session_key, is_add, camp_label, selectbox_key):
-    """商品ターゲ追加/削除 共通レンダラー"""
-    df_all = st.session_state.get(session_key, pd.DataFrame())
-
-    # ① 条件バー
-    if is_add:
-        _cond_bar([
-            ("注文数",   "≥ 3"),
-            ("クリック数", "≥ 5"),
-            ("広告費",   "≥ ¥300"),
-            ("売上",     "≥ 売価×2"),
-            ("ROAS",     "≥ 2.0"),
-            ("対象",     camp_label),
-        ])
-        render_logic_section(
-            f"[+] {camp_label}追加 判定ロジック",
-            '<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">'
-            '<thead><tr style="background:#DBEAFE;">'
-            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>'
-            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>'
-            '</tr></thead><tbody>'
-            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">対象データ</td></tr>'
-            f'<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">分析対象</td>'
-            f'<td style="padding:6px 10px;border:1px solid #BFDBFE;">{camp_label}（ASINターゲティング）</td></tr>'
-            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">信頼度フィルター</td></tr>'
-            '<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">最低条件</td>'
-            '<td style="padding:6px 10px;border:1px solid #BFDBFE;">注文数 ≥ 3件 / クリック数 ≥ 5回 / 広告費 ≥ ¥300</td></tr>'
-            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">採用条件</td></tr>'
-            '<tr style="background:#EAF7EF;"><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2F855A;">✅ 追加対象</td>'
-            '<td style="padding:6px 10px;border:1px solid #BFDBFE;">売上 ≥ 売価 × 2 <b>かつ</b> ROAS ≥ 2.0</td></tr>'
-            '</tbody></table>'
-            '<p style="font-size:.78rem;color:#718096;margin-top:10px;">▶ 売れているASINターゲに予算を集中して利益を最大化する</p>'
-        )
-    else:
-        _cond_bar([
-            ("広告費",   "≥ 売価×2"),
-            ("ROAS",     "< 0.8"),
-            ("対象",     camp_label),
-        ])
-        render_logic_section(
-            f"[x] {camp_label}削除 判定ロジック",
-            '<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">'
-            '<thead><tr style="background:#DBEAFE;">'
-            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>'
-            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>'
-            '</tr></thead><tbody>'
-            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">対象データ</td></tr>'
-            f'<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">分析対象</td>'
-            f'<td style="padding:6px 10px;border:1px solid #BFDBFE;">{camp_label}（ASINターゲティング）</td></tr>'
-            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">削除条件</td></tr>'
-            '<tr style="background:#FFF5F5;"><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">[x] 削除対象</td>'
-            '<td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 ≥ 売価 × 2 <b>かつ</b> ROAS &lt; 0.8</td></tr>'
-            '</tbody></table>'
-            '<p style="font-size:.78rem;color:#718096;margin-top:10px;">▶ 売価の2倍以上広告費を使ってもROASが低いASINターゲは利益を生まない</p>'
-        )
-    st.markdown("")
-
-    # ② 商品選択
-    _c1, _c2 = st.columns([3, 2])
-    with _c1:
-        sel = st.selectbox(
-            "商品選択",
-            ["全商品"] + CAMPAIGNS,
-            label_visibility="visible",
-            key=selectbox_key,
-        )
-    df_view = df_all.copy()
-    if sel != "全商品" and "campaign_theme" in df_view.columns:
-        df_view = df_view[df_view["campaign_theme"] == sel].copy()
-
-    n_rows  = len(df_view)
-    avg_r   = round(df_view["ROAS"].mean(),   2) if n_rows > 0 and "ROAS"   in df_view.columns else 0.0
-    avg_ord = round(df_view["orders"].mean(),  1) if n_rows > 0 and "orders" in df_view.columns else 0.0
-    avg_cst = round(df_view["cost"].mean(),    0) if n_rows > 0 and "cost"   in df_view.columns else 0.0
-
-    # ③ KPIカード（フィルタ後）
-    if is_add:
-        k1, k2, k3, k4 = st.columns(4)
-        kpi(k1, "✅", "追加候補数",  f"{n_rows}件",          "ROAS≥2.0",   "#EAF7EF", "#2F855A")
-        kpi(k2, "\U0001f4ca", "平均ROAS",   f"{avg_r}",      "追加候補",    "#EAF2FF", "#3B82F6")
-        kpi(k3, "\U0001f4e6", "平均注文数", f"{avg_ord}件",   "追加候補",    "#FFFFF0", "#D69E2E")
-        kpi(k4, "\U0001f4b8", "平均広告費", f"¥{int(avg_cst):,}", "追加候補", "#F0FFF4", "#276749")
-    else:
-        k1, k2, k3 = st.columns(3)
-        kpi(k1, "\U0001f5d1", "削除候補数", f"{n_rows}件",          "ROAS<0.8",  "#FFF5F5", "#C53030")
-        kpi(k2, "\U0001f4ca", "平均ROAS",   f"{avg_r}",              "削除候補",  "#FEE2E2", "#C53030")
-        kpi(k3, "\U0001f4b8", "平均広告費", f"¥{int(avg_cst):,}",  "削除候補",  "#F4F6F8", "#718096")
-    st.markdown("")
-
-    # ④ 件数バッジ
-    badge_color = "#2F855A" if is_add else "#C53030"
-
-    badge_label = "追加対象件数" if is_add else "削除対象件数"
-    st.markdown(
-        f'<div class="count-badge" style="border-left-color:{badge_color};">'
-        f'{badge_label}: <b style="font-size:1.1rem;color:{badge_color};">{n_rows}件</b>'
-        f'　<span style="color:#718096;font-size:.8rem;">商品: {sel}</span></div>',
-        unsafe_allow_html=True,
-    )
-
-    if df_view.empty:
-        msg = (f"追加候補の{camp_label}はありません。（条件: 注文≥3 / クリック≥5 / 広告費≥¥300 / 売上≥売価×2 / ROAS≥2.0）"
-               if is_add else
-               f"削除候補の{camp_label}はありません。（条件: 広告費≥売価×2 かつ ROAS<0.8）")
-        st.info(msg)
-        return
-
-    # ⑤ 詳細テーブル
-    if is_add:
-        def _reason(row):
-            rs = []
-            roas = row.get("ROAS", 0); sales = row.get("sales", 0)
-            orders = row.get("orders", 0); clicks = row.get("clicks", 0)
-            if roas >= 4.0: rs.append(f"ROASが高い({roas:.1f}倍)")
-            elif roas >= 2.0: rs.append(f"ROAS良好({roas:.1f}倍)")
-            if sales >= 10000: rs.append(f"売上実績が十分ある(¥{int(sales):,})")
-            elif sales > 0: rs.append(f"売上あり(¥{int(sales):,})")
-            if orders >= 10: rs.append(f"注文実績が十分ある({int(orders)}件)")
-            elif orders >= 3: rs.append(f"注文実績あり({int(orders)}件)")
-            if clicks >= 20: rs.append(f"クリック多数({int(clicks)}回)")
-            rs += ["商品展開候補", "予算追加候補"]
-            return " / ".join(rs[:4])
-        reason_col = "採用理由"
-        _disp_cols = ["campaign_name","ad_group","asin","orders","clicks","cost","sales","ROAS",reason_col]
-        hdr = f"##### ✅ {camp_label}追加詳細テーブル"
-    else:
-        def _reason(row):
-            rs = []
-            cost = row.get("cost", 0); roas = row.get("ROAS", 0); orders = row.get("orders", 0)
-            if cost >= 10000: rs.append(f"広告費消化が大きい(¥{int(cost):,})")
-            else: rs.append(f"広告費≥売価×2(¥{int(cost):,})")
-            if roas < 0.3: rs.append(f"ROASが著しく低い({roas:.2f}倍)")
-            elif roas < 0.8: rs.append(f"ROASが低い({roas:.2f}倍)")
-            if orders == 0: rs.append("注文0件")
-            elif orders < 3: rs.append(f"注文{int(orders)}件のみ")
-            rs += ["費用対効果が悪い", "利益貢献がない", "削除優先度が高い"]
-            return " / ".join(rs[:4])
-        reason_col = "削除理由"
-        _disp_cols = ["campaign_name","ad_group","asin","cost","sales","ROAS",reason_col]
-        hdr = f"##### \U0001f5d1 {camp_label}削除詳細テーブル"
-
-    st.markdown(hdr)
-    _df = df_view.copy()
-    _df[reason_col] = _df.apply(_reason, axis=1)
-    _disp = [c for c in _disp_cols if c in _df.columns or c == reason_col]
-    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","asin":"ASIN",
-           "clicks":"クリック数","orders":"注文数","cost":"広告費","sales":"売上"}
-    _show = _df[[c for c in _disp if c in _df.columns]].rename(columns=_rn).copy()
-    _show.index = _show.index + 1
-    if "広告費" in _show.columns: _show["広告費"] = _show["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    if "売上"   in _show.columns: _show["売上"]   = _show["売上"].apply(lambda x: f"¥{x:,.0f}")
-    if "ROAS"   in _show.columns: _show["ROAS"]   = _show["ROAS"].round(2)
-    st.dataframe(_show, use_container_width=True)
-
-    # ⑥ CSV
-    _action = "追加" if is_add else "削除"
-    _ctype  = "商品" if "_m_" in selectbox_key else "動画"
-    _fname  = f"{_ctype}{_action}_{sel}.csv"
-    _dl = _df[[c for c in _disp if c in _df.columns]].rename(columns=_rn).to_csv(
-        index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    st.download_button(f"\U0001f4e5 {_fname}", data=_dl,
-        file_name=_fname, mime="text/csv", use_container_width=True)
-
-
-def page_pt_add_manual():
-    _t_tab1, _t_tab2 = st.tabs(["改善", "分析"])
-    with _t_tab1:
-        _render_pt_page("df_pt_add_m", True, "商品", "pt_add_m_sel")
-    with _t_tab2:
-        _anls_render_asin_tab(st.session_state.get("df_pt_add_m", pd.DataFrame()), 30, "pt_add_m_analysis.json", "anls_pt_add_m_csv", "商品追加", "商品ターゲ")
-
-def page_pt_del_manual():
-    _render_pt_page("df_pt_del_m", False, "商品", "pt_del_m_sel")
-
-def page_pt_add_video():
-    _t_tab1, _t_tab2 = st.tabs(["改善", "分析"])
-    with _t_tab1:
-        _render_pt_page("df_pt_add_v", True, "動画", "pt_add_v_sel")
-    with _t_tab2:
-        _anls_render_asin_tab(st.session_state.get("df_pt_add_v", pd.DataFrame()), 30, "pt_add_v_analysis.json", "anls_pt_add_v_csv", "動画追加", "動画")
-
-def page_pt_del_video():
-    _render_pt_page("df_pt_del_v", False, "動画", "pt_del_v_sel")
-
-
-
-def page_dd_v4():
-    _ddv4_render_sellable_top10()
-
-
-def page_download():
-    st.markdown("### 📥 ダウンロード")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("**📦 全候補 勝ちKW（一括ZIP）**")
-        st.caption(f"{nw}件 — ROAS≥2.0")
-        if not dw.empty:
-            st.download_button("📥 全候補_ZIP", data=all_zip(dw),
-                file_name="all_win_kw.zip", mime="application/zip", use_container_width=True)
-    with c2:
-        st.empty()
-    st.markdown("")
-    c3, c4 = st.columns(2)
-    with c3:
-        st.markdown("**🚫 削除用KW（キャンペーン別ZIP）**")
-        st.caption(f"{len(dd)}件 — 広告費≥売価×2 かつ ROAS<0.8")
-        if not dd.empty:
-            st.download_button("📥 削除用KW_ZIP", data=del_camp_zip(dd),
-                file_name="del_kw.zip", mime="application/zip", use_container_width=True)
-    with c4:
-        st.markdown("**📈 キーワードCPC調整（全キャンペーン ZIP）**")
-        st.caption("STEP1-4 判定ランク付きCSV")
-        if not dc_cpc.empty:
-            st.download_button("📥 キーワードCPC調整_ZIP", data=cpc_camp_zip(dc_cpc),
-                file_name="cpc_adjust.zip", mime="application/zip", use_container_width=True)
-
-
-def page_manual():
-    st.markdown("### 📖 ANIHA Amazon広告分析ツール — 取扱説明書 Ver.71")
-
-    # ── 概要 ──────────────────────────────────────────────────────────
-    with st.expander("📌 概要", expanded=True):
-        st.markdown("""
-**ANIHA Amazon広告分析ツール** は、Amazon SP広告レポートを読み込み、
-追加・削除・CPC調整の候補を自動抽出するANIHA専用ツールです。
-
-| 機能 | 内容 |
-|---|---|
-| 📋 キーワード追加 | 成果KWを抽出しマニュアル広告追加候補を表示 |
-| 🚫 キーワード削除 | 利益毀損KWを停止候補として抽出 |
-| 📈 キーワードCPC調整 | 既存マニュアルKWの入札最適化 |
-| ➕ 商品追加 | 成果ASINを商品広告へ追加候補として抽出 |
-| 🗑️ 商品削除 | 成果の出ていない商品を停止候補として抽出 |
-| 📹 動画追加 | 成果ASINを動画広告へ追加候補として抽出 |
-| 📹 動画削除 | 成果の出ていない動画広告を停止候補として抽出 |
-| 🎯 商品CPC調整 | 商品広告の入札最適化 |
-| 📹 動画CPC調整 | 動画広告の入札最適化 |
-| 🧹 オート除外KW（キーワード/商品/動画） | オート広告で利益毀損している項目を停止候補として抽出 |
-| 📊 DateDive売れる予測KW | スコアリングによる有力KW抽出 |
-""")
-
-    # ── サイドバー構成 ─────────────────────────────────────────────────
-    with st.expander("🗂️ サイドバー構成"):
-        st.markdown("""
+    existing = _anls_load("cpc_change_history.json")
+    existing.append(record)
+    _anls_save("cpc_change_history.json", existing)
 ```
-追加
-├ キーワード   → キーワード追加
-├ 商品         → 商品追加
-└ 動画         → 動画追加
 
-削除
-├ キーワード   → キーワード削除
-├ 商品         → 商品削除
-└ 動画         → 動画削除
+**重要:** `cpc_delta != 0` の再フィルタは行わない。渡された DataFrame の全行をそのまま保存する。
 
-CPC調整
-├ キーワード   → キーワードCPC調整
-├ 商品         → 商品CPC調整
-└ 動画         → 動画CPC調整
+### 5-4. Before データ
 
-オート除外KW
-├ キーワード   → オートKW削除
-├ 商品         → オート商品削除
-└ 動画         → オート動画削除
+`dc_cpc`（CPC 調整タブ読み込み時に生成された DataFrame）。  
+`campaign_name` / `ad_group` / `keyword` / `avg_cpc` / `rec_cpc` / `cpc_delta` / `ROAS` 等を含む。  
+`match_type` 列は存在しない。
 
-DateDive売れる予測KW
-ダウンロード
-取扱説明書
+### 5-5. After データ生成（`_anls_build_cpc_after`）
+
+```python
+def _anls_build_cpc_after(df, cc, sc, oc_, od, clk, kwt_col) -> pd.DataFrame:
+    # cost > 0 の行のみ対象
+    # _kn_key = norm(campaign_name) + "|" + norm(ad_group) + "|" + norm(keyword)
+    # agg: sales / cost / orders / clicks
+    # 計算: ROAS / CVR / avg_cpc
+    # 戻り値: _kn_key + 数値指標のみ（campaign_theme 列は含まない）
 ```
-""")
 
-    # ── キーワード追加 ────────────────────────────────────────────────
-    with st.expander("📋 キーワード追加"):
-        st.markdown("""
-**目的**
-オート広告で成果が確認できた検索語句を、手動広告（部分一致）へ追加するための候補抽出です。
+### 5-6. cpc_delta の定義
+
+`cpc_delta` はツールが推奨する CPC 変更幅（+5 / 0 / -5 / -10 等）。  
+ユーザーが実際に変更した金額ではない。
 
 ---
 
-**信頼度フィルター（データ量が少ない語句を除外）**
-
-| 条件 | 閾値 |
-|---|---|
-| 注文数 | ≥ 3件 |
-| クリック数 | ≥ 5回 |
-| 広告費 | ≥ ¥300 |
-
-**採用条件**
-
-| 条件 | 閾値 |
-|---|---|
-| 売上 | ≥ 売価 × 2 |
-| ROAS | ≥ 2.0 |
-
-**除外条件**
-
-| 除外対象 | 内容 |
-|---|---|
-| 既存マニュアルKW（完全一致） | 登録済のため除外 |
-| 既存マニュアルKW（部分一致） | 登録済のため除外 |
-| 重複検索語 | 同一キャンペーン内での重複を除外 |
-""")
-
-    # ── キーワード削除 ────────────────────────────────────────────────
-    with st.expander("🚫 キーワード削除"):
-        st.markdown("""
-**目的**
-利益を毀損している検索語を抽出し、停止候補として表示します。
-
----
-
-**削除条件（両方を同時に満たす場合に削除候補）**
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ 売価 × 2 |
-| ROAS | < 0.8 |
-""")
-
-    # ── キーワードCPC調整─────────────────────────────────────────
-    with st.expander("📈 キーワードCPC調整"):
-        st.markdown("""
-**目的** — 既存マニュアルKWの入札額を最適化します。
-
----
-
-**判定対象条件**（いずれか一方を満たせば判定対象）
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ ¥3,000 |
-| 購入数 | ≥ 4件 |
-
-> **判断保留になるのは「広告費 < ¥3,000 かつ 購入数 < 4件」の場合のみです。**
->
-> 例: 広告費¥1,000・購入数7件 → **判定対象**（購入数4件以上のため）
->
-> 例: 広告費¥1,500・購入数2件 → **判断保留**（両方とも閾値未満）
-
----
-
-**ランク判定（判定順序: STEP1 → STEP2 → STEP3 → STEP4）**
-
-| ランク | 条件 | アクション | 変更幅 |
-|---|---|---|---|
-| 判断保留 | 広告費 < ¥3,000 **かつ** 購入数 < 4件 | 変更なし | ±0円 |
-| SS+ | 購入数 ≥ 20 **かつ** ROAS ≥ 4.0 | CPC上げ | +5円 |
-| SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| S | ROAS ≥ 4.0 | CPC上げ | +5円 |
-| A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
-| B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
-| C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
-| D | ROAS < 1.5 | CPC下げ | −10円 |
-| 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
-
-**即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
-
----
-
-**画面表示仕様**
-
-| 表示エリア | 表示内容 |
-|---|---|
-| SS〜E 件数カード | **全件数**を表示（変更なし・判断保留を含む） |
-| 詳細テーブル | **全件表示**（変更なし・判断保留を含む） |
-""")
-
-    # ── 商品追加 ──────────────────────────────────────────────────────
-    with st.expander("➕ 商品追加"):
-        st.markdown("""
-**目的** — 商品広告で成果が出ているASINを追加候補として表示します。
-
----
-
-**対象キャンペーン**
-
-| 条件 | 内容 |
-|---|---|
-| 含む | 「商品ターゲ」を含むキャンペーン |
-| 除外 | 「動画」を含むキャンペーン |
-| 除外 | 「オート」「auto」を含むキャンペーン |
-
-**信頼度フィルター**
-
-| 条件 | 閾値 |
-|---|---|
-| 注文数 | ≥ 3件 |
-| クリック数 | ≥ 5回 |
-| 広告費 | ≥ ¥300 |
-
-**採用条件**
-
-| 条件 | 閾値 |
-|---|---|
-| 売上 | ≥ 売価 × 2 |
-| ROAS | ≥ 2.0 |
-""")
-
-    # ── 商品削除 ──────────────────────────────────────────────────────
-    with st.expander("🗑️ 商品削除"):
-        st.markdown("""
-**目的** — 成果の出ていない商品を停止候補として表示します。
-
----
-
-**対象キャンペーン** — 商品追加と同一（動画・オート除外）
-
-**削除条件（両方を同時に満たす場合に削除候補）**
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ 売価 × 2 |
-| ROAS | < 0.8 |
-""")
-
-    # ── 動画追加 ──────────────────────────────────────────────────────
-    with st.expander("📹 動画追加"):
-        st.markdown("""
-**目的** — 動画広告で成果の出ているASINを追加候補として表示します。
-
----
-
-**対象キャンペーン**
-
-| 条件 | 内容 |
-|---|---|
-| 含む | 「動画」を含むキャンペーン |
-
-**信頼度フィルター**
-
-| 条件 | 閾値 |
-|---|---|
-| 注文数 | ≥ 3件 |
-| クリック数 | ≥ 5回 |
-| 広告費 | ≥ ¥300 |
-
-**採用条件**
-
-| 条件 | 閾値 |
-|---|---|
-| 売上 | ≥ 売価 × 2 |
-| ROAS | ≥ 2.0 |
-""")
-
-    # ── 動画削除 ──────────────────────────────────────────────────────
-    with st.expander("📹 動画削除"):
-        st.markdown("""
-**目的** — 成果の出ていない動画広告を停止候補として表示します。
-
----
-
-**対象キャンペーン** — 動画追加と同一（動画キャンペーンが対象）
-
-**削除条件（両方を同時に満たす場合に削除候補）**
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ 売価 × 2 |
-| ROAS | < 0.8 |
-""")
-
-    # ── 商品CPC調整 ───────────────────────────────────────────────────
-    with st.expander("🎯 商品CPC調整"):
-        st.markdown("""
-**目的** — 商品広告の入札額を最適化します。
-
----
-
-**判定対象条件**（いずれか一方を満たせば判定対象）
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ ¥3,000 |
-| 購入数 | ≥ 4件 |
-
-> **判断保留になるのは「広告費 < ¥3,000 かつ 購入数 < 4件」の場合のみです。**
->
-> 例: 広告費¥1,000・購入数7件 → **判定対象**（購入数4件以上のため）
->
-> 例: 広告費¥1,500・購入数2件 → **判断保留**（両方とも閾値未満）
-
----
-
-**ランク判定**
-
-| ランク | 条件 | アクション | 変更幅 |
-|---|---|---|---|
-| 判断保留 | 広告費 < ¥3,000 **かつ** 購入数 < 4件 | 変更なし | ±0円 |
-| SS+ | 購入数 ≥ 20 **かつ** ROAS ≥ 4.0 | CPC上げ | +5円 |
-| SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| S | ROAS ≥ 4.0 | CPC上げ | +5円 |
-| A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
-| B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
-| C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
-| D | ROAS < 1.5 | CPC下げ | −10円 |
-| 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
-
-**即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
-
----
-
-**画面表示仕様**
-
-| 表示エリア | 表示内容 |
-|---|---|
-| SS〜E 件数カード | **全件数**を表示（変更なし・判断保留を含む） |
-| 詳細テーブル | **変更幅 ≠ 0円のみ**表示（CPC上げ・CPC下げのみ） |
-| 非表示 | 変更なし（SS / A / B）・判断保留 |
-
-> ⚠️ 件数カードの合計とテーブルの件数は一致しない場合があります。これは正常動作です。
-
----
-
-**全商品フィルター**
-
-初期値は **全商品** です。
-
-| 選択 | 動作 |
-|---|---|
-| 全商品（初期値） | すべての対象キャンペーンを集計して表示する |
-| 個別商品名 | 選択商品のキャンペーンのみ表示する |
-""")
-
-    # ── 動画CPC調整 ───────────────────────────────────────────────────
-    with st.expander("📹 動画CPC調整"):
-        st.markdown("""
-**目的** — 動画広告の入札額を最適化します。
-
----
-
-**判定対象条件**（いずれか一方を満たせば判定対象）
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ ¥3,000 |
-| 購入数 | ≥ 4件 |
-
-> **判断保留になるのは「広告費 < ¥3,000 かつ 購入数 < 4件」の場合のみです。**
->
-> 例: 広告費¥1,000・購入数7件 → **判定対象**（購入数4件以上のため）
->
-> 例: 広告費¥1,500・購入数2件 → **判断保留**（両方とも閾値未満）
-
----
-
-**ランク判定**
-
-| ランク | 条件 | アクション | 変更幅 |
-|---|---|---|---|
-| 判断保留 | 広告費 < ¥3,000 **かつ** 購入数 < 4件 | 変更なし | ±0円 |
-| SS+ | 購入数 ≥ 20 **かつ** ROAS ≥ 4.0 | CPC上げ | +5円 |
-| SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
-| S | ROAS ≥ 4.0 | CPC上げ | +5円 |
-| A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
-| B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
-| C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
-| D | ROAS < 1.5 | CPC下げ | −10円 |
-| 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
-
-**即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
-
----
-
-**画面表示仕様**
-
-| 表示エリア | 表示内容 |
-|---|---|
-| SS〜E 件数カード | **全件数**を表示（変更なし・判断保留を含む） |
-| 詳細テーブル | **変更幅 ≠ 0円のみ**表示（CPC上げ・CPC下げのみ） |
-| 非表示 | 変更なし（SS / A / B）・判断保留 |
-
-> ⚠️ 件数カードの合計とテーブルの件数は一致しない場合があります。これは正常動作です。
-
----
-
-**全商品フィルター**
-
-初期値は **全商品** です。
-
-| 選択 | 動作 |
-|---|---|
-| 全商品（初期値） | すべての動画キャンペーンを集計して表示する |
-| 個別商品名 | 選択商品の動画キャンペーンのみ表示する |
-""")
-
-    # ── オート除外KW ──────────────────────────────────────────────────
-    with st.expander("🧹 オート除外KW"):
-        st.markdown("""
-**目的**
-
-オート広告（自動ターゲティング）で利益を毀損している項目を検出し、停止候補として
-「キーワード」「商品」「動画」の3ページに分けて表示します。
-
-サイドバーの「🧹 オート除外KW」内に、キーワード・商品・動画の3つのボタンがあります。
-
----
-
-**集計の元データ**
-
-「検索用語レポート」内のオートキャンペーン行から、「検索用語（カスタマーの検索用語）」列の
-内容によって3種類に振り分けます。
-
-| 検索用語の内容 | 振り分け先 |
-|---|---|
-| 通常の検索語句（日本語など） | 📄 キーワード |
-| ASIN形式（例: B0XXXXXXXXX） | 🎯 商品 |
-| category形式（例: category:〜） | 🎬 動画 |
-
-商品・動画に振り分けられた項目は、既存の「🎯 オート商品削除」「🎥 オート動画削除」
-ページ（商品ターゲティング・動画キャンペーン由来のASIN削除候補）と合流して表示されます。
-
----
-
-**削除条件（両方を同時に満たす場合に削除候補）**
-
-| 条件 | 閾値 |
-|---|---|
-| 広告費 | ≥ 売価 × 2 |
-| ROAS | ≤ 0.8 |
-
----
-
-**除外条件**
-
-| 除外対象 | 内容 |
-|---|---|
-| マニュアル広告に完全一致登録済みの語句／ASIN | 重複のため除外 |
-| 未分類キャンペーン | 売価が特定できないため除外 |
-
----
-
-**各ページの表示内容**
-
-| ページ | 表示内容 |
-|---|---|
-| 📄 キーワード | 通常検索語句のみ（ASIN・category形式は含まれません） |
-| 🎯 商品 | ASIN形式のみ |
-| 🎬 動画 | category形式のみ |
-
-各ページに「キャンペーン」フィルター（全キャンペーン＋各キャンペーン）があり、
-件数カード・除外対象一覧（コピー用）・詳細テーブル・CSVダウンロードを表示します。
-""")
-
-    # ── 売れる予測KW ──────────────────────────────────────────────────
-    with st.expander("📊 DateDive 売れる予測KW"):
-        st.markdown("""
-**目的** — 今後Amazon検索語へ追加すべき有力キーワード候補をスコアリングして抽出します。
-
----
-
-**スコア配点（合計100点）**
-
-| 項目 | 配点 | 説明 |
-|---|---|---|
-| 需要 | 45点 | 検索ボリューム・トレンドを評価 |
-| 関連性 | 35点 | 商品との関連度を評価 |
-| 競争強度 | 15点 | 競合の少なさを評価 |
-| 未使用KW | 5点 | 既存KWに未登録であれば加点 |
-
-需要と関連性を最重視します。
-競争強度や未使用ボーナスのみで上位表示されることはありません。
-
-上位 **TOP10** を表示します。
-""")
-
-    # ── ダウンロード ──────────────────────────────────────────────────
-    with st.expander("📥 ダウンロード"):
-        st.markdown("""
-各分析結果はCSVでダウンロード可能です。
-
-**各ページ内のCSVダウンロードボタン**
-
-| 機能 | CSVファイル名 |
-|---|---|
-| 商品追加 | 商品追加_{商品名}.csv |
-| 商品削除 | 商品削除_{商品名}.csv |
-| 動画追加 | 動画追加_{商品名}.csv |
-| 動画削除 | 動画削除_{商品名}.csv |
-| キーワードCPC調整 | {キャンペーン名}_CPC調整表.csv |
-| 商品CPC調整 | {キャンペーン名}_商品CPC調整_CPC調整表.csv |
-| 動画CPC調整 | {キャンペーン名}_動画CPC調整_CPC調整表.csv |
-
-**ダウンロードページ（ZIPファイル）**
-
-| ZIP名 | 内容 |
-|---|---|
-| 全候補 勝ちKW ZIP | キーワード追加 — 追加KW_{商品名}.csv |
-| 削除用KW ZIP | キーワード削除 — 削除KW_{商品名}.csv |
-| キーワードCPC調整 ZIP | キーワードCPC調整 — {キャンペーン名}_CPC調整表.csv |
-
-> ⚠️ CSVは全件出力です（KW CPC調整テーブルの±0円行も含みます）。
-""")
-
-    # ── ASIN抽出 ──────────────────────────────────────────────────────
-    with st.expander("🔍 ASIN抽出 対応形式"):
-        st.markdown("""
-商品広告・動画広告のASINは以下3形式をすべて自動認識します。
-
-| 形式 | 例 |
-|---|---|
-| `asin="B0XXXXXXXX"` | TargetingExpression 標準形式 |
-| `asin-expanded="B0XXXXXXXX"` | 拡張ターゲティング形式 |
-| 裸ASIN `B0XXXXXXXX` | 直接記述形式 |
-
-> ASINは `B0` で始まる10文字（`B0[A-Z0-9]{8}`）で識別します。
-""")
-
-    # ── 画面サンプル ──────────────────────────────────────────────────
-    with st.expander("🖼️ 画面サンプル"):
-        st.markdown("""
-各ページの主な表示構成は以下の通りです。
-
----
-
-**【追加】キーワード追加**
+## 6. キーワード追加分析ロジック
+
+### 6-1. 分析対象
+
+`dw`（キーワード追加タブで生成した DataFrame）の全行。  
+CPC 分析と異なり、履歴保存は不要。  
+30 日後の比較で改善 / 悪化 / 変化なしを判定する。
+
+### 6-2. After データ生成（`_anls_build_kw_after`）
+
+```python
+def _anls_build_kw_after(df, kc, cc, sc, oc_, od, clk) -> pd.DataFrame:
+    # cost > 0 の行のみ対象
+    # _kn_key = norm(keyword)（検索語句列）
+    # agg: sales / cost / orders / clicks
+    # 計算: ROAS / CVR / avg_cpc
+    # 戻り値: _kn_key + 数値指標のみ（campaign_theme 列は含まない）
 ```
-[条件バー: 最小注文数 / 最小クリック数 / 最小広告費]
-[商品選択プルダウン]
-[KPIカード: 抽出前件数 / 抽出後件数（同一意図KW統合後）]
-[一覧テーブル: keyword / キャンペーン名 / ROAS / 広告費 / 売上 / 注文数 / クリック数]
-※ CSVはダウンロードページの「全候補 勝ちKW ZIP」から取得
+
+### 6-3. 一致キー
+
+`norm(keyword)` のみの 1 キー。
+
+---
+
+## 7. 7 日分析・30 日分析ルール
+
+| 分析種別 | 期間 | 対象 | 履歴保存 |
+|----------|------|------|----------|
+| CPC 分析 | 7 日固定 | ダウンロードしたキーワードのみ | あり（ダウンロード時） |
+| KW 追加分析 | 30 日固定 | dw 全件 | なし |
+
+期間は変更不可（UI でユーザーが変更できない固定値）。
+
+---
+
+## 8. 分析対象の定義
+
+### 8-1. CPC 分析
+
+```
+分析対象 = cpc_change_history.json の最終エントリに含まれるキーワード
+         ∩ 7 日後 CSV に存在するキーワード
+```
+
+- 推奨キーワード全件（cpc_delta != 0）は分析対象外
+- CSV をダウンロードしていない場合は分析不可（エラー表示）
+
+### 8-2. KW 追加分析
+
+```
+分析対象 = dw（キーワード追加タブの抽出結果）の全行
+         ∩ 30 日後 CSV に存在するキーワード
+```
+
+### 8-3. 件数表示（CPC 分析のみ）
+
+```
+変更履歴 N件  = 履歴保存件数（CSV ダウンロード時の行数）
+CSV一致   M件  = inner join 成功件数 = 分析対象件数
+不一致    K件  = N - M（CSV に存在しなかったキーワード）
+分析対象  M件  = merged の行数
 ```
 
 ---
 
-**【追加】商品（商品追加）**
-```
-[条件バー: 売上≥売価×2 / ROAS≥2.0 / 商品]
-[商品選択プルダウン]
-[KPIカード: 追加候補数 / 平均ROAS / 平均注文数 / 平均広告費]
-[一覧テーブル: キャンペーン名 / 広告グループ / ASIN / 注文数 / クリック数 / 広告費 / 売上 / ROAS / 採用理由]
-[CSVダウンロードボタン: 商品追加_{商品名}.csv]
+## 9. 履歴保存仕様
+
+### 9-1. ファイル
+
+`analysis_data/cpc_change_history.json`
+
+### 9-2. スキーマ
+
+```json
+[
+  {
+    "exported_at": "2025-01-01T10:00:00.000000",
+    "entries": [
+      {
+        "campaign_name": "キャンペーン名",
+        "ad_group": "広告グループ名",
+        "keyword": "キーワード",
+        "avg_cpc": 100,
+        "rec_cpc": 95,
+        "cpc_delta": -5,
+        "cpc_rank": "C",
+        "cpc_action": "DOWN",
+        "sales": 10000,
+        "cost": 500,
+        "ROAS": 20.0,
+        "orders": 5
+      }
+    ]
+  }
+]
 ```
 
----
+### 9-3. 保存タイミング
 
-**【追加】動画（動画追加）**
-```
-[条件バー: 売上≥売価×2 / ROAS≥2.0 / 動画]
-[商品選択プルダウン]
-[KPIカード: 追加候補数 / 平均ROAS / 平均注文数 / 平均広告費]
-[一覧テーブル: キャンペーン名 / 広告グループ / ASIN / 注文数 / クリック数 / 広告費 / 売上 / ROAS / 採用理由]
-[CSVダウンロードボタン: 動画追加_{商品名}.csv]
-```
+「CPC 調整 実行用.csv」ダウンロードボタン押下時（`on_click`）。  
+「CPC 調整表.csv」ダウンロードボタンには保存処理を付与しない。
 
----
+### 9-4. 読み込みタイミング
 
-**【削除】キーワード削除**
-```
-[条件バー: 広告費≥売価×2 / ROAS<0.8 / 勝ちKW除外]
-[商品選択プルダウン]
-[件数バッジ: 削除対象件数: N件]
-[一覧テーブル: keyword / キャンペーン名 / ROAS / 広告費 / 売上]
-※ CSVはダウンロードページの「削除用KW ZIP」から取得
-```
+CPC 分析実行ボタン（🔍 分析実行）押下時。  
+`_cpc_hist[-1]`（最終エントリ）のみを使用する。
 
----
+### 9-5. analysis_reports スキーマ（cpc_kw_analysis.json / kw_add_analysis.json）
 
-**【削除】商品（商品削除）**
-```
-[条件バー: 広告費≥売価×2 / ROAS<0.8 / 商品]
-[商品選択プルダウン]
-[KPIカード: 削除候補数 / 平均ROAS / 平均広告費]
-[一覧テーブル: ASIN / campaign / ROAS / cost / 削除理由]
-[CSVダウンロードボタン]
-```
-
----
-
-**【削除】動画（動画削除）**
-```
-[条件バー: 広告費≥売価×2 / ROAS<0.8 / 動画]
-[商品選択プルダウン]
-[KPIカード: 削除候補数 / 平均ROAS / 平均広告費]
-[一覧テーブル: ASIN / campaign / ROAS / cost / 削除理由]
-[CSVダウンロードボタン]
-```
-
----
-
-**【CPC調整】キーワードCPC調整**
-```
-[条件バー: CPC調整ルール適用]
-[ロジックテーブル expander]
-[キャンペーン選択プルダウン]
-[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
-[一覧テーブル: keyword / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
-                                                      ← 全件表示（±0含む）
-[CSVダウンロードボタン]
+```json
+[
+  {
+    "id": "20250101_100000",
+    "saved_at": "2025-01-01",
+    "type": "キーワードCPC調整",
+    "period_days": 7,
+    "n_before": 222,
+    "n_matched": 18,
+    "n_kaizen": 10,
+    "n_akka": 5,
+    "n_henko": 3,
+    "rate": 55.6,
+    "camps": ["液体", "涙やけ"]
+  }
+]
 ```
 
 ---
 
-**【CPC調整】商品CPC調整**
+## 10. 一致キー仕様
+
+### 10-1. CPC 分析キー
+
 ```
-[条件バー: CPC調整ルール適用 / 商品]
-[ロジックテーブル expander]
-[商品選択プルダウン: 全商品 / 液体 / 涙やけ / ...]  ← 全商品が初期値
-[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
-[一覧テーブル: ASIN / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
-                                                       ← 変更幅≠0のみ
-[CSVダウンロードボタン]
+norm(campaign_name) | norm(ad_group) | norm(keyword)
 ```
 
----
+| レイヤー | キー生成コード |
+|----------|--------------|
+| 履歴キー | `_cpc_key(r)` — `r.get("campaign_name")` / `r.get("ad_group")` / `r.get("keyword")` |
+| Before キー | `_cpc_key(r)` — `dc_cpc` の各行に適用 |
+| After キー | `d[cc].apply(norm) + "\|" + d[_agn2].apply(norm) + "\|" + d[kc2].apply(norm)` |
 
-**【CPC調整】動画CPC調整**
+**Match Type は使用しない。** `dc_cpc` に `match_type` 列が存在しないため。
+
+### 10-2. KW 追加分析キー
+
 ```
-[条件バー: CPC調整ルール適用 / 動画]
-[ロジックテーブル expander]
-[商品選択プルダウン: 全商品 / 液体 / 涙やけ / ...]  ← 全商品が初期値
-[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
-[一覧テーブル: ASIN / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
-                                                       ← 変更幅≠0のみ
-[CSVダウンロードボタン]
+norm(keyword)
 ```
-""")
 
-    # ── トラブルシューティング ────────────────────────────────────────
-    with st.expander("🛠️ トラブルシューティング"):
-        st.markdown("""
-**Q. データが表示されない**
-→ 画面上部でCSVをアップロードし「🔍 抽出実行」ボタンを押してください。
-ボタンを押すまで分析は実行されません。
+検索語句列（`kc` で検出）を `norm()` で正規化した値。
 
----
+### 10-3. `norm()` の定義
 
-**Q. 全商品が表示されない（商品が一部しか出ない）**
-→ 売価マスタ（PRICES辞書）に登録されていない商品は除外されます。
-campaign_theme が PRICES のキーと一致しているか確認してください。
+```python
+def norm(s):
+    # 全角→半角変換
+    # 大文字→小文字変換
+    # 前後空白除去
+    # 連続空白を単一空白に統一
+    return normalized_string
+```
 
----
+### 10-4. 禁止事項
 
-**Q. 商品追加・動画追加が0件になる**
-→ 以下を確認してください。
-- 信頼度フィルター（注文≥3 / クリック≥5 / 広告費≥¥300）を満たす語句があるか
-- 売上 ≥ 売価×2 かつ ROAS ≥ 2.0 を満たすASINがあるか
-- 対象キャンペーン名に「商品ターゲ」が含まれているか
+- 部分一致（`contains`）禁止
+- 前方一致（`startswith`）禁止
+- Keyword 単独キー禁止（CPC 分析において）
+- Campaign Theme 単独キー禁止
 
 ---
 
-**Q. CPC調整（商品/動画）のテーブルが空になる**
-→ 商品CPC / 動画CPCの詳細テーブルは「変更幅 ≠ 0円」のみ表示する仕様です。
-SS / A / B（現状維持）と判断保留は表示されません。
-件数カードで各ランクの件数を確認してください。
-なお、キーワードCPC調整の詳細テーブルは**全件表示**です。
+## 11. Session State 仕様
 
----
+### 11-1. 分析結果の保存
 
-**Q. CSVが出力できない**
-→ 分析結果が0件の場合もダウンロードボタンは表示されますが、
-CSVは空ファイルになる場合があります。
-データがあるページでダウンロードしてください。
-
----
-
-**Q. 売価マスタ未登録時の動作**
-→ campaign_theme が PRICES に存在しない商品は、
-追加・削除・CPC調整のすべての判定から除外されます。
-該当商品を利用するにはPRICES辞書への登録が必要です。
-""")
-
-    # ── デバッグ情報 ──────────────────────────────────────────────────
-    with st.expander("ℹ️ デバッグ情報"):
-        dbg = st.session_state.get("dbg", {})
-        st.json(dbg)
-
-
-
-# ─── Page Router ─────────────────────────────────────
-_PAGE_FUNCS = {
-    "📋 キーワード追加":              page_add_kw,
-    "📊 DateDive売れる予測KW":        page_dd_v4,
-    "🚫 キーワード削除":              page_del_kw,
-    "📈 キーワードCPC調整":                   page_cpc,
-    "🎯 商品CPC調整":                  page_cpc_product,
-    "📹 動画CPC調整":                  page_cpc_video,
-    "➕ 商品追加":                     page_pt_add_manual,
-    "🗑️ 商品削除":                    page_pt_del_manual,
-    "📹 動画追加":                     page_pt_add_video,
-    "📹 動画削除":                     page_pt_del_video,
-    "📄 オートKW削除":               page_auto_del_kw,
-    "🎯 オート商品削除":             page_auto_del_product,
-    "🎥 オート動画削除":             page_auto_del_video,
-    "📥 ダウンロード":                 page_download,
-    "📖 取扱説明書":                   page_manual,
+```python
+st.session_state[f"_anls_{csv_key}_result"] = {
+    "merged":       merged,        # 分析済み DataFrame
+    "camps":        camps,         # キャンペーン一覧
+    "stats":        (n_total, n_kaizen, n_akka, n_henko, rate),
+    "hist_fname":   hist_fname,    # analysis_reports ファイル名
+    "label":        label,         # 分析ラベル
+    "period_days":  period_days,   # 分析期間
+    "n_before":     len(before_df),
+    "n_history":    n_history,     # CPC 分析のみ（KW 追加は None）
 }
-_PAGE_FUNCS[current_page]()
+```
+
+### 11-2. 更新タイミング
+
+「🔍 分析実行」ボタン押下時のみ更新する。
+
+### 11-3. 更新しないタイミング
+
+以下の操作では Session State を更新しない:
+
+- キャンペーン切替 selectbox 変更
+- expander の開閉
+- タブの切替
+- 「💾 分析結果を保存」ボタン（JSON ファイルへの書き込みのみ）
+
+### 11-4. 再実行の禁止
+
+分析結果は Session State に保持し、UI 操作のたびに再実行しない。  
+一度実行した分析結果は画面遷移後も保持する。
+
+---
+
+## 12. UI 仕様
+
+### 12-1. タブ構成
+
+6 ページ関数それぞれに `st.tabs(["改善", "分析"])` を持つ:
+
+| ページ関数 | 改善タブ内容 | 分析タブ内容 |
+|-----------|------------|------------|
+| `page_add_kw()` | KW 追加抽出 | 30 日分析 |
+| `page_cpc()` | CPC 調整 | 7 日分析 |
+| `page_cpc_product()` | 商品 CPC 調整 | 商品 CPC 分析 |
+| `page_cpc_video()` | 動画 CPC 調整 | 動画 CPC 分析 |
+| `page_pt_add_manual()` | 手動 PT 追加 | PT 分析 |
+| `page_pt_add_video()` | 動画 PT 追加 | 動画 PT 分析 |
+
+### 12-2. 分析結果 UI 構成
+
+```
+① サマリー 5 カード
+   分析対象件数 / 🟢改善件数 / 🔴悪化件数 / 🟡変化なし件数 / 改善率
+
+② 件数インフォ（CPC 分析のみ）
+   変更履歴N件 | CSV一致M件 | 不一致K件 | 分析対象M件
+
+③ キャンペーン絞り込み selectbox
+
+④ キャンペーン別サマリーテーブル（expander）
+
+⑤ 対象一覧
+   ---
+   🟢/🔴/🟡 キーワード名
+   　改善/悪化/変化なし
+   ▶ 詳細（expander）
+     Before / After 各指標の比較
+
+⑥ 分析結果を保存ボタン
+⑦ 保存済み分析履歴（expander）
+```
+
+### 12-3. 一覧 UI ルール
+
+- 一覧に数字を表示しない
+- アイコン / 判定 / ▶詳細 の 3 行のみ
+- Before/After の数値は ▶詳細 expander 内のみ表示
+
+### 12-4. 5 カード定義
+
+| カード | 色 | 内容 |
+|--------|----|------|
+| 分析対象 | 青 | `n_total` 件 |
+| 🟢 改善 | 緑 | `n_kaizen` 件 |
+| 🔴 悪化 | 赤 | `n_akka` 件 |
+| 🟡 変化なし | 黄 | `n_henko` 件 |
+| 改善率 | 紫 | `rate` % |
+
+---
+
+## 13. 変更禁止事項
+
+### 13-1. コード上の変更禁止事項
+
+| 禁止内容 | 理由 |
+|----------|------|
+| `rcsv()` / `fcol()` / `norm()` / `tonum()` の変更 | 全処理の基盤 |
+| `assign_cpc_rank()` / `build_cpc_df()` の変更 | CPC ランク判定基盤 |
+| `_anls_parse_csv()` の変更 | After CSV 列検出ロジック |
+| `_anls_row_judge()` の変更 | Ver1.1 まで凍結 |
+| `_anls_render_list()` の変更 | UI 凍結 |
+| `_anls_detail_html()` の変更 | UI 凍結 |
+| `_anls_summary_html()` の変更 | 5 カード凍結 |
+| Session State キー名の変更 | 既存保存データとの互換性 |
+| `cpc_change_history.json` スキーマの変更 | 既存履歴との互換性 |
+| `analysis_reports` JSON スキーマの変更 | 蓄積データとの互換性 |
+| サイドバー構成の変更 | 画面遷移凍結 |
+| merge の `how="inner"` の変更 | 設計根拠あり |
+
+### 13-2. 運用上の変更禁止事項
+
+- 分析対象の定義変更（実際にエクスポートしたキーワード以外を対象にしない）
+- 一致キーの構成変更（match_type を追加する場合は Ver2 で設計から行う）
+- 履歴保存タイミングの変更（ダウンロード時以外に保存しない）
+
+---
+
+## 14. Claude 開発ルール
+
+AI（Claude / ChatGPT / Gemini）が本プロジェクトを引き継ぐ際の必須ルール。
+
+### 14-1. 作業前の必須確認
+
+```
+① app_v1_final.py を最初から最後まで読み込む
+② 変更対象の関数を特定する
+③ 参照元・参照先を grep で確認する
+④ 影響範囲を列挙する
+⑤ 変更内容を提案し、ユーザーの承認を得てから実装する
+```
+
+### 14-2. 禁止事項
+
+- 推測による回答禁止
+- コード確認なしの修正禁止
+- 影響範囲の無確認修正禁止
+- 複数箇所を同時変更する際の無連絡禁止
+- 変更禁止箇所の変更禁止
+- ダミーコード・省略コードの出力禁止
+
+### 14-3. 必須報告事項
+
+変更を行う場合、以下を必ず報告する:
+
+1. 修正した関数名一覧
+2. 変更内容（旧コード / 新コード）
+3. 変更理由（コードを根拠に）
+4. 影響範囲
+5. 変更禁止事項に触れていないことの確認
+
+### 14-4. ファイル出力ルール
+
+- 既存ファイルへの上書きは EPERM エラーの可能性あり
+- 新バージョンは必ず新ファイル名で出力する（例: `app_v1_1_final.py`）
+- Python スクリプトを使用して read/replace/write を行う（Edit ツールはマルチバイト文字で失敗する場合あり）
+- 出力後は必ず `python3 -m py_compile` で構文確認する
+
+### 14-5. セッション引継ぎ時の参照順序
+
+```
+1. この DEVELOPMENT_RULES.md を読み込む
+2. app_v1_final.py を読み込む
+3. 最新の変更差分を確認する
+4. 作業を開始する
+```
+
+---
+
+## 15. 実運用フロー
+
+### 15-1. CPC 分析フロー（毎週）
+
+```
+月曜日
+  ↓ 週次 CSV レポートを ANIHA に読み込む
+  ↓ CPC 調整タブで「CPC調整 実行用.csv」を確認
+  ↓ 「📥 CPC調整_実行用.csv」をダウンロード（← 履歴自動保存）
+  ↓ Amazon 広告コンソールへ CSV アップロード
+
+翌週月曜日（7 日後）
+  ↓ 7 日分レポートを CSV でダウンロード
+  ↓ ANIHA の「分析タブ」へ CSV をアップロード
+  ↓ 「🔍 分析実行」を押す
+  ↓ 改善 / 悪化 / 変化なし を確認
+  ↓ 「💾 分析結果を保存」（任意）
+```
+
+### 15-2. KW 追加分析フロー（毎月）
+
+```
+月初
+  ↓ 月次 CSV レポートを ANIHA に読み込む
+  ↓ キーワード追加タブで追加候補を確認・ダウンロード
+  ↓ Amazon 広告コンソールへ KW を追加
+
+翌月（30 日後）
+  ↓ 30 日分レポートを CSV でダウンロード
+  ↓ ANIHA の「分析タブ」へ CSV をアップロード
+  ↓ 「🔍 分析実行」を押す
+  ↓ 改善 / 悪化 / 変化なし を確認
+```
+
+### 15-3. 判定精度の検証（毎回必須）
+
+| 確認項目 | 確認内容 |
+|----------|----------|
+| 改善判定精度 | 「改善」と判定されたものは実際に改善しているか |
+| 悪化判定精度 | 「悪化」と判定されたものは実際に悪化しているか |
+| 変化なし適切性 | 「変化なし」の件数は多すぎないか・少なすぎないか |
+| 感覚との一致 | 分析結果が運用者の直感と一致するか |
+
+精度が低い場合は実データを添えて Ver1.1 の閾値調整を依頼する。
+
+---
+
+## 16. 今後のロードマップ
+
+| フェーズ | 内容 | 状態 |
+|----------|------|------|
+| Phase 1 | 設計 | ✅ 完了 |
+| Phase 2 | 実装 | ✅ 完了 |
+| Phase 3 | Ver1 確定 | ✅ 完了 |
+| Phase 4 | 実運用・データ蓄積 | 🟢 進行中 |
+| Phase 5 | Ver1.1 判定精度改善 | ⏳ 実データ蓄積後 |
+| Phase 6 | Ver2 設計開始 | ⏳ Ver1.1 完成後 |
+
+---
+
+## 17. バージョン管理ルール
+
+### 17-1. バージョン定義
+
+| バージョン | 定義 |
+|-----------|------|
+| Ver1.x | 判定ロジックの閾値調整のみ |
+| Ver2.x | 設計変更・新機能追加・UI 全面変更を含む場合 |
+
+### 17-2. ファイル命名規則
+
+```
+app_v1_final.py       # Ver1 本番（凍結）
+app_v1_1_final.py     # Ver1.1 本番（閾値調整後）
+app_v2_draft.py       # Ver2 開発中
+app_v2_final.py       # Ver2 本番
+```
+
+### 17-3. バージョンアップの条件
+
+| バージョン | 条件 |
+|-----------|------|
+| Ver1 → Ver1.1 | 実データ蓄積後、閾値調整のみで精度向上が見込める場合 |
+| Ver1.1 → Ver2 | 設計変更・新分析機能・UI 大幅変更が必要な場合 |
+
+### 17-4. リリース前チェックリスト
+
+```
+□ python3 -m py_compile でエラーなし
+□ 変更禁止事項に触れていないことを確認
+□ 変更した関数のみ全文出力・レビュー完了
+□ 影響範囲の確認完了
+□ 既存機能が壊れていないことを確認
+```
+
+---
+
+## 18. Ver2 で予定している内容（未確定）
+
+> **注意:** 以下は現時点での検討候補。実運用データの蓄積後に正式決定する。Ver1 開発中に実装してはならない。
+
+| 候補機能 | 概要 |
+|----------|------|
+| Match Type 対応 | 一致キーに Match Type を追加（4 キー化） |
+| 複数履歴の選択分析 | `cpc_change_history.json` の任意エントリを選択して分析 |
+| 分析期間の可変化 | 7 日 / 14 日 / 30 日を選択可能に |
+| KW 追加履歴保存 | KW 追加分析にも history 保存を追加 |
+| 商品 CPC 分析の完全対応 | `_render_pt_cpc_page` への history 保存追加 |
+| ダッシュボード画面 | 全分析結果のサマリーを 1 画面で表示 |
+| CSV 自動判定 | After CSV のフォーマットを自動識別 |
+| エラーハンドリング強化 | CSV 形式不一致時の詳細エラーメッセージ |
+
+---
+
+*この仕様書は ANIHA Ver1 確定時点の情報を記載している。変更が生じた場合は該当セクションを更新し、更新日・更新理由を冒頭に追記すること。*
