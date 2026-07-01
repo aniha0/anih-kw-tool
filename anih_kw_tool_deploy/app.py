@@ -1496,7 +1496,8 @@ def _anls_build_asin_after(df, cc, sc, oc_, od, clk, tkc, camp_pat) -> pd.DataFr
     d["_cost_n"] = tonum(d[oc_])
     d = d[d["_cost_n"] > 0].copy()
     if camp_pat:
-        d = d[d[cc].apply(lambda x: camp_pat in str(x))].copy()
+        camps = set(camp_pat.split("|"))
+        d = d[d[cc].astype(str).isin(camps)].copy()
     def _ext_asin(v):
         m = re.search(r'B0[A-Z0-9]{8}', str(v), re.IGNORECASE)
         return m.group(0).upper() if m else ""
@@ -1566,6 +1567,73 @@ def _anls_row_judge(row):
         return "改善" if pct > 0 else "悪化"
     except Exception:
         return "変化なし"
+
+
+def _anls_generate_insight(row):
+    """既存の_判定結果(_anls_row_judgeの出力)と、算出済みのBefore/After値のみから
+    「理由」「広告運用で触るべき項目」の文字列リストを組み立てる。
+    新しい集計・新しい判定基準・AI推論は一切行わない。単純な数値の大小比較のみ。
+    使用する値: ROAS_b/a, orders_b/a, sales_b/a, cost_b/a, avg_cpc_b/a, _判定"""
+    def _f(key):
+        try:
+            v = row.get(key)
+            if v is None:
+                return 0.0
+            v = float(v)
+            return v if v == v else 0.0  # NaN check
+        except Exception:
+            return 0.0
+
+    roas_b, roas_a   = _f("ROAS_b"), _f("ROAS_a")
+    orders_b, orders_a = _f("orders_b"), _f("orders_a")
+    sales_b, sales_a = _f("sales_b"), _f("sales_a")
+    cost_b, cost_a   = _f("cost_b"), _f("cost_a")
+    cpc_b, cpc_a     = _f("avg_cpc_b"), _f("avg_cpc_a")
+
+    j = row.get("_判定", "変化なし")
+
+    reasons = []
+    if roas_a > roas_b:
+        reasons.append(f"・ROASが{roas_b:.2f}→{roas_a:.2f}へ上昇")
+    elif roas_a < roas_b:
+        reasons.append(f"・ROASが{roas_b:.2f}→{roas_a:.2f}へ低下")
+    else:
+        reasons.append(f"・ROASの変動は小さい（{roas_b:.2f}→{roas_a:.2f}）")
+
+    cpc_maintained = (cpc_a == cpc_b)
+    if cpc_maintained:
+        reasons.append("・平均CPCは維持")
+    elif cpc_a > cpc_b:
+        reasons.append(f"・平均CPCが¥{cpc_b:.0f}→¥{cpc_a:.0f}へ上昇")
+    else:
+        reasons.append(f"・平均CPCが¥{cpc_b:.0f}→¥{cpc_a:.0f}へ低下")
+
+    if orders_a > orders_b:
+        reasons.append(f"・注文数が{orders_b:.0f}→{orders_a:.0f}件へ増加")
+    elif orders_a < orders_b:
+        reasons.append(f"・注文数が{orders_b:.0f}→{orders_a:.0f}件へ減少")
+
+    if cost_a > cost_b and sales_a <= sales_b:
+        reasons.append("・広告費が増加したが売上は伸びていない")
+
+    actions = []
+    if j == "改善":
+        if cpc_maintained:
+            actions.append("・CPCを維持")
+        if orders_a > orders_b:
+            actions.append("・予算増額を検討")
+        if not actions:
+            actions.append("・現状維持")
+    elif j == "悪化":
+        actions.append("・CPCを下げる")
+        if cost_a > cost_b and orders_a <= orders_b:
+            actions.append("・検索語句レポート確認")
+            actions.append("・不要ターゲット停止候補")
+    else:
+        actions.append("・現状維持")
+        actions.append("・1週間様子を見る")
+
+    return reasons, actions
 
 
 def _anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate):
@@ -1763,6 +1831,10 @@ def _anls_render_list(merged, id_col):
         st.markdown(f'　<span style="color:{clr};font-weight:700;">{j}</span>', unsafe_allow_html=True)
         with st.expander("▶ 詳細", expanded=False):
             st.markdown(_anls_detail_html(row, id_col), unsafe_allow_html=True)
+            _insight_reasons, _insight_actions = _anls_generate_insight(row)
+            _reason_hdr = f"{j}理由" if j in ("改善", "悪化") else "理由"
+            st.markdown(f"**{_reason_hdr}**\n" + "\n".join(_insight_reasons))
+            st.markdown("**■広告運用で触るべき項目**\n" + "\n".join(_insight_actions))
 
 
 def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
