@@ -1026,7 +1026,6 @@ def _anls_save(fname: str, records: list):
         encoding="utf-8")
 
 def _anls_parse_csv(csv_file):
-    """分析用CSVを読み込んで主要カラム名を返す (df, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn)"""
     df = rcsv(csv_file)
     kc  = fcol(df, ["検索用語","カスタマーの検索用語","Customer Search Term","search term"])
     cc  = fcol(df, ["キャンペーン名","Campaign Name","campaign name"])
@@ -1045,20 +1044,16 @@ def _anls_parse_csv(csv_file):
     return df, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn
 
 def _anls_build_kw_after(df, kc, cc, sc, oc_, od, clk) -> pd.DataFrame:
-    """キーワード追加分析用: オート行を kw_norm 単位で集計して返す"""
     if not all([kc, cc, sc, oc_]): return pd.DataFrame()
     df = df.copy()
     df["kn"] = df[kc].apply(norm)
     df["ct"] = df[cc].apply(lambda x: official(get_theme(str(x))))
     df = df[df[cc].str.contains("オート|auto", case=False, na=False)].copy()
     if df.empty: return pd.DataFrame()
-    agg_d = {
-        "keyword": (kc, "first"),
-        "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
-        "sales": (sc, "sum"), "cost": (oc_, "sum"),
-    }
-    if od:  agg_d["orders"] = (od, "sum")
-    if clk: agg_d["clicks"] = (clk, "sum")
+    agg_d = {"keyword":(kc,"first"),"campaign_theme":("ct",lambda x: x.mode().iloc[0] if len(x)>0 else "未分類"),
+              "sales":(sc,"sum"),"cost":(oc_,"sum")}
+    if od:  agg_d["orders"] = (od,"sum")
+    if clk: agg_d["clicks"] = (clk,"sum")
     agg = df.groupby("kn").agg(**agg_d).reset_index(drop=True)
     agg["ROAS"] = agg.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
     if "clicks" in agg.columns and "orders" in agg.columns:
@@ -1067,34 +1062,28 @@ def _anls_build_kw_after(df, kc, cc, sc, oc_, od, clk) -> pd.DataFrame:
     return agg
 
 def _anls_build_cpc_after(df, cc, sc, oc_, od, clk, kwt_col) -> pd.DataFrame:
-    """CPC調整分析用: SP広告マニュアル行を Keyword Text 単位で集計して返す"""
-    cpc_col = kwt_col
-    if not all([cc, sc, oc_, cpc_col]): return pd.DataFrame()
+    if not all([cc, sc, oc_, kwt_col]): return pd.DataFrame()
     df = df.copy()
     df["ct"] = df[cc].apply(lambda x: official(get_theme(str(x))))
     mask = (df[cc].str.contains("SP広告.*マニュアル|SP.*manual", case=False, na=False)
             & ~df[cc].str.contains("商品ターゲ|動画ターゲ|オート|auto", case=False, na=False))
     df = df[mask].copy()
     if df.empty: return pd.DataFrame()
-    df["_kn"] = df[cpc_col].apply(norm)
+    df["_kn"] = df[kwt_col].apply(norm)
     df = df[df["_kn"].str.strip() != ""].copy()
     if df.empty: return pd.DataFrame()
-    agg_d = {
-        "keyword": (cpc_col, "first"),
-        "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
-        "sales": (sc, "sum"), "cost": (oc_, "sum"),
-    }
-    if od:  agg_d["orders"] = (od, "sum")
-    if clk: agg_d["clicks"] = (clk, "sum")
+    agg_d = {"keyword":(kwt_col,"first"),"campaign_theme":("ct",lambda x: x.mode().iloc[0] if len(x)>0 else "未分類"),
+              "sales":(sc,"sum"),"cost":(oc_,"sum")}
+    if od:  agg_d["orders"] = (od,"sum")
+    if clk: agg_d["clicks"] = (clk,"sum")
     agg = df.groupby(["ct","_kn"]).agg(**agg_d).reset_index(drop=True)
     agg["ROAS"] = agg.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
     if "clicks" in agg.columns:
-        agg["avg_cpc"] = (agg["cost"]/agg["clicks"].replace(0, float("nan"))).round(0).fillna(0).astype(int)
+        agg["avg_cpc"] = (agg["cost"]/agg["clicks"].replace(0,float("nan"))).round(0).fillna(0).astype(int)
     agg["_kn_key"] = agg["keyword"].apply(norm)
     return agg
 
 def _anls_build_asin_after(df, cc, sc, oc_, od, clk, tkc, camp_pat) -> pd.DataFrame:
-    """商品/動画 ASIN 単位で集計して返す"""
     import re as _re_ax
     def _ex(s):
         m = _re_ax.search(r'B0[A-Z0-9]{8}', str(s), _re_ax.IGNORECASE)
@@ -1107,275 +1096,274 @@ def _anls_build_asin_after(df, cc, sc, oc_, od, clk, tkc, camp_pat) -> pd.DataFr
     df["_asin"] = df[tkc].apply(_ex)
     df = df[df["_asin"] != ""].copy()
     if df.empty: return pd.DataFrame()
-    agg_d = {
-        "asin": ("_asin","first"),
-        "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x)>0 else "未分類"),
-        "sales": (sc,"sum"), "cost": (oc_,"sum"),
-    }
-    if od:  agg_d["orders"] = (od, "sum")
-    if clk: agg_d["clicks"] = (clk, "sum")
+    agg_d = {"asin":("_asin","first"),"campaign_theme":("ct",lambda x: x.mode().iloc[0] if len(x)>0 else "未分類"),
+              "sales":(sc,"sum"),"cost":(oc_,"sum")}
+    if od:  agg_d["orders"] = (od,"sum")
+    if clk: agg_d["clicks"] = (clk,"sum")
     agg = df.groupby("_asin").agg(**agg_d).reset_index(drop=True)
     agg["ROAS"] = agg.apply(lambda r: round(r["sales"]/r["cost"],2) if r["cost"]>0 else 0.0, axis=1)
     if "clicks" in agg.columns:
-        agg["avg_cpc"] = (agg["cost"]/agg["clicks"].replace(0, float("nan"))).round(0).fillna(0).astype(int)
+        agg["avg_cpc"] = (agg["cost"]/agg["clicks"].replace(0,float("nan"))).round(0).fillna(0).astype(int)
     return agg
 
 def _anls_judge(b, a, higher_ok=True):
-    """改善判定文字列を返す"""
     if b == 0: return "ー"
     pct = (a - b) / b * 100
     if abs(pct) < 2: return "→ 変化なし"
     if higher_ok: return f"↑ 改善 ({pct:+.1f}%)" if pct > 0 else f"↓ 悪化 ({pct:+.1f}%)"
     return f"↓ 改善 ({pct:+.1f}%)" if pct < 0 else f"↑ 悪化 ({pct:+.1f}%)"
 
-def _anls_html_table(rows):
-    """list[dict] → HTML テーブル文字列"""
-    if not rows: return ""
-    cols = list(rows[0].keys())
+def _anls_pct_str(b, a):
+    if not b or float(b) == 0: return "ー"
+    pct = (float(a) - float(b)) / float(b) * 100
+    return f"{'+' if pct>=0 else ''}{pct:.0f}%"
+
+def _anls_diff_str(b, a, unit=""):
+    diff = float(a) - float(b)
+    return f"{'+' if diff>=0 else ''}{diff:,.0f}{unit}"
+
+def _anls_row_judge(row):
+    """ROASベースで行の改善判定: 改善 / 悪化 / 変化なし"""
+    b = float(row.get("ROAS_b", 0) or 0)
+    a = float(row.get("ROAS_a", 0) or 0)
+    j = _anls_judge(b, a)
+    if "改善" in j: return "改善"
+    if "悪化" in j: return "悪化"
+    return "変化なし"
+
+def _anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate):
+    def _card(bg, brd, lc, vc, label, val):
+        return (f'<div style="background:{bg};border:1px solid {brd};border-radius:10px;'
+                f'padding:12px 20px;text-align:center;min-width:90px;">'
+                f'<div style="font-size:.7rem;color:{lc};font-weight:700;letter-spacing:.05em;">{label}</div>'
+                f'<div style="font-size:1.55rem;font-weight:800;color:{vc};margin-top:2px;">{val}</div>'
+                f'</div>')
+    cards = (
+        _card("#EBF8FF","#90CDF4","#2C5282","#2B6CB0","分析対象",f"{n_total}件") +
+        _card("#F0FFF4","#9AE6B4","#276749","#276749","🟢 改善",f"{n_kaizen}件") +
+        _card("#FFF5F5","#FEB2B2","#C53030","#C53030","🔴 悪化",f"{n_akka}件") +
+        _card("#FFFFF0","#F6E05E","#744210","#744210","🟡 変化なし",f"{n_henko}件") +
+        _card("#FAF5FF","#D6BCFA","#553C9A","#553C9A","改善率",f"{rate:.0f}%")
+    )
+    return f'<div style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap;">{cards}</div>'
+
+def _anls_camp_table_html(merged):
+    """キャンペーン別 改善サマリーをHTMLテーブルで返す"""
+    _J = {"改善":"🟢","悪化":"🔴","変化なし":"🟡"}
+    rows_html = ""
+    for ct, grp in merged.groupby("campaign_theme"):
+        n  = len(grp)
+        nk = int((grp["_判定"]=="改善").sum())
+        na = int((grp["_判定"]=="悪化").sum())
+        nv = int((grp["_判定"]=="変化なし").sum())
+        rate = f"{nk/n*100:.0f}%" if n > 0 else "ー"
+        def _avg_pct(col_b, col_a):
+            if col_b not in grp.columns or col_a not in grp.columns: return "ー"
+            b = grp[col_b].mean(); a = grp[col_a].mean()
+            return _anls_pct_str(b, a)
+        roas_chg = _avg_pct("ROAS_b","ROAS_a")
+        cvr_chg  = (f"{grp['CVR_a'].mean()-grp['CVR_b'].mean():+.1f}pt"
+                    if "CVR_b" in grp.columns and "CVR_a" in grp.columns else "ー")
+        if "cost_b" in grp.columns and "clicks_b" in grp.columns and grp["clicks_b"].sum()>0:
+            cpc_b = grp["cost_b"].sum()/grp["clicks_b"].sum()
+            cpc_a = grp["cost_a"].sum()/grp["clicks_a"].sum() if "clicks_a" in grp.columns and grp["clicks_a"].sum()>0 else 0
+            cpc_chg = f"{cpc_a-cpc_b:+.0f}円"
+        else:
+            cpc_chg = "ー"
+        rows_html += (
+            f'<tr><td style="padding:7px 10px;border:1px solid #E2E8F0;font-weight:600;">{ct}</td>'
+            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;color:#276749;text-align:center;">🟢 {nk}件</td>'
+            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;color:#C53030;text-align:center;">🔴 {na}件</td>'
+            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;color:#744210;text-align:center;">🟡 {nv}件</td>'
+            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;text-align:center;font-weight:700;">{rate}</td>'
+            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;text-align:center;">{roas_chg}</td>'
+            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;text-align:center;">{cvr_chg}</td>'
+            f'<td style="padding:7px 10px;border:1px solid #E2E8F0;text-align:center;">{cpc_chg}</td>'
+            f'</tr>'
+        )
     hd = "".join(
-        f'<th style="padding:7px 10px;border:1px solid #E2E8F0;background:#EBF4FF;'
-        f'text-align:center;font-size:.82rem;">{c}</th>' for c in cols)
-    bd = ""
-    for r in rows:
-        bd += "<tr>" + "".join(
-            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:center;'
-            f'font-size:.82rem;">{v}</td>' for v in r.values()) + "</tr>"
-    return (f'<table style="width:100%;border-collapse:collapse;margin-top:8px;">'
-            f'<thead><tr>{hd}</tr></thead><tbody>{bd}</tbody></table>')
+        f'<th style="padding:7px 10px;border:1px solid #E2E8F0;background:#EBF4FF;text-align:center;font-size:.8rem;">{c}</th>'
+        for c in ["キャンペーン","改善","悪化","変化なし","改善率","ROAS変化","CVR変化","CPC変化"])
+    return (f'<table style="width:100%;border-collapse:collapse;font-size:.82rem;">'
+            f'<thead><tr>{hd}</tr></thead><tbody>{rows_html}</tbody></table>')
+
+def _anls_detail_html(row, id_col):
+    """Before / After 詳細をHTMLで返す"""
+    metrics = [
+        ("売上",   "sales_b",  "sales_a",  "¥{:,.0f}", True),
+        ("広告費", "cost_b",   "cost_a",   "¥{:,.0f}", False),
+        ("ROAS",   "ROAS_b",   "ROAS_a",   "{:.2f}",   True),
+        ("CVR",    "CVR_b",    "CVR_a",    "{:.1f}%",  True),
+        ("注文数", "orders_b", "orders_a", "{:.0f}件", True),
+        ("クリック","clicks_b","clicks_a", "{:.0f}",   True),
+    ]
+    # CPC (cost/clicks)
+    cpc_b = (float(row.get("cost_b",0) or 0)/float(row.get("clicks_b",1) or 1)
+             if float(row.get("clicks_b",0) or 0) > 0 else None)
+    cpc_a = (float(row.get("cost_a",0) or 0)/float(row.get("clicks_a",1) or 1)
+             if float(row.get("clicks_a",0) or 0) > 0 else None)
+    def _fmt(val, fmt):
+        try: return fmt.format(float(val))
+        except Exception: return "ー"
+    def _jclr(b, a, higher_ok=True):
+        j = _anls_judge(float(b or 0), float(a or 0), higher_ok)
+        return ("#276749" if "改善" in j else "#C53030" if "悪化" in j else "#718096"), j
+    rows_h = ""
+    for lbl, cb, ca, fmt, hok in metrics:
+        bv = row.get(cb); av = row.get(ca)
+        if bv is None and av is None: continue
+        bvs = _fmt(bv, fmt); avs = _fmt(av, fmt)
+        clr, jt = _jclr(bv or 0, av or 0, hok)
+        rows_h += (
+            f'<tr><td style="padding:6px 10px;border:1px solid #E2E8F0;font-weight:600;">{lbl}</td>'
+            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{bvs}</td>'
+            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{avs}</td>'
+            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:center;color:{clr};font-weight:700;">{jt}</td>'
+            f'</tr>')
+    if cpc_b is not None or cpc_a is not None:
+        bvs = f"¥{cpc_b:.0f}" if cpc_b else "ー"
+        avs = f"¥{cpc_a:.0f}" if cpc_a else "ー"
+        clr, jt = _jclr(cpc_b or 0, cpc_a or 0, False)
+        rows_h += (
+            f'<tr><td style="padding:6px 10px;border:1px solid #E2E8F0;font-weight:600;">CPC</td>'
+            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{bvs}</td>'
+            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:right;">{avs}</td>'
+            f'<td style="padding:6px 10px;border:1px solid #E2E8F0;text-align:center;color:{clr};font-weight:700;">{jt}</td>'
+            f'</tr>')
+    hd = "".join(f'<th style="padding:7px 10px;border:1px solid #E2E8F0;background:#EBF4FF;text-align:center;">{c}</th>'
+                 for c in ["指標","Before","After","判定"])
+    return (f'<table style="width:100%;border-collapse:collapse;font-size:.82rem;margin-top:6px;">'
+            f'<thead><tr>{hd}</tr></thead><tbody>{rows_h}</tbody></table>')
+
+def _anls_render_list(merged, id_col):
+    _ICON = {"改善":"🟢","悪化":"🔴","変化なし":"🟡"}
+    _CLR  = {"改善":"#276749","悪化":"#C53030","変化なし":"#744210"}
+    for i, (_, row) in enumerate(merged.iterrows()):
+        j    = row.get("_判定","変化なし")
+        icon = _ICON.get(j,"🟡")
+        clr  = _CLR.get(j,"#718096")
+        kw   = str(row.get(id_col, ""))
+        kw_disp = kw[:40] + ("…" if len(kw) > 40 else "")
+        st.markdown("---")
+        st.markdown(f"**{icon} {kw_disp}**")
+        st.markdown(
+            f'　<span style="color:{clr};font-weight:700;">{j}</span>',
+            unsafe_allow_html=True)
+        with st.expander("▶ 詳細", expanded=False):
+            st.markdown(_anls_detail_html(row, id_col), unsafe_allow_html=True)
 
 def _anls_render_kw_tab(before_df: pd.DataFrame, period_days: int,
                         hist_fname: str, csv_key: str, label: str,
                         after_builder_type: str):
-    """
-    キーワード系 分析タブ 共通レンダラー。
-    after_builder_type: "kw_add" | "cpc_kw"
-    """
     st.markdown(f"#### 📊 {label} 分析")
     st.info(f"📅 分析期間: **{period_days}日固定** — {period_days}日レポートCSVをアップロードしてください。")
     if before_df is None or before_df.empty:
         st.warning("先に「改善」タブで抽出実行を行ってください。抽出対象が分析対象になります。")
         return
-    n_before = len(before_df)
-    kw_col = "keyword"
     camps = sorted(before_df["campaign_theme"].unique().tolist()) if "campaign_theme" in before_df.columns else []
-    st.markdown(f"**改善対象: {n_before}件　キャンペーン: {len(camps)}件**")
-
-    # ① キャンペーン一覧
-    with st.expander("① キャンペーン一覧（改善対象）", expanded=False):
-        if "campaign_theme" in before_df.columns:
-            _g = before_df.groupby("campaign_theme").size().reset_index(name="件数")
-            st.dataframe(_g, use_container_width=True)
-
-    # ② キャンペーン選択
-    sel_camp = st.selectbox("② キャンペーン選択", ["全キャンペーン"] + camps, key=f"_anls_{csv_key}_camp")
-
-    # CSV アップロード + 分析実行
     st.markdown(f"**③ 比較用 {period_days}日レポートCSVをアップロード**")
     af_file = st.file_uploader(f"{period_days}日レポートCSV", type="csv", key=csv_key)
     run_btn = st.button("🔍 分析実行", key=f"_anls_{csv_key}_run", type="primary")
-
     if run_btn and af_file is None:
-        st.warning("CSVをアップロードしてください。")
-        return
-    if not run_btn:
-        return
-
+        st.warning("CSVをアップロードしてください。"); return
+    if not run_btn: return
     with st.spinner("分析中..."):
         df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
         if not all([cc, sc, oc_]):
-            st.error("必要な列が見つかりません（キャンペーン名・売上・広告費）。")
-            return
+            st.error("必要な列が見つかりません（キャンペーン名・売上・広告費）。"); return
         if after_builder_type == "kw_add":
-            if not kc:
-                st.error("「検索用語」列が見つかりません。")
-                return
+            if not kc: st.error("「検索用語」列が見つかりません。"); return
             after_df = _anls_build_kw_after(df_raw, kc, cc, sc, oc_, od, clk)
-        else:  # cpc_kw
+        else:
             kw_col_cpc = kwt if kwt else fcol(df_raw, ["ターゲティング","Targeting","targeting"])
             after_df = _anls_build_cpc_after(df_raw, cc, sc, oc_, od, clk, kw_col_cpc)
         if after_df.empty:
-            st.warning("Afterデータが取得できませんでした。キャンペーン構成を確認してください。")
-            return
-
-        # Before に _kn_key を付与してマッチング
+            st.warning("Afterデータが取得できませんでした。"); return
         bf = before_df.copy()
-        bf["_kn_key"] = bf[kw_col].apply(norm) if kw_col in bf.columns else bf.index.astype(str)
-        sfx_cols = [c for c in ["sales","cost","ROAS","orders","clicks","CVR","avg_cpc"] if c in after_df.columns]
-        merged = bf.merge(after_df[["_kn_key"] + sfx_cols], on="_kn_key", how="inner", suffixes=("_b","_a"))
-        if sel_camp != "全キャンペーン" and "campaign_theme" in merged.columns:
-            merged = merged[merged["campaign_theme"] == sel_camp].copy()
-
-    n_matched = len(merged)
-    st.markdown(f"**マッチ件数: {n_matched}件 / 改善対象: {n_before}件**")
+        bf["_kn_key"] = bf["keyword"].apply(norm) if "keyword" in bf.columns else bf.index.astype(str)
+        sfx = [c for c in ["sales","cost","ROAS","orders","clicks","CVR","avg_cpc"] if c in after_df.columns]
+        merged = bf.merge(after_df[["_kn_key"]+sfx], on="_kn_key", how="inner", suffixes=("_b","_a"))
     if merged.empty:
-        st.info("マッチするキーワードが見つかりませんでした。同キャンペーンのCSVを確認してください。")
-        return
-
-    # ③ キャンペーン比較
-    st.markdown("##### ③ キャンペーン比較")
-    has_b_sales = "sales_b" in merged.columns; has_a_sales = "sales_a" in merged.columns
-    if has_b_sales and has_a_sales:
-        _bc = merged.groupby("campaign_theme")[["sales_b","cost_b","ROAS_b"]].sum() if "cost_b" in merged.columns else pd.DataFrame()
-        if not _bc.empty:
-            _ac = merged.groupby("campaign_theme")[["sales_a","cost_a","ROAS_a"]].sum()
-            rows_c = []
-            for ct in _bc.index:
-                bs, ba = float(_bc.loc[ct,"sales_b"]), float(_ac.loc[ct,"sales_a"])
-                bc, ac_ = float(_bc.loc[ct,"cost_b"]), float(_ac.loc[ct,"cost_a"])
-                br, ar = float(_bc.loc[ct,"ROAS_b"]) if "ROAS_b" in _bc.columns else 0, float(_ac.loc[ct,"ROAS_a"]) if "ROAS_a" in _ac.columns else 0
-                rows_c.append({
-                    "キャンペーン": ct,
-                    "売上 Before": f"¥{bs:,.0f}", "売上 After": f"¥{ba:,.0f}", "売上 判定": _anls_judge(bs, ba),
-                    "広告費 Before": f"¥{bc:,.0f}", "広告費 After": f"¥{ac_:,.0f}", "広告費 判定": _anls_judge(bc, ac_, higher_ok=False),
-                    "ROAS Before": f"{br:.2f}", "ROAS After": f"{ar:.2f}", "ROAS 判定": _anls_judge(br, ar),
-                })
-            st.markdown(_anls_html_table(rows_c), unsafe_allow_html=True)
-
-    # ④⑤ 対象一覧 + Before/After
-    st.markdown("##### ④⑤ 対象一覧 Before / After")
-    _dcols_b = [c for c in [kw_col,"campaign_theme","sales_b","cost_b","ROAS_b","orders_b","CVR_b","avg_cpc_b"] if c in merged.columns]
-    _dcols_a = [c for c in ["sales_a","cost_a","ROAS_a","orders_a","CVR_a","avg_cpc_a"] if c in merged.columns]
-    _disp = merged[_dcols_b + _dcols_a].copy()
-    _ren = {kw_col:"キーワード","campaign_theme":"キャンペーン",
-            "sales_b":"売上_Before","cost_b":"広告費_Before","ROAS_b":"ROAS_Before",
-            "orders_b":"注文_Before","CVR_b":"CVR_Before","avg_cpc_b":"CPC_Before",
-            "sales_a":"売上_After","cost_a":"広告費_After","ROAS_a":"ROAS_After",
-            "orders_a":"注文_After","CVR_a":"CVR_After","avg_cpc_a":"CPC_After"}
-    _disp = _disp.rename(columns=_ren)
-    for c in [c for c in _disp.columns if "売上" in c or "広告費" in c]:
-        _disp[c] = _disp[c].apply(lambda x: f"¥{x:,.0f}" if isinstance(x,(int,float)) else x)
-    _disp.index = range(1, len(_disp)+1)
-    st.dataframe(_disp, use_container_width=True)
-
-    # 履歴保存
+        st.info("マッチするキーワードが見つかりませんでした。"); return
+    merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
+    n_total  = len(merged)
+    n_kaizen = int((merged["_判定"]=="改善").sum())
+    n_akka   = int((merged["_判定"]=="悪化").sum())
+    n_henko  = int((merged["_判定"]=="変化なし").sum())
+    rate     = n_kaizen / n_total * 100 if n_total > 0 else 0
+    st.markdown(_anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate), unsafe_allow_html=True)
+    sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"]+camps, key=f"_anls_{csv_key}_camp")
+    view = merged if sel_camp == "全キャンペーン" else merged[merged["campaign_theme"]==sel_camp].copy()
+    with st.expander("📊 キャンペーン別サマリー", expanded=True):
+        st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
+    st.markdown("#### 📋 対象一覧")
+    _anls_render_list(view, "keyword")
     if st.button("💾 分析結果を保存", key=f"_anls_{csv_key}_save"):
         _recs = _anls_load(hist_fname)
-        _recs.append({
-            "id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
-            "saved_at": _anls_dt.date.today().isoformat(),
-            "type": label, "period_days": period_days,
-            "n_before": n_before, "n_matched": n_matched,
-            "camps": camps,
-        })
+        _recs.append({"id":_anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
+                      "saved_at":_anls_dt.date.today().isoformat(),"type":label,
+                      "period_days":period_days,"n_before":len(before_df),
+                      "n_matched":n_total,"n_kaizen":n_kaizen,"n_akka":n_akka,"n_henko":n_henko,
+                      "rate":round(rate,1),"camps":camps})
         _anls_save(hist_fname, _recs)
         st.success("✅ 分析結果を保存しました。")
-
-    # 保存済み履歴
     with st.expander("📂 保存済み分析履歴", expanded=False):
         _recs = _anls_load(hist_fname)
-        if not _recs:
-            st.info("保存済み分析はありません。")
-        else:
-            st.dataframe(pd.DataFrame(_recs[::-1]), use_container_width=True)
-
+        if not _recs: st.info("保存済み分析はありません。")
+        else: st.dataframe(pd.DataFrame(_recs[::-1]), use_container_width=True)
 
 def _anls_render_asin_tab(before_df: pd.DataFrame, period_days: int,
                           hist_fname: str, csv_key: str, label: str, camp_pat: str):
-    """商品/動画 ASIN 系 分析タブ 共通レンダラー"""
     st.markdown(f"#### 📊 {label} 分析")
     st.info(f"📅 分析期間: **{period_days}日固定** — {period_days}日レポートCSVをアップロードしてください。")
     if before_df is None or before_df.empty:
-        st.warning("先に「改善」タブで抽出実行を行ってください。")
-        return
-    n_before = len(before_df)
-    id_col = "asin" if "asin" in before_df.columns else "keyword"
+        st.warning("先に「改善」タブで抽出実行を行ってください。"); return
     camps = sorted(before_df["campaign_theme"].unique().tolist()) if "campaign_theme" in before_df.columns else []
-    st.markdown(f"**改善対象: {n_before}件　キャンペーン: {len(camps)}件**")
-
-    with st.expander("① キャンペーン一覧（改善対象）", expanded=False):
-        if "campaign_theme" in before_df.columns:
-            _g = before_df.groupby("campaign_theme").size().reset_index(name="件数")
-            st.dataframe(_g, use_container_width=True)
-
-    sel_camp = st.selectbox("② キャンペーン選択", ["全キャンペーン"] + camps, key=f"_anls_{csv_key}_camp")
-
+    id_col = "asin" if "asin" in before_df.columns else "keyword"
     st.markdown(f"**③ 比較用 {period_days}日レポートCSVをアップロード**")
     af_file = st.file_uploader(f"{period_days}日レポートCSV", type="csv", key=csv_key)
     run_btn = st.button("🔍 分析実行", key=f"_anls_{csv_key}_run", type="primary")
-
     if run_btn and af_file is None:
-        st.warning("CSVをアップロードしてください。")
-        return
-    if not run_btn:
-        return
-
+        st.warning("CSVをアップロードしてください。"); return
+    if not run_btn: return
     with st.spinner("分析中..."):
         df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
         if not all([cc, sc, oc_, tkc]):
-            st.error("必要な列が見つかりません（キャンペーン名・売上・広告費・ターゲティング）。")
-            return
+            st.error("必要な列が見つかりません（キャンペーン名・売上・広告費・ターゲティング）。"); return
         after_df = _anls_build_asin_after(df_raw, cc, sc, oc_, od, clk, tkc, camp_pat)
-        if after_df.empty:
-            st.warning("Afterデータが取得できませんでした。")
-            return
-
+        if after_df.empty: st.warning("Afterデータが取得できませんでした。"); return
         bf = before_df.copy()
-        sfx_cols = [c for c in ["sales","cost","ROAS","orders","clicks","avg_cpc"] if c in after_df.columns]
+        sfx = [c for c in ["sales","cost","ROAS","orders","clicks","avg_cpc"] if c in after_df.columns]
         if id_col not in after_df.columns:
-            st.error(f"After データに '{id_col}' 列がありません。")
-            return
-        merged = bf.merge(after_df[[id_col] + sfx_cols], on=id_col, how="inner", suffixes=("_b","_a"))
-        if sel_camp != "全キャンペーン" and "campaign_theme" in merged.columns:
-            merged = merged[merged["campaign_theme"] == sel_camp].copy()
-
-    n_matched = len(merged)
-    st.markdown(f"**マッチ件数: {n_matched}件 / 改善対象: {n_before}件**")
-    if merged.empty:
-        st.info("マッチするASINが見つかりませんでした。")
-        return
-
-    # ③ キャンペーン比較
-    st.markdown("##### ③ キャンペーン比較")
-    if "sales_b" in merged.columns and "sales_a" in merged.columns:
-        _bc = merged.groupby("campaign_theme")[["sales_b","cost_b","ROAS_b"]].sum()
-        _ac = merged.groupby("campaign_theme")[["sales_a","cost_a","ROAS_a"]].sum()
-        rows_c = []
-        for ct in _bc.index:
-            bs, ba = float(_bc.loc[ct,"sales_b"]), float(_ac.loc[ct,"sales_a"])
-            bc, ac_ = float(_bc.loc[ct,"cost_b"]), float(_ac.loc[ct,"cost_a"])
-            br = float(_bc.loc[ct,"ROAS_b"]) if "ROAS_b" in _bc.columns else 0
-            ar = float(_ac.loc[ct,"ROAS_a"]) if "ROAS_a" in _ac.columns else 0
-            rows_c.append({
-                "キャンペーン": ct,
-                "売上 Before": f"¥{bs:,.0f}", "売上 After": f"¥{ba:,.0f}", "売上 判定": _anls_judge(bs, ba),
-                "広告費 Before": f"¥{bc:,.0f}", "広告費 After": f"¥{ac_:,.0f}", "広告費 判定": _anls_judge(bc, ac_, higher_ok=False),
-                "ROAS Before": f"{br:.2f}", "ROAS After": f"{ar:.2f}", "ROAS 判定": _anls_judge(br, ar),
-            })
-        st.markdown(_anls_html_table(rows_c), unsafe_allow_html=True)
-
-    # ④⑤ 対象別 Before/After
-    st.markdown("##### ④⑤ 対象別 Before / After")
-    _dcols_b = [c for c in [id_col,"campaign_theme","sales_b","cost_b","ROAS_b","orders_b","avg_cpc_b"] if c in merged.columns]
-    _dcols_a = [c for c in ["sales_a","cost_a","ROAS_a","orders_a","avg_cpc_a"] if c in merged.columns]
-    _disp = merged[_dcols_b + _dcols_a].copy()
-    _ren = {id_col:"ASIN","campaign_theme":"キャンペーン",
-            "sales_b":"売上_Before","cost_b":"広告費_Before","ROAS_b":"ROAS_Before",
-            "orders_b":"注文_Before","avg_cpc_b":"CPC_Before",
-            "sales_a":"売上_After","cost_a":"広告費_After","ROAS_a":"ROAS_After",
-            "orders_a":"注文_After","avg_cpc_a":"CPC_After"}
-    _disp = _disp.rename(columns=_ren)
-    for c in [c for c in _disp.columns if "売上" in c or "広告費" in c]:
-        _disp[c] = _disp[c].apply(lambda x: f"¥{x:,.0f}" if isinstance(x,(int,float)) else x)
-    _disp.index = range(1, len(_disp)+1)
-    st.dataframe(_disp, use_container_width=True)
-
+            st.error(f"After データに '{id_col}' 列がありません。"); return
+        merged = bf.merge(after_df[[id_col]+sfx], on=id_col, how="inner", suffixes=("_b","_a"))
+    if merged.empty: st.info("マッチするASINが見つかりませんでした。"); return
+    merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
+    n_total  = len(merged)
+    n_kaizen = int((merged["_判定"]=="改善").sum())
+    n_akka   = int((merged["_判定"]=="悪化").sum())
+    n_henko  = int((merged["_判定"]=="変化なし").sum())
+    rate     = n_kaizen / n_total * 100 if n_total > 0 else 0
+    st.markdown(_anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate), unsafe_allow_html=True)
+    sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"]+camps, key=f"_anls_{csv_key}_camp")
+    view = merged if sel_camp == "全キャンペーン" else merged[merged["campaign_theme"]==sel_camp].copy()
+    with st.expander("📊 キャンペーン別サマリー", expanded=True):
+        st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
+    st.markdown("#### 📋 対象一覧")
+    _anls_render_list(view, id_col)
     if st.button("💾 分析結果を保存", key=f"_anls_{csv_key}_save"):
         _recs = _anls_load(hist_fname)
-        _recs.append({
-            "id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
-            "saved_at": _anls_dt.date.today().isoformat(),
-            "type": label, "period_days": period_days,
-            "n_before": n_before, "n_matched": n_matched, "camps": camps,
-        })
+        _recs.append({"id":_anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
+                      "saved_at":_anls_dt.date.today().isoformat(),"type":label,
+                      "period_days":period_days,"n_before":len(before_df),
+                      "n_matched":n_total,"n_kaizen":n_kaizen,"n_akka":n_akka,"n_henko":n_henko,
+                      "rate":round(rate,1),"camps":camps})
         _anls_save(hist_fname, _recs)
         st.success("✅ 分析結果を保存しました。")
-
     with st.expander("📂 保存済み分析履歴", expanded=False):
         _recs = _anls_load(hist_fname)
-        if not _recs:
-            st.info("保存済み分析はありません。")
-        else:
-            st.dataframe(pd.DataFrame(_recs[::-1]), use_container_width=True)
+        if not _recs: st.info("保存済み分析はありません。")
+        else: st.dataframe(pd.DataFrame(_recs[::-1]), use_container_width=True)
 
 
 def page_add_kw():
@@ -1472,15 +1460,7 @@ def page_add_kw():
             _dd["CVR"] = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
         st.dataframe(_dd, use_container_width=True)
     with _t_tab2:
-        _anls_render_kw_tab(
-            before_df=dw,
-            period_days=30,
-            hist_fname="kw_add_analysis.json",
-            csv_key="anls_kw_add_csv",
-            label="キーワード追加",
-            after_builder_type="kw_add",
-        )
-
+        _anls_render_kw_tab(dw,30,"kw_add_analysis.json","anls_kw_add_csv","キーワード追加","kw_add")
 
 def page_del_kw():
     _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "< 0.8"), ("勝ちKW", "除外")])
@@ -1935,15 +1915,7 @@ def page_cpc():
             st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
                 file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
     with _t_tab2:
-        _anls_render_kw_tab(
-            before_df=dc_cpc,
-            period_days=7,
-            hist_fname="cpc_kw_analysis.json",
-            csv_key="anls_cpc_kw_csv",
-            label="キーワードCPC調整",
-            after_builder_type="cpc_kw",
-        )
-
+        _anls_render_kw_tab(dc_cpc,7,"cpc_kw_analysis.json","anls_cpc_kw_csv","キーワードCPC調整","cpc_kw")
 
 def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str):
     """商品ターゲ CPC調整ページ共通レンダラー（page_cpc()と同一ロジック・UI）"""
@@ -2141,28 +2113,14 @@ def page_cpc_product():
     with _t_tab1:
         _render_pt_cpc_page(dc_cpc_product, "商品CPC調整", "cpc_product_sel")
     with _t_tab2:
-        _anls_render_asin_tab(
-            before_df=dc_cpc_product,
-            period_days=7,
-            hist_fname="cpc_product_analysis.json",
-            csv_key="anls_cpc_pt_csv",
-            label="商品CPC調整",
-            camp_pat="商品ターゲ",
-        )
+        _anls_render_asin_tab(dc_cpc_product,7,"cpc_product_analysis.json","anls_cpc_pt_csv","商品CPC調整","商品ターゲ")
 
 def page_cpc_video():
     _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
     with _t_tab1:
         _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel")
     with _t_tab2:
-        _anls_render_asin_tab(
-            before_df=dc_cpc_video,
-            period_days=7,
-            hist_fname="cpc_video_analysis.json",
-            csv_key="anls_cpc_vid_csv",
-            label="動画CPC調整",
-            camp_pat="動画",
-        )
+        _anls_render_asin_tab(dc_cpc_video,7,"cpc_video_analysis.json","anls_cpc_vid_csv","動画CPC調整","動画")
 
 
 # ===================================================
@@ -2879,14 +2837,7 @@ def page_pt_add_manual():
     with _t_tab1:
         _render_pt_page("df_pt_add_m", True,  "商品", "pt_add_m_sel")
     with _t_tab2:
-        _anls_render_asin_tab(
-            before_df=st.session_state.get("df_pt_add_m", pd.DataFrame()),
-            period_days=30,
-            hist_fname="pt_add_m_analysis.json",
-            csv_key="anls_pt_add_m_csv",
-            label="商品追加",
-            camp_pat="商品ターゲ",
-        )
+        _anls_render_asin_tab(st.session_state.get("df_pt_add_m",pd.DataFrame()),30,"pt_add_m_analysis.json","anls_pt_add_m_csv","商品追加","商品ターゲ")
 
 def page_pt_del_manual():
     _render_pt_page("df_pt_del_m", False, "商品", "pt_del_m_sel")
@@ -2896,14 +2847,7 @@ def page_pt_add_video():
     with _t_tab1:
         _render_pt_page("df_pt_add_v", True,  "動画", "pt_add_v_sel")
     with _t_tab2:
-        _anls_render_asin_tab(
-            before_df=st.session_state.get("df_pt_add_v", pd.DataFrame()),
-            period_days=30,
-            hist_fname="pt_add_v_analysis.json",
-            csv_key="anls_pt_add_v_csv",
-            label="動画追加",
-            camp_pat="動画",
-        )
+        _anls_render_asin_tab(st.session_state.get("df_pt_add_v",pd.DataFrame()),30,"pt_add_v_analysis.json","anls_pt_add_v_csv","動画追加","動画")
 
 def page_pt_del_video():
     _render_pt_page("df_pt_del_v", False, "動画", "pt_del_v_sel")
@@ -2941,8 +2885,8 @@ def page_download():
                 file_name="cpc_adjust.zip", mime="application/zip", use_container_width=True)
 
 
-
 def page_manual():
+    st.markdown("### 📖 ANIHA Amazon広告分析ツール — 取扱説明書 Ver.71")
 
     # ── 概要 ──────────────────────────────────────────────────────────
     with st.expander("📌 概要", expanded=True):
@@ -2963,7 +2907,6 @@ def page_manual():
 | 📹 動画CPC調整 | 動画広告の入札最適化 |
 | 🧹 オート除外KW（キーワード/商品/動画） | オート広告で利益毀損している項目を停止候補として抽出 |
 | 📊 DateDive売れる予測KW | スコアリングによる有力KW抽出 |
-| 📊 分析 | 改善施策の前後比較・自動評価・AI傾向分析 |
 """)
 
     # ── サイドバー構成 ─────────────────────────────────────────────────
@@ -2993,8 +2936,6 @@ CPC調整
 DateDive売れる予測KW
 ダウンロード
 取扱説明書
-追加分析（分析機能）
-CPC分析（分析機能）
 ```
 """)
 
@@ -3002,27 +2943,11 @@ CPC分析（分析機能）
     with st.expander("📋 キーワード追加"):
         st.markdown("""
 **目的**
-
-オート広告（自動ターゲティング）で成果が出た検索語句を、
-手動広告（部分一致）のマニュアルキャンペーンへ追加するための候補を抽出します。
-サイドバーの「➕ キーワード追加」を選択するとこのページが表示されます。
+オート広告で成果が確認できた検索語句を、手動広告（部分一致）へ追加するための候補抽出です。
 
 ---
 
-**集計元データ**
-
-「検索用語レポート」内のオートキャンペーン行の「カスタマーの検索用語」列を集計します。
-キャンペーン名に「オート」または「auto」が含まれる行がオートキャンペーン行です。
-
-| 項目 | 内容 |
-|---|---|
-| 集計対象キャンペーン | キャンペーン名に「オート」「auto」を含むもの |
-| 集計単位 | 正規化後の検索語句（kn） |
-| 集計項目 | 売上・広告費・注文数・クリック数の合算 |
-
----
-
-**信頼度フィルター（両方を同時に満たす必要があります）**
+**信頼度フィルター（データ量が少ない語句を除外）**
 
 | 条件 | 閾値 |
 |---|---|
@@ -3030,744 +2955,302 @@ CPC分析（分析機能）
 | クリック数 | ≥ 5回 |
 | 広告費 | ≥ ¥300 |
 
-> サイドバーで閾値を変更できます。
-
----
-
-**採用条件（両方を同時に満たす必要があります）**
+**採用条件**
 
 | 条件 | 閾値 |
 |---|---|
 | 売上 | ≥ 売価 × 2 |
 | ROAS | ≥ 2.0 |
 
----
-
 **除外条件**
 
 | 除外対象 | 内容 |
 |---|---|
-| ASIN形式（例: B0XXXXXXXXX） | オート除外KW（商品）ページで管理するため除外 |
-| category形式（例: category:〜） | オート除外KW（動画）ページで管理するため除外 |
-| 同一意図KW（語順・表記ゆれ） | 代表1件に統合して重複を排除 |
-
----
-
-**画面の表示内容**
-
-| 表示エリア | 内容 |
-|---|---|
-| キャンペーン選択 | 全キャンペーン / 個別キャンペーン |
-| 件数バッジ | 該当件数: N件 |
-| Amazon広告登録用KW一覧 | コピー用コードブロック |
-| KW詳細テーブル | keyword / キャンペーン / ROAS / 広告費 / 売上 / 注文数 / クリック数（ROAS降順） |
-
-CSV出力は「ダウンロードページ」の「全候補 勝ちKW ZIP」から行います。
-
----
-
-### ■ 目的
-
-オート広告で成果が確認できた検索語句を、手動広告（部分一致）へ追加するための候補を抽出します。
-オート広告は自動で検索語句を探索しますが、入札コントロールができません。
-成果が出た語句を手動広告（部分一致）に登録することで入札を最適化し、
-同一語句への広告費を効率的に配分できます。
-
----
-
-### ■ 集計元データ
-
-「検索用語レポート」内のオートキャンペーン行が集計対象です。
-キャンペーン名に「オート」または「auto」（大文字・小文字不問）を含む行がオートキャンペーン行です。
-マニュアルキャンペーンの行は集計対象外です。
-検索語句は正規化（norm()）処理を経て、語順・表記ゆれを統一したうえで集計します。
-
----
-
-### ■ 使用するCSV
-
-Amazon広告管理画面の **「検索用語レポート」** を使用します。
-集計期間は **14〜30日** を推奨します。
-期間が短いと信頼度フィルターを通過できる語句が少なくなり、抽出件数が減少します。
-
----
-
-### ■ 対象
-
-以下の手順ですべての条件を通過した検索語句が追加候補になります。
-
-| ステップ | 内容 |
-|---|---|
-| ① オートキャンペーン行の抽出 | キャンペーン名に「オート」「auto」を含む行のみ残す |
-| ② 語句の種別除外 | ASIN形式・category形式を除外し、通常検索語句のみ残す |
-| ③ 信頼度フィルター | 注文数≥3 AND クリック数≥5 AND 広告費≥¥300 |
-| ④ 採用条件 | 売上≥売価×2 AND ROAS≥2.0 |
-| ⑤ 同一意図KW統合 | 語順・表記ゆれが同じ語句を代表1件に統合 |
-
----
-
-### ■ 処理ロジック
-
-```
-オートキャンペーン行を抽出
-        ↓
-ASIN形式・category形式の語句を除外
-（通常の日本語・英語の検索語句のみ残す）
-        ↓
-信頼度フィルター適用
-（注文数≥3件 AND クリック数≥5回 AND 広告費≥¥300）
-        ↓
-採用条件チェック
-（売上≥売価×2 AND ROAS≥2.0）
-        ↓
-同一意図KW統合
-（語順・表記ゆれが同じ語句は代表1件に集約）
-        ↓
-追加候補として件数バッジ・一覧・詳細テーブルに表示
-```
-
-信頼度フィルターは、データ不足による偶発的な成果を排除するための前処理です。
-採用条件の売上・ROASはどちらか一方だけでは不十分で、**両方を同時に満たす**必要があります。
-同一意図KW統合後の件数が、統合前の件数より少なくなることがあります。これは正常動作です。
-
----
-
-### ■ 判定条件
-
-| 条件名 | 項目 | 閾値 | 意味 |
-|---|---|---|---|
-| 信頼度フィルター | 注文数 | ≥ 3件 | 偶発的な注文を排除 |
-| 信頼度フィルター | クリック数 | ≥ 5回 | データ不足を排除 |
-| 信頼度フィルター | 広告費 | ≥ ¥300 | データ不足を排除 |
-| 採用条件 | 売上 | ≥ 売価 × 2 | 売価の2倍以上の売上が必要 |
-| 採用条件 | ROAS | ≥ 2.0 | 広告効率の最低基準 |
-
-すべての条件を**同時に**満たす語句のみが追加候補になります。
-
----
-
-### ■ 対象になるケース
-
-```
-例: 注文数5件 / クリック数10回 / 広告費¥500 / 売上¥3,000 / 売価¥1,000 / ROAS 6.0
-  → 信頼度フィルター: ○（注文5≥3 / クリック10≥5 / 広告費500≥300）
-  → 採用条件: ○（売上3,000≥売価×2=2,000 / ROAS 6.0≥2.0）
-  → 追加候補に採用
-```
-
-- 注文数・クリック数・広告費の信頼度フィルターをすべて通過している
-- 売上が売価の2倍以上ある
-- ROASが2.0以上ある
-- ASIN形式・category形式ではない通常の検索語句である
-
----
-
-### ■ 対象にならないケース
-
-| ケース | 理由 |
-|---|---|
-| 注文数 < 3件 | 信頼度フィルター未通過（データ不足） |
-| クリック数 < 5回 | 信頼度フィルター未通過（データ不足） |
-| 広告費 < ¥300 | 信頼度フィルター未通過（データ不足） |
-| 売上 < 売価 × 2 | 採用条件未通過（売上が不十分） |
-| ROAS < 2.0 | 採用条件未通過（広告効率が基準未満） |
-| ASIN形式の語句 | オート除外KW（商品）ページで管理 |
-| category形式の語句 | オート除外KW（動画）ページで管理 |
-| 売価マスタ未登録の商品のKW | 売価が特定できず採用条件を判定できない |
-
----
-
-### ■ 処理の流れ
-
-① 検索用語レポート（CSV）をアップロードする
-② 「🔍 抽出実行」ボタンを押す
-③ オートキャンペーン行を自動抽出する
-④ ASIN形式・category形式の語句を除外する
-⑤ 信頼度フィルターを適用する（注文数・クリック数・広告費）
-⑥ 採用条件をチェックする（売上・ROAS）
-⑦ 同一意図KWを統合する
-⑧ キャンペーン選択で絞り込む（任意）
-⑨ 件数バッジ・KW一覧・詳細テーブルに結果を表示する
-
----
-
-### ■ 実際の操作手順
-
-① Amazon広告管理画面にログインする
-② 「レポート」→「広告レポート」→「検索用語レポート」を選択してCSVをダウンロードする
-③ ツール画面の上部「CSVアップロード」からファイルを選択する
-④ 「🔍 抽出実行」ボタンを押す
-⑤ サイドバーの「📋 キーワード追加」を選択してこのページを開く
-⑥ 「キャンペーン」プルダウンで対象キャンペーンを選択する（または「全キャンペーン」）
-⑦ 件数バッジで追加候補件数を確認する
-⑧ 詳細テーブルで各語句のROAS・売上・注文数を確認する
-⑨ 「Amazon広告登録用KW一覧」のコードブロック右上のコピーボタンで語句をコピーする
-⑩ Amazon広告管理画面の手動キャンペーン→広告グループ→「キーワードターゲティング」→「部分一致」へ貼り付けて登録する
-
-※ CSVで一括登録する場合
-⑨′ ダウンロードページの「全候補 勝ちKW ZIP」からCSVを取得する
-⑩′ Amazonバルクシートに貼り付けてアップロードする
-
----
-
-### ■ 実行後の確認方法
-
-```
-[キャンペーン選択プルダウン: 全キャンペーン / 個別キャンペーン]
-[件数バッジ: 該当件数: N件  キャンペーン: 〇〇]
-[Amazon広告登録用KW一覧（コピー用コードブロック）]
-[KW詳細テーブル: keyword / キャンペーン / ROAS / 広告費 / 売上 / 注文数 / クリック数]
-                 ← ROAS降順（最も効率の高いKWが上位）
-```
-
-件数が **0件** の場合、信頼度フィルターまたは採用条件を満たす語句がありません。
-→ 集計期間を延ばす、またはサイドバーで閾値を調整してください。
-
-件数が **統合前より少ない** 場合、同一意図KWが統合されています。これは正常動作です。
-
----
-
-### ■ 注意事項
-
-- 信頼度フィルター（注文数・クリック数・広告費）は**3つすべて同時に**満たす必要があります。
-- 採用条件（売上・ROAS）も**両方同時に**満たす必要があります。
-- CSVはこのページではなく「ダウンロードページ」の「全候補 勝ちKW ZIP」から出力します。
-- 追加はツールで自動実行しません。必ず手動でAmazon広告管理画面へ登録してください。
-- 同一意図KW統合後の件数が、統合前より少なくなる場合があります。これは正常動作です。
-- 売価マスタ（PRICES辞書）に未登録の商品のKWは集計から除外されます。
-
----
-
-### ■ おすすめ運用
-
-- 毎週CSVを更新し、追加候補を確認する。
-- 新規追加したキーワードは「改善履歴」へ登録し、分析機能でBefore / After比較を実施する。
-- 集計期間は14〜30日を基本とし、データ量が少ない場合は期間を延ばす。
-- 追加後7日経過したら分析機能で効果を確認する。
-- 追加候補が0件の場合は、集計期間を30日に延ばすかサイドバーで閾値を下げてみる。
+| 既存マニュアルKW（完全一致） | 登録済のため除外 |
+| 既存マニュアルKW（部分一致） | 登録済のため除外 |
+| 重複検索語 | 同一キャンペーン内での重複を除外 |
 """)
 
+    # ── キーワード削除 ────────────────────────────────────────────────
     with st.expander("🚫 キーワード削除"):
         st.markdown("""
 **目的**
-
-マニュアル広告（手動ターゲティング）のキーワードのうち、
-広告費を消費しているにもかかわらず成果が出ていない語句を停止候補として抽出します。
-サイドバーの「🚫 キーワード削除」を選択するとこのページが表示されます。
-
----
-
-**集計元データ**
-
-「検索用語レポート」内のマニュアルキャンペーン行の「カスタマーの検索用語」列を集計します。
-キャンペーン名に「オート」「auto」を含まない行がマニュアルキャンペーン行です。
-
-| 項目 | 内容 |
-|---|---|
-| 集計対象キャンペーン | キャンペーン名に「オート」「auto」を含まないもの |
-| 集計単位 | 正規化後の検索語句（kn） |
-| 集計項目 | 売上・広告費・注文数・クリック数の合算 |
+利益を毀損している検索語を抽出し、停止候補として表示します。
 
 ---
 
 **削除条件（両方を同時に満たす場合に削除候補）**
 
-| 条件 | 閾値 | 意味 |
-|---|---|---|
-| 広告費 | ≥ 売価 × 2 | 売価の2倍以上の広告費を消費している |
-| ROAS | < 0.8 | 広告効率が基準を大きく下回っている |
-
-> ⚠️ 広告費とROASの**両方**を同時に満たす場合のみ削除候補になります。
-
----
-
-**除外条件**
-
-| 除外対象 | 内容 |
+| 条件 | 閾値 |
 |---|---|
-| ASIN形式（例: B0XXXXXXXXX） | 検索語句ではなくターゲティング指定のため除外 |
-| category形式（例: category:〜） | 同上 |
-| 勝ちKW（追加候補と重複する語句） | 成果の出ているKWを誤削除しないための保護 |
-| 売価マスタ未登録の商品 | 売価が特定できず削除条件を判定できないため除外 |
-
----
-
-**画面の表示内容**
-
-| 表示エリア | 内容 |
-|---|---|
-| キャンペーン選択 | 全キャンペーン / 個別キャンペーン |
-| 件数バッジ | 削除対象件数: N件（赤色） |
-| 削除対象KW一覧 | コピー用コードブロック |
-| 削除KW詳細テーブル | keyword / キャンペーン / ROAS / 広告費 / 売上（ROAS昇順） |
-
-CSV出力は「ダウンロードページ」の「削除用KW ZIP」から行います。
-
----
-
-### ■ 目的
-
-広告費を消費しているにもかかわらず成果が出ていないキーワードを停止し、
-費用対効果の高いキーワードへ広告費を集中させます。
-感覚や主観ではなく「広告費とROAS」という客観的な数値基準で停止候補を判定します。
-
----
-
-### ■ 集計元データ
-
-「検索用語レポート」内のマニュアルキャンペーン行が集計対象です。
-キャンペーン名に「オート」「auto」を含まない行がマニュアルキャンペーン行です。
-オートキャンペーンの行は除外されます（オート除外KWページで管理します）。
-検索語句は正規化（norm()）処理を経て、語順・表記ゆれを統一したうえで集計します。
-
----
-
-### ■ 使用するCSV
-
-Amazon広告管理画面の **「検索用語レポート」** を使用します。
-集計期間は **14〜30日** を推奨します。
-期間が短すぎると広告費が閾値（売価×2）に達しない語句が多くなり、
-データ不足として削除候補に上がらない語句が増えます。
-
----
-
-### ■ 対象
-
-以下の手順ですべての条件を通過した検索語句が削除候補になります。
-
-| ステップ | 内容 |
-|---|---|
-| ① マニュアルキャンペーン行の抽出 | キャンペーン名に「オート」「auto」を含まない行のみ残す |
-| ② 語句の種別除外 | ASIN形式・category形式を除外し、通常検索語句のみ残す |
-| ③ 削除条件チェック | 広告費≥売価×2 AND ROAS<0.8 |
-| ④ 勝ちKW除外 | キーワード追加候補（勝ちKW）と重複する語句を除外 |
-| ⑤ 売価チェック | 売価マスタ未登録の商品を除外 |
-
----
-
-### ■ 処理ロジック
-
-```
-マニュアルキャンペーン行を抽出
-（キャンペーン名に「オート」「auto」を含まない行）
-        ↓
-ASIN形式・category形式の語句を除外
-（通常の検索語句のみ残す）
-        ↓
-正規化後の語句単位でキャンペーン別に集計
-（売上・広告費・注文数・クリック数を合算）
-        ↓
-売価マスタを参照して売価を付与
-（未登録商品は除外）
-        ↓
-削除条件チェック
-（広告費 ≥ 売価 × 2  AND  ROAS < 0.8）
-        ↓
-勝ちKW除外
-（キーワード追加候補と重複する語句を削除対象から除外）
-        ↓
-削除候補として件数バッジ・一覧・詳細テーブルに表示
-```
-
-削除条件は広告費とROASの**両方**を同時に満たす必要があります。
-どちらか一方だけでは削除候補になりません（データ不足・経過観察扱い）。
-勝ちKW保護処理により、成果の出ているKWを誤って削除するリスクを防いでいます。
-
----
-
-### ■ 判定条件
-
-| 条件名 | 項目 | 閾値 | 意味 |
-|---|---|---|---|
-| 削除条件 | 広告費 | ≥ 売価 × 2 | 売価の2倍以上の広告費を消費 |
-| 削除条件 | ROAS | < 0.8 | 広告効率が基準を大きく下回る |
-
-削除条件の2つを**同時に**満たす場合にのみ削除候補になります。
-
----
-
-### ■ 対象になるケース
-
-```
-例: 広告費¥2,500 / 売価¥1,000 / ROAS 0.5
-  → 削除条件①: ○（広告費2,500 ≥ 売価×2=2,000）
-  → 削除条件②: ○（ROAS 0.5 < 0.8）
-  → 削除候補に採用
-```
-
-- 広告費が売価の2倍以上に達している
-- ROASが0.8未満である
-- ASIN形式・category形式ではない通常の検索語句である
-- 勝ちKW（追加候補）と重複していない
-
----
-
-### ■ 対象にならないケース
-
-| ケース | 理由 |
-|---|---|
-| 広告費 < 売価 × 2 | データ不足（判定に十分なデータがない）・経過観察 |
-| ROAS ≥ 0.8 | 一定の広告効率が出ているため停止不要 |
-| ASIN形式の語句 | 検索語句ではなくターゲティング指定のため対象外 |
-| category形式の語句 | 同上 |
-| 勝ちKWと重複する語句 | 成果の出ているKWを誤削除しないための保護 |
-| 売価マスタ未登録の商品 | 売価が判定できないため除外 |
-
----
-
-### ■ 処理の流れ
-
-① 検索用語レポート（CSV）をアップロードする
-② 「🔍 抽出実行」ボタンを押す
-③ マニュアルキャンペーン行を自動抽出する
-④ ASIN形式・category形式の語句を除外する
-⑤ 語句単位でキャンペーン別に集計する
-⑥ 売価マスタを参照して売価を付与する
-⑦ 削除条件をチェックする（広告費・ROAS）
-⑧ 勝ちKWと重複する語句を除外する
-⑨ キャンペーン選択で絞り込む（任意）
-⑩ 件数バッジ・KW一覧・詳細テーブルに結果を表示する
-
----
-
-### ■ 実際の操作手順
-
-① Amazon広告管理画面にログインする
-② 「レポート」→「広告レポート」→「検索用語レポート」を選択してCSVをダウンロードする
-③ ツール画面の上部「CSVアップロード」からファイルを選択する
-④ 「🔍 抽出実行」ボタンを押す
-⑤ サイドバーの「🚫 キーワード削除」を選択してこのページを開く
-⑥ 「キャンペーン（削除用KW）」プルダウンで対象を選択する（または「全キャンペーン」）
-⑦ 件数バッジで削除対象件数を確認する
-⑧ 詳細テーブルで削除候補の語句・ROAS・広告費を確認する（ROAS昇順で最も低いものが上位）
-⑨ 削除対象KW一覧をコピーするか、ダウンロードページの「削除用KW ZIP」からCSVを取得する
-⑩ Amazon広告管理画面で対象キーワードを「一時停止」する
-
----
-
-### ■ 実行後の確認方法
-
-```
-[キャンペーン選択プルダウン: 全キャンペーン / 個別キャンペーン（削除用KW）]
-[件数バッジ: 削除対象件数: N件（赤色）]
-[削除対象KW一覧（コピー用コードブロック）]
-[削除KW詳細テーブル: keyword / キャンペーン / ROAS / 広告費 / 売上]
-                      ← ROAS昇順（最も効率の悪い語句が上位）
-```
-
-件数が **0件** の場合、削除条件（広告費≥売価×2 AND ROAS<0.8）を満たす語句がありません。
-→ データ蓄積期間を延ばすと判定できる語句が増えます。
-
----
-
-### ■ 注意事項
-
-- 広告費とROASの**両方**が条件を満たした場合のみ削除候補になります。
-- ROAS ≥ 0.8 の語句は成果が出ているため削除候補になりません。
-- 広告費が売価×2未満の語句はデータ不足として削除候補になりません。
-- 勝ちKW（追加候補）と重複する語句は削除候補から自動除外されています。
-- CSVはこのページではなく「ダウンロードページ」の「削除用KW ZIP」から出力します。
-- 削除はツールで自動実行しません。必ず手動でAmazon広告管理画面で停止してください。
-- **「一時停止」を推奨します。**完全削除すると元に戻せません。
-
----
-
-### ■ おすすめ運用
-
-- 毎週CSVを更新し、削除候補を確認する。
-- 停止前に詳細テーブルを確認し、意図しない語句が含まれていないか確かめる。
-- 停止後は「改善履歴」へ登録し、分析機能でBefore / After比較を実施する。
-- 一時停止後1〜2週間様子を見てから完全削除を判断する。
-- 停止後7日経過したら分析機能で広告費削減効果を確認する。
+| 広告費 | ≥ 売価 × 2 |
+| ROAS | < 0.8 |
 """)
 
+    # ── キーワードCPC調整─────────────────────────────────────────
     with st.expander("📈 キーワードCPC調整"):
         st.markdown("""
-**目的**
-
-SP広告マニュアルキャンペーンのキーワード入札額（CPC）を最適化します。
-ROASと購入数の実績に基づいてランクを判定し、
-入札引き上げ・現状維持・引き下げ・即削除の推奨アクションと推奨CPCを表示します。
-サイドバーの「📈 キーワードCPC調整」を選択するとこのページが表示されます。
+**目的** — 既存マニュアルKWの入札額を最適化します。
 
 ---
 
-**集計元データ**
+**判定対象条件**（いずれか一方を満たせば判定対象）
 
-「検索用語レポート」内のSP広告マニュアルキャンペーン行の
-「キーワードテキスト（Keyword Text）」列をキャンペーン単位で集計します。
-
-| 項目 | 内容 |
+| 条件 | 閾値 |
 |---|---|
-| 集計対象キャンペーン | 「SP広告.*マニュアル」「SP.*manual」を含むキャンペーン |
-| 集計単位 | キャンペーン × キーワードテキスト（正規化後） |
-| 集計項目 | 広告費・売上・購入数・クリック数の合算 |
+| 広告費 | ≥ ¥3,000 |
+| 購入数 | ≥ 4件 |
+
+> **判断保留になるのは「広告費 < ¥3,000 かつ 購入数 < 4件」の場合のみです。**
+>
+> 例: 広告費¥1,000・購入数7件 → **判定対象**（購入数4件以上のため）
+>
+> 例: 広告費¥1,500・購入数2件 → **判断保留**（両方とも閾値未満）
 
 ---
 
-**ランク判定（STEP1 → STEP2 → STEP3 → STEP4 の順で判定）**
+**ランク判定（判定順序: STEP1 → STEP2 → STEP3 → STEP4）**
 
-| ランク | 判定条件 | アクション | CPC変更幅 |
+| ランク | 条件 | アクション | 変更幅 |
 |---|---|---|---|
 | 判断保留 | 広告費 < ¥3,000 **かつ** 購入数 < 4件 | 変更なし | ±0円 |
-| SS+ | 購入数 ≥ 20件 **かつ** ROAS ≥ 4.0 | CPC上げ | +5円 |
-| SS | 購入数 ≥ 20件 **かつ** 2.0 ≤ ROAS < 4.0 | 現状維持 | ±0円 |
+| SS+ | 購入数 ≥ 20 **かつ** ROAS ≥ 4.0 | CPC上げ | +5円 |
+| SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
 | S | ROAS ≥ 4.0 | CPC上げ | +5円 |
-| A | 3.0 ≤ ROAS < 4.0 | 現状維持 | ±0円 |
+| A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
 | B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
 | C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
 | D | ROAS < 1.5 | CPC下げ | −10円 |
-| 即削除 | ROAS < 0.8 **かつ** 広告費 ≥ 閾値 | 即削除 | — |
+| 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
 
-**即削除閾値**
+**即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
 
-| 売価 | 広告費閾値 |
+---
+
+**画面表示仕様**
+
+| 表示エリア | 表示内容 |
 |---|---|
-| ≤ ¥1,500 | ≥ ¥3,000 |
-| ≤ ¥2,000 | ≥ ¥4,000 |
-| > ¥2,000 | ≥ ¥5,000 |
+| SS〜E 件数カード | **全件数**を表示（変更なし・判断保留を含む） |
+| 詳細テーブル | **全件表示**（変更なし・判断保留を含む） |
+""")
+
+    # ── 商品追加 ──────────────────────────────────────────────────────
+    with st.expander("➕ 商品追加"):
+        st.markdown("""
+**目的** — 商品広告で成果が出ているASINを追加候補として表示します。
 
 ---
 
-**除外条件**
+**対象キャンペーン**
 
-| 除外対象 | 内容 |
+| 条件 | 内容 |
 |---|---|
-| オートキャンペーン行（「オート」「auto」） | 手動入札が設定されていないため除外 |
-| 商品ターゲティング行（「商品ターゲ」「動画ターゲ」） | 商品CPC・動画CPC調整ページで管理 |
-| ASIN形式・category形式・complement・substitute | キーワードではなくターゲティング指定 |
-| Keyword Text（キーワードテキスト）が空欄の行 | キーワードが特定できないため除外 |
-| ブランドキーワード（アニハ・あには・アニは） | 自社ブランドKWは除外対象 |
-| 売価マスタ未登録の商品 | 即削除閾値が計算できないため除外 |
+| 含む | 「商品ターゲ」を含むキャンペーン |
+| 除外 | 「動画」を含むキャンペーン |
+| 除外 | 「オート」「auto」を含むキャンペーン |
 
----
+**信頼度フィルター**
 
-**画面の表示内容**
-
-| 表示エリア | 内容 |
+| 条件 | 閾値 |
 |---|---|
-| 商品選択プルダウン | 全商品（初期値）/ 個別商品 |
-| 件数カード | SS+ / SS / S / A / B / C / D / 即削除 ← **全件数**（判断保留・現状維持を含む） |
-| 本日調整対象 | CPC上げN件 / CPC下げN件 |
-| 詳細テーブル | **変更幅 ≠ 0のみ**（CPC上げ・下げ対象のみ） |
+| 注文数 | ≥ 3件 |
+| クリック数 | ≥ 5回 |
+| 広告費 | ≥ ¥300 |
 
-> ⚠️ 件数カードの合計とテーブルの件数は一致しません。SS / A / B / 判断保留はカードのみに表示されます。
+**採用条件**
 
----
-
-### ■ 目的
-
-SP広告マニュアルキャンペーンのキーワード入札額（CPC）を最適化します。
-成果の高いキーワードの入札を引き上げて露出を拡大し、
-成果の低いキーワードの入札を下げてコスト効率を改善します。
-感覚ではなく ROASと購入数の実績という客観的な指標でランクを判定します。
-
----
-
-### ■ 集計元データ
-
-「検索用語レポート」内のSP広告マニュアルキャンペーン行が集計対象です。
-「SP広告.*マニュアル」または「SP.*manual」を含むキャンペーン名の行を抽出します。
-「キーワードテキスト（Keyword Text）」列を集計の基準列とします。
-同一キャンペーン内で同一キーワードが複数行ある場合は、
-広告費・売上・購入数・クリック数を合算（sum）します。
-
----
-
-### ■ 使用するCSV
-
-Amazon広告管理画面の **「検索用語レポート」** を使用します。
-集計期間は **14〜30日** を推奨します。
-期間が短いと「判断保留」（データ不足）になるキーワードが増えます。
-
----
-
-### ■ 対象
-
-以下の手順ですべての条件を通過したキーワードがCPC調整の対象になります。
-
-| ステップ | 内容 |
+| 条件 | 閾値 |
 |---|---|
-| ① SP広告マニュアルキャンペーン行の抽出 | 「SP広告.*マニュアル」「SP.*manual」を含む行のみ残す |
-| ② オートキャンペーン除外 | キャンペーン名に「オート」「auto」を含む行を除外 |
-| ③ 商品・動画ターゲ除外 | 「商品ターゲ」「動画ターゲ」を含む行を除外 |
-| ④ KW種別除外 | ASIN形式・category形式・complement・substituteを除外 |
-| ⑤ ブランドKW除外 | 「アニハ」「あには」「アニは」を含む語句を除外 |
-| ⑥ Keyword Text空欄除外 | Keyword Text列が空欄の行を除外 |
-| ⑦ キャンペーン×KWテキスト単位で集計 | 広告費・売上・購入数・クリック数を合算 |
-| ⑧ 売価マスタを参照 | 未登録商品は除外 |
-| ⑨ ランク判定 | STEP1→STEP2→STEP3→STEP4の順で判定 |
+| 売上 | ≥ 売価 × 2 |
+| ROAS | ≥ 2.0 |
+""")
+
+    # ── 商品削除 ──────────────────────────────────────────────────────
+    with st.expander("🗑️ 商品削除"):
+        st.markdown("""
+**目的** — 成果の出ていない商品を停止候補として表示します。
 
 ---
 
-### ■ 処理ロジック
+**対象キャンペーン** — 商品追加と同一（動画・オート除外）
 
-```
-SP広告マニュアルキャンペーン行を抽出
-        ↓
-除外処理
-（オート / 商品ターゲ / 動画ターゲ / ASIN形式 / category形式
- / complement / substitute / ブランドKW / Keyword Text空欄）
-        ↓
-キャンペーン × キーワードテキスト（正規化後）の単位で集計
-（広告費・売上・購入数・クリック数を合算）
-        ↓
-現在CPC算出（広告費 ÷ クリック数）
-        ↓
-ランク判定（STEP1→STEP2→STEP3→STEP4）
-  STEP1: 判断保留（広告費<¥3,000 AND 購入数<4件）
-  STEP2: SS+・SS（購入数≥20件での高実績判定）
-  STEP3: S・A・B・C・D（ROASベース判定）
-  STEP4: 即削除（ROAS<0.8 AND 広告費≥即削除閾値）
-        ↓
-変更幅算出（+5 / 0 / -5 / -10円）
-推奨CPC算出（現在CPC + 変更幅、最低1円）
-        ↓
-商品選択で絞り込み（任意）
-        ↓
-件数カード（全件数）・本日調整対象・詳細テーブル（変更幅≠0のみ）に表示
-```
+**削除条件（両方を同時に満たす場合に削除候補）**
 
----
-
-### ■ 判定条件
-
-**STEP1（最優先）：データ不足判定**
-
-| 条件 | 閾値 | 結果 |
-|---|---|---|
-| 広告費 < ¥3,000 **かつ** 購入数 < 4件 | 両方 | 判断保留（変更なし） |
-
-> STEP1を通過したKWのみ STEP2以降で判定します。
-> 広告費≥¥3,000 **または** 購入数≥4件の場合、STEP1は通過します。
-
-**STEP2：高実績ランク（購入数優先）**
-
-| ランク | 条件 | 変更幅 |
-|---|---|---|
-| SS+ | 購入数 ≥ 20件 **かつ** ROAS ≥ 4.0 | +5円 |
-| SS | 購入数 ≥ 20件 **かつ** 2.0 ≤ ROAS < 4.0 | ±0円 |
-
-**STEP3：ROASベースランク**
-
-| ランク | 条件 | 変更幅 |
-|---|---|---|
-| S | ROAS ≥ 4.0 | +5円 |
-| A | 3.0 ≤ ROAS < 4.0 | ±0円 |
-| B | 1.8 ≤ ROAS < 3.0 | ±0円 |
-| C | 1.5 ≤ ROAS < 1.8 | −5円 |
-| D | ROAS < 1.5 | −10円 |
-
-**STEP4：即削除判定**
-
-| 条件 | 閾値 | 結果 |
-|---|---|---|
-| ROAS < 0.8 **かつ** 広告費 ≥ 即削除閾値 | 両方 | 即削除 |
-
----
-
-### ■ 対象になるケース
-
-```
-例（SS+）: 広告費¥5,000 / 購入数25件 / ROAS 5.0 / 現在CPC ¥100
-  → STEP1通過（広告費≥¥3,000）
-  → STEP2: SS+（購入数25≥20 AND ROAS 5.0≥4.0）
-  → 変更幅 +5円 / 推奨CPC ¥105
-
-例（D）: 広告費¥4,000 / 購入数2件 / ROAS 1.2 / 現在CPC ¥200
-  → STEP1通過（広告費≥¥3,000）
-  → STEP2非該当（購入数2<20）
-  → STEP3: D（ROAS 1.2 < 1.5）
-  → 変更幅 −10円 / 推奨CPC ¥190
-```
-
----
-
-### ■ 対象にならないケース
-
-| ケース | ランク / 理由 |
+| 条件 | 閾値 |
 |---|---|
-| 広告費 < ¥3,000 かつ 購入数 < 4件 | 判断保留（データ不足） |
-| ROAS ≥ 1.8 かつ ランクA・B・SS | 現状維持（変更幅 ±0円）→ テーブル非表示 |
-| オートキャンペーン行 | 除外（手動入札が設定されていない） |
-| 商品ターゲ・動画ターゲ行 | 除外（商品CPC・動画CPCページで管理） |
-| ASIN形式・category形式 | 除外（キーワードではない） |
-| ブランドKW | 除外（自社ブランドKWは対象外） |
-| Keyword Text 空欄 | 除外（KWが特定できない） |
-| 売価マスタ未登録商品 | 除外（即削除閾値が計算できない） |
+| 広告費 | ≥ 売価 × 2 |
+| ROAS | < 0.8 |
+""")
+
+    # ── 動画追加 ──────────────────────────────────────────────────────
+    with st.expander("📹 動画追加"):
+        st.markdown("""
+**目的** — 動画広告で成果の出ているASINを追加候補として表示します。
 
 ---
 
-### ■ 処理の流れ
+**対象キャンペーン**
 
-① 検索用語レポート（CSV）をアップロードする
-② 「🔍 抽出実行」ボタンを押す
-③ SP広告マニュアルキャンペーン行を自動抽出する
-④ オート・商品ターゲ・ASIN形式・ブランドKW・空欄を除外する
-⑤ キャンペーン×キーワードテキスト単位で広告費・売上・購入数・クリック数を集計する
-⑥ 現在CPCを算出する（広告費 ÷ クリック数）
-⑦ ランクを判定する（STEP1→STEP2→STEP3→STEP4）
-⑧ 変更幅・推奨CPCを算出する
-⑨ 商品選択で絞り込む（任意）
-⑩ 件数カード・本日調整対象・詳細テーブルに結果を表示する
+| 条件 | 内容 |
+|---|---|
+| 含む | 「動画」を含むキャンペーン |
 
----
+**信頼度フィルター**
 
-### ■ 実際の操作手順
+| 条件 | 閾値 |
+|---|---|
+| 注文数 | ≥ 3件 |
+| クリック数 | ≥ 5回 |
+| 広告費 | ≥ ¥300 |
 
-① Amazon広告管理画面にログインする
-② 「レポート」→「広告レポート」→「検索用語レポート」を選択してCSVをダウンロードする
-③ ツール画面の上部「CSVアップロード」からファイルを選択する
-④ 「🔍 抽出実行」ボタンを押す
-⑤ サイドバーの「📈 キーワードCPC調整」を選択してこのページを開く
-⑥ 「商品選択」プルダウンで対象商品を選択する（または「全商品」）
-⑦ 件数カードでランク別件数を確認する（全件数が表示されます）
-⑧ 「本日調整対象」でCPC上げ・CPC下げの件数を確認する
-⑨ 詳細テーブルで各キーワードのランク・変更幅・推奨CPCを確認する（変更幅≠0のみ表示）
-⑩ CSVをダウンロードする（ダウンロードボタン）
-⑪ Amazon広告管理画面でSP広告マニュアルキャンペーンを開く
-⑫ 各キーワードの入札額を推奨CPCに変更する
-⑬ 「即削除」ランクのキーワードは一時停止または削除する
+**採用条件**
+
+| 条件 | 閾値 |
+|---|---|
+| 売上 | ≥ 売価 × 2 |
+| ROAS | ≥ 2.0 |
+""")
+
+    # ── 動画削除 ──────────────────────────────────────────────────────
+    with st.expander("📹 動画削除"):
+        st.markdown("""
+**目的** — 成果の出ていない動画広告を停止候補として表示します。
 
 ---
 
-### ■ 実行後の確認方法
+**対象キャンペーン** — 動画追加と同一（動画キャンペーンが対象）
 
-```
-[商品選択プルダウン: 全商品（初期値）/ 個別商品]
-[件数カード: SS+ / SS / S / A / B / C / D / 即削除]
-              ← 全件数（SS/A/B/判断保留を含む）
-[本日調整対象: CPC上げ N件 / CPC下げ N件]
-[詳細テーブル: keyword / キャンペーン名 / 広告グループ / ROAS / 広告費 / 売上 /
-              購入数 / 現在CPC / 判定ランク / 推奨アクション / 変更幅 / 推奨CPC]
-              ← 変更幅≠0（SS+・S・C・D・即削除）のみ表示
-[CSVダウンロードボタン]
-```
+**削除条件（両方を同時に満たす場合に削除候補）**
 
-件数カードは変更なし（SS / A / B）・判断保留を含む**全件数**を表示します。
-詳細テーブルは変更幅≠0のみを表示するため、件数カードの合計とテーブルの件数は一致しません。
+| 条件 | 閾値 |
+|---|---|
+| 広告費 | ≥ 売価 × 2 |
+| ROAS | < 0.8 |
+""")
 
----
-
-### ■ 注意事項
-
-- 件数カードの合計とテーブルの件数は一致しません。SS / A / B / 判断保留はテーブルに表示されません。
-- 「判断保留」はデータ不足です。集計期間を延ばすと判定対象になります。
-- 「即削除」ランクはツールで自動停止しません。Amazon広告管理画面で手動停止してください。
-- 推奨CPCは「現在CPC ＋ 変更幅」で算出された参考値です。広告管理画面の入札額は自動更新されません。
-- CPC変更後は入札額が反映されるまで数時間かかる場合があります。
-- 変更後は1〜2週間データを蓄積してから再分析することを推奨します。
-- 売価マスタ（PRICES辞書）に未登録の商品は集計から除外されます。
+    # ── 商品CPC調整 ───────────────────────────────────────────────────
+    with st.expander("🎯 商品CPC調整"):
+        st.markdown("""
+**目的** — 商品広告の入札額を最適化します。
 
 ---
 
-### ■ おすすめ運用
+**判定対象条件**（いずれか一方を満たせば判定対象）
 
-- 毎週CSVを更新し、ランク変動を確認する。
-- CPC変更後は「改善履歴」に登録し、分析機能でBefore / After比較を実施する。
-- 判断保留が多い場合は集計期間を30日に延ばす。
-- 即削除ランクは優先的に処理し、広告費の無駄を削減する。
-- 変更後7日経過したら分析機能でCPC変更の効果を確認する。
+| 条件 | 閾値 |
+|---|---|
+| 広告費 | ≥ ¥3,000 |
+| 購入数 | ≥ 4件 |
+
+> **判断保留になるのは「広告費 < ¥3,000 かつ 購入数 < 4件」の場合のみです。**
+>
+> 例: 広告費¥1,000・購入数7件 → **判定対象**（購入数4件以上のため）
+>
+> 例: 広告費¥1,500・購入数2件 → **判断保留**（両方とも閾値未満）
+
+---
+
+**ランク判定**
+
+| ランク | 条件 | アクション | 変更幅 |
+|---|---|---|---|
+| 判断保留 | 広告費 < ¥3,000 **かつ** 購入数 < 4件 | 変更なし | ±0円 |
+| SS+ | 購入数 ≥ 20 **かつ** ROAS ≥ 4.0 | CPC上げ | +5円 |
+| SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
+| S | ROAS ≥ 4.0 | CPC上げ | +5円 |
+| A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
+| B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
+| C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
+| D | ROAS < 1.5 | CPC下げ | −10円 |
+| 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
+
+**即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
+
+---
+
+**画面表示仕様**
+
+| 表示エリア | 表示内容 |
+|---|---|
+| SS〜E 件数カード | **全件数**を表示（変更なし・判断保留を含む） |
+| 詳細テーブル | **変更幅 ≠ 0円のみ**表示（CPC上げ・CPC下げのみ） |
+| 非表示 | 変更なし（SS / A / B）・判断保留 |
+
+> ⚠️ 件数カードの合計とテーブルの件数は一致しない場合があります。これは正常動作です。
+
+---
+
+**全商品フィルター**
+
+初期値は **全商品** です。
+
+| 選択 | 動作 |
+|---|---|
+| 全商品（初期値） | すべての対象キャンペーンを集計して表示する |
+| 個別商品名 | 選択商品のキャンペーンのみ表示する |
+""")
+
+    # ── 動画CPC調整 ───────────────────────────────────────────────────
+    with st.expander("📹 動画CPC調整"):
+        st.markdown("""
+**目的** — 動画広告の入札額を最適化します。
+
+---
+
+**判定対象条件**（いずれか一方を満たせば判定対象）
+
+| 条件 | 閾値 |
+|---|---|
+| 広告費 | ≥ ¥3,000 |
+| 購入数 | ≥ 4件 |
+
+> **判断保留になるのは「広告費 < ¥3,000 かつ 購入数 < 4件」の場合のみです。**
+>
+> 例: 広告費¥1,000・購入数7件 → **判定対象**（購入数4件以上のため）
+>
+> 例: 広告費¥1,500・購入数2件 → **判断保留**（両方とも閾値未満）
+
+---
+
+**ランク判定**
+
+| ランク | 条件 | アクション | 変更幅 |
+|---|---|---|---|
+| 判断保留 | 広告費 < ¥3,000 **かつ** 購入数 < 4件 | 変更なし | ±0円 |
+| SS+ | 購入数 ≥ 20 **かつ** ROAS ≥ 4.0 | CPC上げ | +5円 |
+| SS | 購入数 ≥ 20 **かつ** ROAS ≥ 2.0 | 現状維持 | ±0円 |
+| S | ROAS ≥ 4.0 | CPC上げ | +5円 |
+| A | ROAS ≥ 3.0 | 現状維持 | ±0円 |
+| B | 1.8 ≤ ROAS < 3.0 | 現状維持 | ±0円 |
+| C | 1.5 ≤ ROAS < 1.8 | CPC下げ | −5円 |
+| D | ROAS < 1.5 | CPC下げ | −10円 |
+| 即削除 | 広告費 ≥ 閾値 **かつ** ROAS < 0.8 | 即削除 | — |
+
+**即削除閾値:** 売価 ≤¥1,500 → ¥3,000 / 売価 ≤¥2,000 → ¥4,000 / 売価 >¥2,000 → ¥5,000
+
+---
+
+**画面表示仕様**
+
+| 表示エリア | 表示内容 |
+|---|---|
+| SS〜E 件数カード | **全件数**を表示（変更なし・判断保留を含む） |
+| 詳細テーブル | **変更幅 ≠ 0円のみ**表示（CPC上げ・CPC下げのみ） |
+| 非表示 | 変更なし（SS / A / B）・判断保留 |
+
+> ⚠️ 件数カードの合計とテーブルの件数は一致しない場合があります。これは正常動作です。
+
+---
+
+**全商品フィルター**
+
+初期値は **全商品** です。
+
+| 選択 | 動作 |
+|---|---|
+| 全商品（初期値） | すべての動画キャンペーンを集計して表示する |
+| 個別商品名 | 選択商品の動画キャンペーンのみ表示する |
 """)
 
     # ── オート除外KW ──────────────────────────────────────────────────
@@ -3826,257 +3309,233 @@ SP広告マニュアルキャンペーン行を抽出
 
 各ページに「キャンペーン」フィルター（全キャンペーン＋各キャンペーン）があり、
 件数カード・除外対象一覧（コピー用）・詳細テーブル・CSVダウンロードを表示します。
+""")
+
+    # ── 売れる予測KW ──────────────────────────────────────────────────
+    with st.expander("📊 DateDive 売れる予測KW"):
+        st.markdown("""
+**目的** — 今後Amazon検索語へ追加すべき有力キーワード候補をスコアリングして抽出します。
 
 ---
 
-### ■ 対象データ
+**スコア配点（合計100点）**
 
-オートキャンペーン（自動ターゲティング）から発生した検索語句・ASIN・categoryが対象です。
-マニュアルキャンペーンの行は除外されます。
+| 項目 | 配点 | 説明 |
+|---|---|---|
+| 需要 | 45点 | 検索ボリューム・トレンドを評価 |
+| 関連性 | 35点 | 商品との関連度を評価 |
+| 競争強度 | 15点 | 競合の少なさを評価 |
+| 未使用KW | 5点 | 既存KWに未登録であれば加点 |
+
+需要と関連性を最重視します。
+競争強度や未使用ボーナスのみで上位表示されることはありません。
+
+上位 **TOP10** を表示します。
+""")
+
+    # ── ダウンロード ──────────────────────────────────────────────────
+    with st.expander("📥 ダウンロード"):
+        st.markdown("""
+各分析結果はCSVでダウンロード可能です。
+
+**各ページ内のCSVダウンロードボタン**
+
+| 機能 | CSVファイル名 |
+|---|---|
+| 商品追加 | 商品追加_{商品名}.csv |
+| 商品削除 | 商品削除_{商品名}.csv |
+| 動画追加 | 動画追加_{商品名}.csv |
+| 動画削除 | 動画削除_{商品名}.csv |
+| キーワードCPC調整 | {キャンペーン名}_CPC調整表.csv |
+| 商品CPC調整 | {キャンペーン名}_商品CPC調整_CPC調整表.csv |
+| 動画CPC調整 | {キャンペーン名}_動画CPC調整_CPC調整表.csv |
+
+**ダウンロードページ（ZIPファイル）**
+
+| ZIP名 | 内容 |
+|---|---|
+| 全候補 勝ちKW ZIP | キーワード追加 — 追加KW_{商品名}.csv |
+| 削除用KW ZIP | キーワード削除 — 削除KW_{商品名}.csv |
+| キーワードCPC調整 ZIP | キーワードCPC調整 — {キャンペーン名}_CPC調整表.csv |
+
+> ⚠️ CSVは全件出力です（KW CPC調整テーブルの±0円行も含みます）。
+""")
+
+    # ── ASIN抽出 ──────────────────────────────────────────────────────
+    with st.expander("🔍 ASIN抽出 対応形式"):
+        st.markdown("""
+商品広告・動画広告のASINは以下3形式をすべて自動認識します。
+
+| 形式 | 例 |
+|---|---|
+| `asin="B0XXXXXXXX"` | TargetingExpression 標準形式 |
+| `asin-expanded="B0XXXXXXXX"` | 拡張ターゲティング形式 |
+| 裸ASIN `B0XXXXXXXX` | 直接記述形式 |
+
+> ASINは `B0` で始まる10文字（`B0[A-Z0-9]{8}`）で識別します。
+""")
+
+    # ── 画面サンプル ──────────────────────────────────────────────────
+    with st.expander("🖼️ 画面サンプル"):
+        st.markdown("""
+各ページの主な表示構成は以下の通りです。
 
 ---
 
-### ■ 使用するCSV
-
-Amazon広告管理画面の **「検索用語レポート」** を使用します。
-集計期間は14〜30日を推奨します。
-
----
-
-### ■ 処理ロジック
-
+**【追加】キーワード追加**
 ```
-オートキャンペーン行を抽出
-        ↓
-検索語句の内容で振り分け
-  ├ 通常語句 → キーワードページ
-  ├ ASIN形式 → 商品ページ（オート商品削除と合流）
-  └ category形式 → 動画ページ（オート動画削除と合流）
-        ↓
-削除条件チェック（広告費≥売価×2 AND ROAS≤0.8）
-        ↓
-除外処理（マニュアル完全一致登録済み・未分類を除外）
-        ↓
-各ページに除外候補を表示
+[条件バー: 最小注文数 / 最小クリック数 / 最小広告費]
+[商品選択プルダウン]
+[KPIカード: 抽出前件数 / 抽出後件数（同一意図KW統合後）]
+[一覧テーブル: keyword / キャンペーン名 / ROAS / 広告費 / 売上 / 注文数 / クリック数]
+※ CSVはダウンロードページの「全候補 勝ちKW ZIP」から取得
 ```
 
 ---
 
-### ■ 処理の流れ
-
-① CSVをアップロードし「抽出実行」を押す
-② オートキャンペーン行を自動抽出
-③ 検索語句の形式によってキーワード・商品・動画に振り分け
-④ 削除条件（広告費・ROAS）を両方満たす項目を選別
-⑤ 除外条件に該当する項目を除外
-⑥ 各ページに除外候補を表示
-
----
-
-### ■ 実際の操作手順
-
-① Amazon広告管理画面から「検索用語レポート」をダウンロードする
-② ツール画面の上部「CSVアップロード」からファイルを選択する
-③ 「🔍 抽出実行」ボタンを押す
-④ サイドバーの「🧹 オート除外KW」から「キーワード」「商品」「動画」のいずれかを選択する
-⑤ キャンペーンフィルターで対象キャンペーンを選択する（または「全キャンペーン」）
-⑥ 件数カードと一覧で除外候補を確認する
-⑦ 除外対象一覧（コピー用）をコピーするか、CSVをダウンロードする
-⑧ Amazon広告管理画面のオートキャンペーンのネガティブターゲティングへ登録する
-
----
-
-### ■ 実行後の確認方法
-
+**【追加】商品（商品追加）**
 ```
-[キャンペーンフィルター: 全キャンペーン / 個別キャンペーン]
-[件数カード: 除外候補件数]
-[除外対象一覧（コピー用）]
-[詳細テーブル: 語句 / キャンペーン / ROAS / 広告費 / 売上]
+[条件バー: 売上≥売価×2 / ROAS≥2.0 / 商品]
+[商品選択プルダウン]
+[KPIカード: 追加候補数 / 平均ROAS / 平均注文数 / 平均広告費]
+[一覧テーブル: キャンペーン名 / 広告グループ / ASIN / 注文数 / クリック数 / 広告費 / 売上 / ROAS / 採用理由]
+[CSVダウンロードボタン: 商品追加_{商品名}.csv]
+```
+
+---
+
+**【追加】動画（動画追加）**
+```
+[条件バー: 売上≥売価×2 / ROAS≥2.0 / 動画]
+[商品選択プルダウン]
+[KPIカード: 追加候補数 / 平均ROAS / 平均注文数 / 平均広告費]
+[一覧テーブル: キャンペーン名 / 広告グループ / ASIN / 注文数 / クリック数 / 広告費 / 売上 / ROAS / 採用理由]
+[CSVダウンロードボタン: 動画追加_{商品名}.csv]
+```
+
+---
+
+**【削除】キーワード削除**
+```
+[条件バー: 広告費≥売価×2 / ROAS<0.8 / 勝ちKW除外]
+[商品選択プルダウン]
+[件数バッジ: 削除対象件数: N件]
+[一覧テーブル: keyword / キャンペーン名 / ROAS / 広告費 / 売上]
+※ CSVはダウンロードページの「削除用KW ZIP」から取得
+```
+
+---
+
+**【削除】商品（商品削除）**
+```
+[条件バー: 広告費≥売価×2 / ROAS<0.8 / 商品]
+[商品選択プルダウン]
+[KPIカード: 削除候補数 / 平均ROAS / 平均広告費]
+[一覧テーブル: ASIN / campaign / ROAS / cost / 削除理由]
 [CSVダウンロードボタン]
 ```
 
 ---
 
-### ■ 注意事項
-
-- キーワード・商品・動画は別ページに表示されます。サイドバーから切り替えてください。
-- 除外はツールで自動実行しません。Amazon広告管理画面で手動登録してください。
-- マニュアル広告に登録済みの語句は除外候補から自動除外されています。
+**【削除】動画（動画削除）**
+```
+[条件バー: 広告費≥売価×2 / ROAS<0.8 / 動画]
+[商品選択プルダウン]
+[KPIカード: 削除候補数 / 平均ROAS / 平均広告費]
+[一覧テーブル: ASIN / campaign / ROAS / cost / 削除理由]
+[CSVダウンロードボタン]
+```
 
 ---
 
-### ■ おすすめ運用
+**【CPC調整】キーワードCPC調整**
+```
+[条件バー: CPC調整ルール適用]
+[ロジックテーブル expander]
+[キャンペーン選択プルダウン]
+[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
+[一覧テーブル: keyword / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
+                                                      ← 全件表示（±0含む）
+[CSVダウンロードボタン]
+```
 
-- 毎週CSVを更新し、除外候補を確認する。
-- 除外後は「改善履歴」に登録し、分析機能でオート広告費削減効果を確認する。
-- 商品・動画ページは「オート商品削除」「オート動画削除」ページと合流しているため、両方から確認する。
+---
+
+**【CPC調整】商品CPC調整**
+```
+[条件バー: CPC調整ルール適用 / 商品]
+[ロジックテーブル expander]
+[商品選択プルダウン: 全商品 / 液体 / 涙やけ / ...]  ← 全商品が初期値
+[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
+[一覧テーブル: ASIN / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
+                                                       ← 変更幅≠0のみ
+[CSVダウンロードボタン]
+```
+
+---
+
+**【CPC調整】動画CPC調整**
+```
+[条件バー: CPC調整ルール適用 / 動画]
+[ロジックテーブル expander]
+[商品選択プルダウン: 全商品 / 液体 / 涙やけ / ...]  ← 全商品が初期値
+[件数カード: SS+ / SS / S / A / B / C / D / 即削除]  ← 全件表示
+[一覧テーブル: ASIN / ROAS / cost / 現在CPC / ランク / 変更幅 / 推奨CPC]
+                                                       ← 変更幅≠0のみ
+[CSVダウンロードボタン]
+```
 """)
 
-    # ── 分析 ─────────────────────────────────────────────────────────
-    with st.expander("📊 分析"):
+    # ── トラブルシューティング ────────────────────────────────────────
+    with st.expander("🛠️ トラブルシューティング"):
         st.markdown("""
-## 📊 分析機能
-
-分析機能は、**改善で抽出した対象**の成果変化を確認する機能です。
-新しい抽出ロジックは使いません。改善対象だけを分析します。
-
----
-
-### ■ 目的
-
-改善タブ（キーワード追加・商品追加・動画追加・CPC調整）で抽出した対象が、
-その後の実績でどう変化したかをCSV比較で確認します。
+**Q. データが表示されない**
+→ 画面上部でCSVをアップロードし「🔍 抽出実行」ボタンを押してください。
+ボタンを押すまで分析は実行されません。
 
 ---
 
-### ■ 分析対象
-
-| 分析タブ | 分析対象 |
-|---------|---------|
-| キーワード追加 / 分析 | 改善タブで追加候補となったキーワード |
-| 商品追加 / 分析 | 改善タブで追加候補となったASIN |
-| 動画追加 / 分析 | 改善タブで追加候補となった動画ASIN |
-| キーワードCPC調整 / 分析 | 改善タブでCPC調整対象となったキーワード |
-| 商品CPC調整 / 分析 | 改善タブでCPC調整対象となった商品ASIN |
-| 動画CPC調整 / 分析 | 改善タブでCPC調整対象となった動画ASIN |
+**Q. 全商品が表示されない（商品が一部しか出ない）**
+→ 売価マスタ（PRICES辞書）に登録されていない商品は除外されます。
+campaign_theme が PRICES のキーと一致しているか確認してください。
 
 ---
 
-### ■ 分析期間
-
-| 対象 | 期間 |
-|------|------|
-| キーワード追加・商品追加・動画追加 | **30日固定** |
-| キーワードCPC調整・商品CPC調整・動画CPC調整 | **7日固定** |
-
-期間変更機能はありません。30日 / 7日のみ使用してください。
+**Q. 商品追加・動画追加が0件になる**
+→ 以下を確認してください。
+- 信頼度フィルター（注文≥3 / クリック≥5 / 広告費≥¥300）を満たす語句があるか
+- 売上 ≥ 売価×2 かつ ROAS ≥ 2.0 を満たすASINがあるか
+- 対象キャンペーン名に「商品ターゲ」が含まれているか
 
 ---
 
-### ■ 分析フロー
-
-```
-① 改善タブで「抽出実行」
-        ↓
-② 改善対象が抽出される
-（キーワード追加: 30日後に確認 / CPC調整: 7日後に確認）
-        ↓
-③ 分析タブへ移動
-        ↓
-④ 比較用CSVをアップロード
-（キーワード追加 → 30日レポート / CPC調整 → 7日レポート）
-        ↓
-⑤ 「分析実行」ボタンを押す
-        ↓
-⑥ 改善対象を新CSVから自動検索
-（同一キャンペーン + キーワード/ASIN で照合）
-        ↓
-⑦ Before（改善時） / After（新CSV）を比較表示
-        ↓
-⑧ 「分析結果を保存」ボタンで履歴に保存
-```
+**Q. CPC調整（商品/動画）のテーブルが空になる**
+→ 商品CPC / 動画CPCの詳細テーブルは「変更幅 ≠ 0円」のみ表示する仕様です。
+SS / A / B（現状維持）と判断保留は表示されません。
+件数カードで各ランクの件数を確認してください。
+なお、キーワードCPC調整の詳細テーブルは**全件表示**です。
 
 ---
 
-### ■ キーワード追加 分析
-
-- **使用レポート**: 30日レポートCSV
-- **分析対象**: 改善タブで追加候補となったキーワードのみ
-- **Before**: 改善実行時のデータ（改善タブで抽出した時点の実績）
-- **After**: 新しくアップロードした30日レポートの実績
-- **照合キー**: キャンペーン + 正規化キーワード（表記ゆれを吸収）
+**Q. CSVが出力できない**
+→ 分析結果が0件の場合もダウンロードボタンは表示されますが、
+CSVは空ファイルになる場合があります。
+データがあるページでダウンロードしてください。
 
 ---
 
-### ■ CPC調整 分析
-
-- **使用レポート**: 7日レポートCSV
-- **分析対象**: 改善タブでCPC調整対象となったキーワード/ASINのみ
-- **Before**: 改善実行時のデータ（CPC調整前の実績）
-- **After**: 新しくアップロードした7日レポートの実績
-- **照合キー**: キャンペーン + Keyword Text / ASIN
-
----
-
-### ■ 比較項目
-
-売上 / 広告費 / ROAS / CTR / CVR / CPC / クリック数 / 注文数
-
-各項目に対して「↑ 改善」「↓ 悪化」「→ 変化なし」を自動判定します（変化率 ±2% 未満は「変化なし」）。
-
----
-
-### ■ 画面構成
-
-```
-① キャンペーン一覧（改善対象）
-② キャンペーン選択
-③ 比較用CSVをアップロード（30日 or 7日）
-④ 分析実行ボタン
-⑤ キャンペーン比較（Before / After）
-⑥ 対象別 Before / After 一覧
-⑦ 分析結果を保存ボタン
-⑧ 保存済み分析履歴
-```
-
----
-
-### ■ 操作手順
-
-**① 改善タブで抽出実行**
-キーワード追加 or CPC調整の「改善」タブでCSVをアップロードし「抽出実行」を押します。
-この時の抽出結果が分析の「Before」データになります。
-
-**② 改善を実施（KW追加 / CPC変更）**
-抽出結果を使ってAmazon広告の改善を実施します。
-
-**③ 期間経過後にCSVを取得**
-- キーワード追加 → 30日後に30日レポートを取得
-- CPC調整 → 7日後に7日レポートを取得
-
-**④ 分析タブへ移動**
-同じページの「分析」タブをクリックします。
-
-**⑤ 比較用CSVをアップロード**
-新しいレポートCSVをアップロードします。
-
-**⑥ 分析実行**
-「🔍 分析実行」ボタンを押します。
-改善対象と新CSV内の同一キーワード/ASINを自動照合します。
-
-**⑦ 結果確認**
-Before / After 比較表とキャンペーン別集計が表示されます。
-
-**⑧ 分析結果を保存**
-「💾 分析結果を保存」ボタンで履歴に追記されます。
-
----
-
-### ■ 注意事項
-
-- 「改善」タブで抽出実行してから「分析」タブを開いてください。先に分析タブを開いても対象データがありません。
-- キーワード追加分析は30日レポートを使用してください。7日レポートでは比較対象が異なります。
-- CPC調整分析は7日レポートを使用してください。
-- 新旧CSVで同一キャンペーン名 / キーワードが含まれていないとマッチしません。
-- 分析結果の保存先: `analysis_data/` フォルダ（JSONファイル）
-
----
-
-### ■ おすすめ運用
-
-**キーワード追加**
-① 改善タブで抽出実行 → KW追加を実施
-② 30日後に新しい30日レポートを取得
-③ 分析タブで比較 → 売上・ROAS改善を確認
-④ 分析結果を保存
-
-**CPC調整**
-① 改善タブで抽出実行 → CPC変更を実施
-② 7日後に新しい7日レポートを取得
-③ 分析タブで比較 → ROAS・CPC変化を確認
-④ 分析結果を保存
+**Q. 売価マスタ未登録時の動作**
+→ campaign_theme が PRICES に存在しない商品は、
+追加・削除・CPC調整のすべての判定から除外されます。
+該当商品を利用するにはPRICES辞書への登録が必要です。
 """)
+
+    # ── デバッグ情報 ──────────────────────────────────────────────────
+    with st.expander("ℹ️ デバッグ情報"):
+        dbg = st.session_state.get("dbg", {})
+        st.json(dbg)
+
+
 
 # ─── Page Router ─────────────────────────────────────
 _PAGE_FUNCS = {
