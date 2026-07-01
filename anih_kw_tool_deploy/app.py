@@ -1837,6 +1837,228 @@ def _anls_render_list(merged, id_col):
             st.markdown("**■広告運用で触るべき項目**\n" + "\n".join(_insight_actions))
 
 
+def _anls_aggregate_before_after(merged: pd.DataFrame) -> dict:
+    """「💾 分析結果を保存」時に、Before/After・理由・アクション表示に必要な
+    最小限の集計値だけを計算する新規追加関数（読み取り専用・merged自体は変更しない）。
+    ここで計算した値は、既存の _anls_generate_insight にそのまま渡せる形
+    （ROAS_b/a, orders_b/a, sales_b/a, cost_b/a, avg_cpc_b/a）にすることで、
+    理由・アクションの生成ロジック自体は既存関数を一切変更せず再利用する。
+
+    agg_clicks_b/a, agg_rows は現時点のどの既存ロジック・表示からも参照されない
+    「将来の分析レポート拡張のためだけ」の保存専用フィールド。
+    """
+    def _sum(col):
+        return float(merged[col].sum()) if col in merged.columns else 0.0
+
+    sales_b, sales_a   = _sum("sales_b"), _sum("sales_a")
+    cost_b,  cost_a    = _sum("cost_b"),  _sum("cost_a")
+    orders_b, orders_a = _sum("orders_b"), _sum("orders_a")
+    clicks_b, clicks_a = _sum("clicks_b"), _sum("clicks_a")
+
+    roas_b = round(sales_b / cost_b, 2) if cost_b > 0 else 0.0
+    roas_a = round(sales_a / cost_a, 2) if cost_a > 0 else 0.0
+    cpc_b  = round(cost_b / clicks_b, 0) if clicks_b > 0 else 0.0
+    cpc_a  = round(cost_a / clicks_a, 0) if clicks_a > 0 else 0.0
+
+    return {
+        "agg_sales_b": sales_b, "agg_sales_a": sales_a,
+        "agg_cost_b": cost_b, "agg_cost_a": cost_a,
+        "agg_orders_b": orders_b, "agg_orders_a": orders_a,
+        "agg_roas_b": roas_b, "agg_roas_a": roas_a,
+        "agg_avg_cpc_b": cpc_b, "agg_avg_cpc_a": cpc_a,
+        "agg_clicks_b": clicks_b, "agg_clicks_a": clicks_a,
+        "agg_rows": int(len(merged)),
+    }
+
+
+def _anls_render_saved_report(recs: list, label: str):
+    """保存済み分析履歴（recsは_anls_load()の戻り値そのまま）を、
+    DataFrameの代わりにカード形式の「分析レポート」として表示する追加関数。
+
+    【重要】既存のJSON構造・保存処理・分析ロジック・行単位の判定基準（_anls_row_judge）・
+    既存のBefore/After実数値生成には一切触れない。新規追加した agg_* フィールド
+    （agg_sales_b/a, agg_cost_b/a, agg_orders_b/a, agg_roas_b/a, agg_avg_cpc_b/a）が
+    レコードに存在する場合は、既存関数 _anls_generate_insight にそのまま渡して
+    実数値ベースの理由・アクションを表示する（判定/理由生成ロジック自体は既存のまま）。
+    agg_* フィールドが無い旧履歴（このアップデート以前に保存された履歴）は、
+    従来通り件数ベースの簡易表示にフォールバックし、互換性を維持する。
+    """
+    if not recs:
+        st.info("保存済み分析はありません。")
+        return
+
+    def _sort_key(r):
+        return (str(r.get("saved_at") or ""), str(r.get("id") or ""))
+
+    recs_sorted = sorted(recs, key=_sort_key)
+    enriched = []
+    for pos, rec in enumerate(recs_sorted):
+        prev = recs_sorted[pos - 1] if pos > 0 else None
+        enriched.append((rec, prev))
+    enriched_desc = list(reversed(enriched))
+
+    st.markdown("##### 📈 履歴推移（改善率）")
+    _trend_index = [r.get("saved_at", "") for r in recs_sorted]
+    _trend_vals = [float(r.get("rate", 0) or 0) for r in recs_sorted]
+    if len(recs_sorted) >= 2:
+        _trend_df = pd.DataFrame({"改善率(%)": _trend_vals}, index=_trend_index)
+        st.line_chart(_trend_df)
+    _trend_txt = "　→　".join(f"{d}: {v:.1f}%" for d, v in zip(_trend_index, _trend_vals))
+    st.caption(_trend_txt)
+    st.markdown("---")
+
+    for i, (rec, prev_rec) in enumerate(enriched_desc):
+        n_total  = int(rec.get("n_matched", 0) or 0)
+        n_kaizen = int(rec.get("n_kaizen", 0) or 0)
+        n_akka   = int(rec.get("n_akka", 0) or 0)
+        n_henko  = int(rec.get("n_henko", 0) or 0)
+        rate     = float(rec.get("rate", 0) or 0)
+        n_before = int(rec.get("n_before", 0) or 0)
+        camps    = rec.get("camps") or []
+        saved_at = rec.get("saved_at", "―")
+        rtype    = rec.get("type", label)
+        period_days_r = rec.get("period_days", "―")
+
+        if n_kaizen > 0 and n_kaizen >= n_akka and n_kaizen >= n_henko:
+            trend, color, emoji = "改善", "#1e8e3e", "🟢"
+        elif n_akka > 0 and n_akka > n_kaizen and n_akka >= n_henko:
+            trend, color, emoji = "悪化", "#d93025", "🔴"
+        else:
+            trend, color, emoji = "変化なし", "#f9a825", "🟡"
+
+        stars_n = max(0, min(5, round(rate / 20)))
+        stars = "★" * stars_n + "☆" * (5 - stars_n)
+
+        header = f"{emoji} {saved_at}　{rtype}　改善率 {rate:.1f}%　{trend}"
+        with st.expander(header, expanded=(i == 0)):
+            st.markdown(
+                f'<div style="border-bottom:2px solid #ddd;padding-bottom:8px;margin-bottom:12px;">'
+                f'<div style="font-size:20px;font-weight:700;">📊 {rtype}</div>'
+                f'<div style="color:#666;font-size:13px;margin-top:4px;">'
+                f'分析日: {saved_at} ｜ 比較期間: {period_days_r}日固定 ｜ 対象キャンペーン数: {len(camps)}'
+                f'</div></div>',
+                unsafe_allow_html=True)
+
+            st.markdown(
+                f'<div style="background:{color}1a;border:1px solid {color};border-radius:10px;'
+                f'padding:14px 18px;margin-bottom:14px;">'
+                f'<span style="font-size:22px;">{emoji}</span>'
+                f'<span style="font-size:20px;font-weight:700;color:{color};margin-left:6px;">{trend}</span>'
+                f'<div style="margin-top:8px;font-size:22px;letter-spacing:2px;color:{color};">{stars}</div>'
+                f'<div style="margin-top:4px;"><span style="color:#666;">改善率</span>'
+                f'<span style="font-size:28px;font-weight:800;color:{color};margin-left:8px;">{rate:.1f}%</span>'
+                f'</div></div>',
+                unsafe_allow_html=True)
+
+            _detail_keys = ("agg_sales_b", "agg_sales_a", "agg_cost_b", "agg_cost_a",
+                            "agg_orders_b", "agg_orders_a", "agg_roas_b", "agg_roas_a",
+                            "agg_avg_cpc_b", "agg_avg_cpc_a")
+            has_detail = all(k in rec for k in _detail_keys)
+
+            if has_detail:
+                roas_b, roas_a   = float(rec["agg_roas_b"]), float(rec["agg_roas_a"])
+                orders_b, orders_a = float(rec["agg_orders_b"]), float(rec["agg_orders_a"])
+                sales_b, sales_a = float(rec["agg_sales_b"]), float(rec["agg_sales_a"])
+                cost_b, cost_a   = float(rec["agg_cost_b"]), float(rec["agg_cost_a"])
+                cpc_b, cpc_a     = float(rec["agg_avg_cpc_b"]), float(rec["agg_avg_cpc_a"])
+
+                def _bf_card(m_label, b, a, higher_better, fmt):
+                    if a > b:
+                        clr = "#1e8e3e" if higher_better else "#d93025"
+                    elif a < b:
+                        clr = "#d93025" if higher_better else "#1e8e3e"
+                    else:
+                        clr = "#f9a825"
+                    return (
+                        f'<div style="background:#f5f5f5;border-radius:8px;padding:12px;'
+                        f'text-align:center;margin-bottom:8px;">'
+                        f'<div style="color:#888;font-size:12px;">{m_label}</div>'
+                        f'<div style="font-size:20px;font-weight:800;">{fmt.format(b)}'
+                        f'<span style="color:#999;font-size:14px;"> → </span>'
+                        f'<span style="color:{clr};">{fmt.format(a)}</span></div></div>'
+                    )
+
+                st.markdown("**Before / After**")
+                _bf_html = "".join([
+                    _bf_card("ROAS", roas_b, roas_a, True, "{:.2f}"),
+                    _bf_card("注文数", orders_b, orders_a, True, "{:.0f}件"),
+                    _bf_card("売上", sales_b, sales_a, True, "¥{:,.0f}"),
+                    _bf_card("広告費", cost_b, cost_a, False, "¥{:,.0f}"),
+                    _bf_card("平均CPC", cpc_b, cpc_a, False, "¥{:.0f}"),
+                ])
+                st.markdown(_bf_html, unsafe_allow_html=True)
+
+                _agg_row = {
+                    "ROAS_b": roas_b, "ROAS_a": roas_a,
+                    "orders_b": orders_b, "orders_a": orders_a,
+                    "sales_b": sales_b, "sales_a": sales_a,
+                    "cost_b": cost_b, "cost_a": cost_a,
+                    "avg_cpc_b": cpc_b, "avg_cpc_a": cpc_a,
+                    "_判定": trend,
+                }
+                _reasons, _actions = _anls_generate_insight(_agg_row)
+                _reason_hdr = f"{trend}理由" if trend in ("改善", "悪化") else "理由"
+                st.markdown(f"**{_reason_hdr}**\n" + "\n".join(_reasons))
+                st.markdown("**■ 広告運用で触るべき項目**\n" + "\n".join(_actions))
+            else:
+                st.markdown("**Before / After（対象件数）**")
+                _c1, _c2 = st.columns(2)
+                with _c1:
+                    st.markdown(
+                        f'<div style="background:#f5f5f5;border-radius:8px;padding:14px;text-align:center;">'
+                        f'<div style="color:#888;font-size:12px;">Before（抽出対象）</div>'
+                        f'<div style="font-size:26px;font-weight:800;">{n_before}件</div></div>',
+                        unsafe_allow_html=True)
+                with _c2:
+                    st.markdown(
+                        f'<div style="background:#f5f5f5;border-radius:8px;padding:14px;text-align:center;">'
+                        f'<div style="color:#888;font-size:12px;">After（CSV一致・分析対象）</div>'
+                        f'<div style="font-size:26px;font-weight:800;">{n_total}件</div></div>',
+                        unsafe_allow_html=True)
+                st.caption("※ この履歴は本アップデート以前に保存されたため、実数値（ROAS等）が記録されていません。対象件数の比較のみ表示しています。")
+
+                st.markdown("**なぜこうなったのか**")
+                _pct = (lambda x: (x / n_total * 100) if n_total else 0.0)
+                st.markdown(
+                    f"・改善 {n_kaizen}件（{_pct(n_kaizen):.1f}%）\n\n"
+                    f"・悪化 {n_akka}件（{_pct(n_akka):.1f}%）\n\n"
+                    f"・変化なし {n_henko}件（{_pct(n_henko):.1f}%）"
+                )
+                st.caption("※ この履歴は本アップデート以前に保存されたため、詳細な理由データがありません。")
+
+                st.markdown("**■ 広告運用で触るべき項目**")
+                if trend == "改善":
+                    _actions = ["・現状維持", "・予算増額を検討"]
+                elif trend == "悪化":
+                    _actions = ["・CPCを下げる", "・検索語句レポート確認", "・不要ターゲット停止候補"]
+                else:
+                    _actions = ["・現状維持", "・1週間様子を見る"]
+                st.markdown("\n\n".join(_actions))
+                st.caption("※ この履歴は本アップデート以前に保存されたため、集計傾向に基づく一般的な提案です。")
+
+            st.markdown("**サマリー**")
+            st.markdown(_anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate), unsafe_allow_html=True)
+
+            if camps:
+                st.markdown("**対象キャンペーン**")
+                _tags = "".join(
+                    f'<span style="display:inline-block;background:#eef1f5;border-radius:12px;'
+                    f'padding:3px 10px;margin:2px;font-size:12px;">{c}</span>'
+                    for c in camps)
+                st.markdown(_tags, unsafe_allow_html=True)
+
+            if prev_rec is not None:
+                _prev_rate = float(prev_rec.get("rate", 0) or 0)
+                _diff = rate - _prev_rate
+                _arrow = "↑改善" if _diff > 0 else ("↓悪化" if _diff < 0 else "→変化なし")
+                st.markdown(
+                    f"**前回との比較**\n\n"
+                    f"前回（{prev_rec.get('saved_at', '?')}）: {_prev_rate:.1f}%　→　今回: {rate:.1f}%　**{_arrow}**"
+                )
+            else:
+                st.caption("前回の保存履歴はありません（初回保存）。")
+
+
 def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                      anls_hist_fname: str, csv_key: str, label: str,
                      mode: str,
@@ -1982,17 +2204,18 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
     _anls_render_list(view, res_id_col)
     if st.button("💾 分析結果を保存", key=f"{_sk}_save"):
         _recs = _anls_load(anls_hist_fname)
+        _agg = _anls_aggregate_before_after(merged)
         _recs.append({"id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
                       "saved_at": _anls_dt.date.today().isoformat(), "type": label,
                       "period_days": period_days, "n_before": res["n_before"],
                       "n_matched": n_total, "n_kaizen": n_kaizen, "n_akka": n_akka,
-                      "n_henko": n_henko, "rate": round(rate, 1), "camps": camps})
+                      "n_henko": n_henko, "rate": round(rate, 1), "camps": camps,
+                      **_agg})
         _anls_save(anls_hist_fname, _recs)
         st.success("✅ 分析結果を保存しました。")
     with st.expander("📂 保存済み分析履歴", expanded=False):
         _recs = _anls_load(anls_hist_fname)
-        if not _recs: st.info("保存済み分析はありません。")
-        else: st.dataframe(pd.DataFrame(_recs[::-1]), use_container_width=True)
+        _anls_render_saved_report(_recs, label)
 
 
 def page_cpc():
