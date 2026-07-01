@@ -1844,7 +1844,10 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                      cpc_hist_fname: str = ""):
     _sk = f"_anls_{csv_key}"
     st.markdown(f"#### 📊 {label} 分析")
-    st.info(f"📅 分析期間: **{period_days}日固定** — {period_days}日レポートCSVをアップロードしてください。")
+    if mode in ("kw_add", "asin_add"):
+        st.info(f"📅 追加後の効果測定期間: **{period_days}日固定** — 追加候補を反映してから{period_days}日間のレポートCSVをアップロードしてください。")
+    else:
+        st.info(f"📅 分析期間: **{period_days}日固定** — {period_days}日レポートCSVをアップロードしてください。")
     if before_df is None or before_df.empty:
         st.warning("先に「改善」タブで抽出実行を行ってください。抽出対象が分析対象になります。")
         return
