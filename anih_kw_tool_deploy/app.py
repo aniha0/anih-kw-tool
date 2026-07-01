@@ -1385,21 +1385,40 @@ def page_auto_del_video():
 
 def _anls_load(fname: str) -> list:
     p = _anls_plib.Path("analysis_data") / fname
+    st.write("DEBUG[_anls_load] 読込開始")
+    st.write("DEBUG[_anls_load] 絶対パス:", str(p.resolve()))
+    st.write("DEBUG[_anls_load] cwd:", str(_anls_plib.Path.cwd()))
+    st.write("DEBUG[_anls_load] exists:", p.exists())
+    st.write("DEBUG[_anls_load] ファイルサイズ:", p.stat().st_size if p.exists() else None)
     if not p.exists():
         return []
     try:
-        return _anls_json.loads(p.read_text(encoding="utf-8")).get("records", [])
-    except Exception:
+        _anls_load_result = _anls_json.loads(p.read_text(encoding="utf-8")).get("records", [])
+        st.write("DEBUG[_anls_load] records件数:", len(_anls_load_result))
+        return _anls_load_result
+    except Exception as e:
+        st.exception(e)
         return []
 
 
 def _anls_save(fname: str, records: list):
-    p = _anls_plib.Path("analysis_data")
-    p.mkdir(exist_ok=True)
-    (p / fname).write_text(
-        _anls_json.dumps({"records": records}, ensure_ascii=False, indent=2),
-        encoding="utf-8"
-    )
+    try:
+        p = _anls_plib.Path("analysis_data")
+        st.write("DEBUG[_anls_save] 保存開始")
+        st.write("DEBUG[_anls_save] 保存ファイル名:", fname)
+        st.write("DEBUG[_anls_save] 絶対パス:", str((p / fname).resolve()))
+        st.write("DEBUG[_anls_save] cwd:", str(_anls_plib.Path.cwd()))
+        st.write("DEBUG[_anls_save] records件数:", len(records))
+        p.mkdir(exist_ok=True)
+        (p / fname).write_text(
+            _anls_json.dumps({"records": records}, ensure_ascii=False, indent=2),
+            encoding="utf-8"
+        )
+        st.write("DEBUG[_anls_save] 保存成功")
+        st.write("DEBUG[_anls_save] ファイル存在:", (p / fname).exists())
+        st.write("DEBUG[_anls_save] ファイルサイズ:", (p / fname).stat().st_size if (p / fname).exists() else None)
+    except Exception as e:
+        st.exception(e)
 
 
 def _anls_parse_csv(csv_file):
@@ -1763,7 +1782,14 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
             bf = before_df.copy()
             n_history = None
             if mode == "cpc_kw":
-                _cpc_hist = _anls_load(cpc_hist_fname or "cpc_change_history.json")
+                _dbg_hist_fname = cpc_hist_fname or "cpc_change_history.json"
+                st.write("DEBUG[run_btn] historyファイル名:", _dbg_hist_fname)
+                st.write("DEBUG[run_btn] analysis_data一覧:", sorted(p_.name for p_ in _anls_plib.Path("analysis_data").glob("*")) if _anls_plib.Path("analysis_data").exists() else [])
+                st.write("DEBUG[run_btn] history絶対パス:", str((_anls_plib.Path("analysis_data") / _dbg_hist_fname).resolve()))
+                _cpc_hist = _anls_load(_dbg_hist_fname)
+                st.write("DEBUG[before_no_history_check] exists:", (_anls_plib.Path("analysis_data") / _dbg_hist_fname).exists())
+                st.write("DEBUG[before_no_history_check] records件数:", len(_cpc_hist))
+                st.write("DEBUG[before_no_history_check] read結果:", _cpc_hist)
                 if not _cpc_hist:
                     st.error("履歴がありません。先に「CPC調整タブ → 実行用CSVをダウンロード」してください。"); return
                 _last_entries = _cpc_hist[-1]["entries"]
@@ -1780,7 +1806,13 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                 bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
             elif mode == "cpc_asin":
                 if cpc_hist_fname:
+                    st.write("DEBUG[run_btn] historyファイル名:", cpc_hist_fname)
+                    st.write("DEBUG[run_btn] analysis_data一覧:", sorted(p_.name for p_ in _anls_plib.Path("analysis_data").glob("*")) if _anls_plib.Path("analysis_data").exists() else [])
+                    st.write("DEBUG[run_btn] history絶対パス:", str((_anls_plib.Path("analysis_data") / cpc_hist_fname).resolve()))
                     _asin_hist = _anls_load(cpc_hist_fname)
+                    st.write("DEBUG[before_no_history_check] exists:", (_anls_plib.Path("analysis_data") / cpc_hist_fname).exists())
+                    st.write("DEBUG[before_no_history_check] records件数:", len(_asin_hist))
+                    st.write("DEBUG[before_no_history_check] read結果:", _asin_hist)
                     if not _asin_hist:
                         st.error("履歴がありません。先に「CPC調整タブ → 実行用CSVをダウンロード」してください。"); return
                     _last_entries = _asin_hist[-1]["entries"]
@@ -1796,7 +1828,13 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                     bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
             elif mode == "asin_add":
                 if cpc_hist_fname:
+                    st.write("DEBUG[run_btn] historyファイル名:", cpc_hist_fname)
+                    st.write("DEBUG[run_btn] analysis_data一覧:", sorted(p_.name for p_ in _anls_plib.Path("analysis_data").glob("*")) if _anls_plib.Path("analysis_data").exists() else [])
+                    st.write("DEBUG[run_btn] history絶対パス:", str((_anls_plib.Path("analysis_data") / cpc_hist_fname).resolve()))
                     _asin_add_hist = _anls_load(cpc_hist_fname)
+                    st.write("DEBUG[before_no_history_check] exists:", (_anls_plib.Path("analysis_data") / cpc_hist_fname).exists())
+                    st.write("DEBUG[before_no_history_check] records件数:", len(_asin_add_hist))
+                    st.write("DEBUG[before_no_history_check] read結果:", _asin_add_hist)
                     if not _asin_add_hist:
                         st.error("履歴がありません。先に「追加候補タブ → CSVをダウンロード」してください。"); return
                     _last_entries = _asin_add_hist[-1]["entries"]
@@ -1812,7 +1850,13 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                     bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
             else:  # kw_add
                 if cpc_hist_fname:
+                    st.write("DEBUG[run_btn] historyファイル名:", cpc_hist_fname)
+                    st.write("DEBUG[run_btn] analysis_data一覧:", sorted(p_.name for p_ in _anls_plib.Path("analysis_data").glob("*")) if _anls_plib.Path("analysis_data").exists() else [])
+                    st.write("DEBUG[run_btn] history絶対パス:", str((_anls_plib.Path("analysis_data") / cpc_hist_fname).resolve()))
                     _kw_add_hist = _anls_load(cpc_hist_fname)
+                    st.write("DEBUG[before_no_history_check] exists:", (_anls_plib.Path("analysis_data") / cpc_hist_fname).exists())
+                    st.write("DEBUG[before_no_history_check] records件数:", len(_kw_add_hist))
+                    st.write("DEBUG[before_no_history_check] read結果:", _kw_add_hist)
                     if not _kw_add_hist:
                         st.error("履歴がありません。先に「追加候補タブ → CSVをダウンロード」してください。"); return
                     _last_entries = _kw_add_hist[-1]["entries"]
