@@ -2026,22 +2026,21 @@ def _anls_render_saved_detail(detail: list, anls_hist_fname: str = "", rec_id: s
                     for _r in all_recs:
                         for _hi, _hd in enumerate(_r.get("detail") or []):
                             if _hd.get("campaign", "") == _camp_name and str(_hd.get("keyword", "")) == kw:
-                                _hist.append((_r.get("saved_at", ""), _r.get("id", ""), _hi, _hd, _r.get("period_days")))
+                                _hist.append((_r.get("saved_at", ""), _r.get("id", ""), _hi, _hd, _r.get("period")))
                     _hist.sort(key=lambda t: (t[0], t[1]))
                 if not _hist:
                     _hist = [("この保存", rec_id, int(_idx), detail[int(_idx)], None)]
                 st.markdown(f"**保存履歴（時系列・{len(_hist)}件）**")
-                _CPC_TYPES = {"キーワードCPC分析", "商品CPC分析", "動画CPC分析"}
-                _is_cpc = rtype in _CPC_TYPES
-                for _h_saved_at, _h_rec_id, _h_row_idx, _h_d, _h_period_days in _hist:
+                for _h_saved_at, _h_rec_id, _h_row_idx, _h_d, _h_period in _hist:
                     _hist_label = f"{_h_saved_at} 保存"
-                    if _is_cpc and _h_period_days:
+                    if _h_period:
                         try:
-                            _p_end = _anls_dt.date.fromisoformat(_h_saved_at)
-                            _p_start = _p_end - _anls_dt.timedelta(days=int(_h_period_days) - 1)
-                            _hist_label = f"{_p_start.month}/{_p_start.day}〜{_p_end.month}/{_p_end.day}"
+                            _ps, _pe = str(_h_period).split(" - ")
+                            _psd = _anls_dt.datetime.strptime(_ps, "%Y/%m/%d").date()
+                            _ped = _anls_dt.datetime.strptime(_pe, "%Y/%m/%d").date()
+                            _hist_label = f"{_psd.month}/{_psd.day}〜{_ped.month}/{_ped.day}"
                         except Exception:
-                            _hist_label = f"{_h_saved_at} 保存（期間不明）"
+                            _hist_label = f"{_h_saved_at} 保存"
                     _hist_key = f"_anls_histopen_{_h_rec_id}_{_h_row_idx}"
                     if st.checkbox(_hist_label, key=_hist_key):
                         _hb, _ha = (_h_d.get("before") or {}), (_h_d.get("after") or {})
@@ -2281,144 +2280,163 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
         return
     camps = sorted(before_df["campaign_theme"].unique().tolist()) if "campaign_theme" in before_df.columns else []
     st.markdown(f"**比較用 {_disp_days}日レポートCSVをアップロード**")
-    af_file = st.file_uploader(f"{_disp_days}日レポートCSV", type="csv", key=csv_key)
+    _accept_multiple = mode in ("cpc_kw", "cpc_asin")
+    af_files = st.file_uploader(f"{_disp_days}日レポートCSV", type="csv", key=csv_key, accept_multiple_files=_accept_multiple)
+    af_files = af_files if isinstance(af_files, list) else ([af_files] if af_files is not None else [])
     run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
     if run_btn:
-        if af_file is None:
+        if not af_files:
             st.warning("CSVをアップロードしてください。"); return
-        with st.spinner("分析中..."):
-            df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
-            if not all([cc, sc, oc_]):
-                st.error("必要な列が見つかりません（キャンペーン名・売上・広告費）。"); return
-            if mode == "kw_add":
-                if not kc: st.error("「検索用語」列が見つかりません。"); return
-                after_df = _anls_build_kw_after(df_raw, kc, cc, sc, oc_, od, clk)
-            elif mode == "cpc_kw":
-                kw_col_cpc = kwt if kwt else fcol(df_raw, ["ターゲティング", "Targeting", "targeting"])
-                after_df = _anls_build_cpc_after(df_raw, cc, sc, oc_, od, clk, kw_col_cpc)
-            else:  # cpc_asin or asin_add
-                camp_pat = None
-                if mode == "cpc_asin" and before_df is not None and not before_df.empty:
-                    if "campaign_name" in before_df.columns:
-                        camp_pat = "|".join(before_df["campaign_name"].dropna().unique().tolist())
-                after_df = _anls_build_asin_after(df_raw, cc, sc, oc_, od, clk, tkc, camp_pat)
-            if after_df.empty:
-                st.warning("Afterデータが取得できませんでした。"); return
-            bf = before_df.copy()
-            n_history = None
-            if mode == "cpc_kw":
-                _cpc_hist = _anls_load(cpc_hist_fname or "cpc_change_history.json")
-                if not _cpc_hist:
-                    st.error("履歴がありません。先に「CPC調整タブ → 実行用CSVをダウンロード」してください。"); return
-                _last_entries = _cpc_hist[-1]["entries"]
-                _hist_df = pd.DataFrame(_last_entries)
-                def _cpc_key_fn(r):
-                    cn_  = norm(str(r.get("campaign_name", "") or ""))
-                    agn_ = norm(str(r.get("ad_group", "") or ""))
-                    kw_  = norm(str(r.get("keyword", "") or ""))
-                    return f"{cn_}|{agn_}|{kw_}"
-                _hist_df["_kn_key"] = _hist_df.apply(_cpc_key_fn, axis=1)
-                _hist_keys = set(_hist_df["_kn_key"])
-                n_history = len(_hist_df)
-                bf["_kn_key"] = bf.apply(_cpc_key_fn, axis=1)
-                bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
-            elif mode == "cpc_asin":
-                if cpc_hist_fname:
-                    _asin_hist = _anls_load(cpc_hist_fname)
-                    if not _asin_hist:
+        _results = []
+        for af_file in af_files:
+            with st.spinner("分析中..."):
+                df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
+                _period_str = None
+                if mode in ("cpc_kw", "cpc_asin"):
+                    _pc = fcol(df_raw, ["期間"])
+                    if _pc:
+                        try:
+                            _parts = df_raw[_pc].astype(str).str.split(" - ", expand=True)
+                            _starts = pd.to_datetime(_parts[0], format="%Y/%m/%d", errors="coerce")
+                            _ends = pd.to_datetime(_parts[1], format="%Y/%m/%d", errors="coerce") if _parts.shape[1] > 1 else _starts
+                            if _starts.notna().any() and _ends.notna().any():
+                                _period_str = f"{_starts.min().strftime('%Y/%m/%d')} - {_ends.max().strftime('%Y/%m/%d')}"
+                        except Exception:
+                            _period_str = None
+                if not all([cc, sc, oc_]):
+                    st.error("必要な列が見つかりません（キャンペーン名・売上・広告費）。"); return
+                if mode == "kw_add":
+                    if not kc: st.error("「検索用語」列が見つかりません。"); return
+                    after_df = _anls_build_kw_after(df_raw, kc, cc, sc, oc_, od, clk)
+                elif mode == "cpc_kw":
+                    kw_col_cpc = kwt if kwt else fcol(df_raw, ["ターゲティング", "Targeting", "targeting"])
+                    after_df = _anls_build_cpc_after(df_raw, cc, sc, oc_, od, clk, kw_col_cpc)
+                else:  # cpc_asin or asin_add
+                    camp_pat = None
+                    if mode == "cpc_asin" and before_df is not None and not before_df.empty:
+                        if "campaign_name" in before_df.columns:
+                            camp_pat = "|".join(before_df["campaign_name"].dropna().unique().tolist())
+                    after_df = _anls_build_asin_after(df_raw, cc, sc, oc_, od, clk, tkc, camp_pat)
+                if after_df.empty:
+                    st.warning("Afterデータが取得できませんでした。"); return
+                bf = before_df.copy()
+                n_history = None
+                if mode == "cpc_kw":
+                    _cpc_hist = _anls_load(cpc_hist_fname or "cpc_change_history.json")
+                    if not _cpc_hist:
                         st.error("履歴がありません。先に「CPC調整タブ → 実行用CSVをダウンロード」してください。"); return
-                    _last_entries = _asin_hist[-1]["entries"]
+                    _last_entries = _cpc_hist[-1]["entries"]
                     _hist_df = pd.DataFrame(_last_entries)
-                    if "asin" in _hist_df.columns:
-                        _hist_keys = set(_hist_df["asin"].str.upper())
-                        n_history = len(_hist_df)
-                        bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
-                        bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
+                    def _cpc_key_fn(r):
+                        cn_  = norm(str(r.get("campaign_name", "") or ""))
+                        agn_ = norm(str(r.get("ad_group", "") or ""))
+                        kw_  = norm(str(r.get("keyword", "") or ""))
+                        return f"{cn_}|{agn_}|{kw_}"
+                    _hist_df["_kn_key"] = _hist_df.apply(_cpc_key_fn, axis=1)
+                    _hist_keys = set(_hist_df["_kn_key"])
+                    n_history = len(_hist_df)
+                    bf["_kn_key"] = bf.apply(_cpc_key_fn, axis=1)
+                    bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
+                elif mode == "cpc_asin":
+                    if cpc_hist_fname:
+                        _asin_hist = _anls_load(cpc_hist_fname)
+                        if not _asin_hist:
+                            st.error("履歴がありません。先に「CPC調整タブ → 実行用CSVをダウンロード」してください。"); return
+                        _last_entries = _asin_hist[-1]["entries"]
+                        _hist_df = pd.DataFrame(_last_entries)
+                        if "asin" in _hist_df.columns:
+                            _hist_keys = set(_hist_df["asin"].str.upper())
+                            n_history = len(_hist_df)
+                            bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
+                            bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
+                        else:
+                            bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
                     else:
                         bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
-                else:
-                    bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
-            elif mode == "asin_add":
-                if cpc_hist_fname:
-                    _asin_add_hist = _anls_load(cpc_hist_fname)
-                    if not _asin_add_hist:
-                        st.error("履歴がありません。先に「追加候補タブ → CSVをダウンロード」してください。"); return
-                    _last_entries = _asin_add_hist[-1]["entries"]
-                    _hist_df = pd.DataFrame(_last_entries)
-                    if "asin" in _hist_df.columns:
-                        _hist_keys = set(_hist_df["asin"].str.upper())
-                        n_history = len(_hist_df)
-                        bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
-                        bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
+                elif mode == "asin_add":
+                    if cpc_hist_fname:
+                        _asin_add_hist = _anls_load(cpc_hist_fname)
+                        if not _asin_add_hist:
+                            st.error("履歴がありません。先に「追加候補タブ → CSVをダウンロード」してください。"); return
+                        _last_entries = _asin_add_hist[-1]["entries"]
+                        _hist_df = pd.DataFrame(_last_entries)
+                        if "asin" in _hist_df.columns:
+                            _hist_keys = set(_hist_df["asin"].str.upper())
+                            n_history = len(_hist_df)
+                            bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
+                            bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
+                        else:
+                            bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
                     else:
                         bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
-                else:
-                    bf["_kn_key"] = bf["asin"].str.upper() if "asin" in bf.columns else bf.index.astype(str)
-            else:  # kw_add
-                if cpc_hist_fname:
-                    _kw_add_hist = _anls_load(cpc_hist_fname)
-                    if not _kw_add_hist:
-                        st.error("履歴がありません。先に「追加候補タブ → CSVをダウンロード」してください。"); return
-                    _last_entries = _kw_add_hist[-1]["entries"]
-                    _hist_df = pd.DataFrame(_last_entries)
-                    if "keyword" in _hist_df.columns:
-                        _hist_df["_kn_key"] = _hist_df["keyword"].apply(norm)
-                        _hist_keys = set(_hist_df["_kn_key"])
-                        n_history = len(_hist_df)
+                else:  # kw_add
+                    if cpc_hist_fname:
+                        _kw_add_hist = _anls_load(cpc_hist_fname)
+                        if not _kw_add_hist:
+                            st.error("履歴がありません。先に「追加候補タブ → CSVをダウンロード」してください。"); return
+                        _last_entries = _kw_add_hist[-1]["entries"]
+                        _hist_df = pd.DataFrame(_last_entries)
+                        if "keyword" in _hist_df.columns:
+                            _hist_df["_kn_key"] = _hist_df["keyword"].apply(norm)
+                            _hist_keys = set(_hist_df["_kn_key"])
+                            n_history = len(_hist_df)
+                            bf["_kn_key"] = bf["keyword"].apply(norm) if "keyword" in bf.columns else bf.index.astype(str)
+                            bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
+                        else:
+                            bf["_kn_key"] = bf["keyword"].apply(norm) if "keyword" in bf.columns else bf.index.astype(str)
+                    else:
                         bf["_kn_key"] = bf["keyword"].apply(norm) if "keyword" in bf.columns else bf.index.astype(str)
-                        bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
-                    else:
-                        bf["_kn_key"] = bf["keyword"].apply(norm) if "keyword" in bf.columns else bf.index.astype(str)
-                else:
-                    bf["_kn_key"] = bf["keyword"].apply(norm) if "keyword" in bf.columns else bf.index.astype(str)
-            sfx = [c for c in ["sales", "cost", "ROAS", "orders", "clicks", "CVR", "avg_cpc"] if c in after_df.columns]
-            merged = bf.merge(after_df[["_kn_key"] + sfx], on="_kn_key", how="inner", suffixes=("_b", "_a"))
-        if merged.empty:
-            st.info("マッチするデータが見つかりませんでした。"); return
-        merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
-        n_total  = len(merged)
-        n_kaizen = int((merged["_判定"] == "改善").sum())
-        n_akka   = int((merged["_判定"] == "悪化").sum())
-        n_henko  = int((merged["_判定"] == "変化なし").sum())
-        rate     = n_kaizen / n_total * 100 if n_total > 0 else 0
-        st.session_state[f"{_sk}_result"] = {
-            "merged": merged, "camps": camps,
-            "stats": (n_total, n_kaizen, n_akka, n_henko, rate),
-            "anls_hist_fname": anls_hist_fname, "label": label,
-            "period_days": period_days, "n_before": len(before_df),
-            "n_history": n_history, "id_col": id_col,
-        }
+                sfx = [c for c in ["sales", "cost", "ROAS", "orders", "clicks", "CVR", "avg_cpc"] if c in after_df.columns]
+                merged = bf.merge(after_df[["_kn_key"] + sfx], on="_kn_key", how="inner", suffixes=("_b", "_a"))
+            if merged.empty:
+                st.info("マッチするデータが見つかりませんでした。"); return
+            merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
+            n_total  = len(merged)
+            n_kaizen = int((merged["_判定"] == "改善").sum())
+            n_akka   = int((merged["_判定"] == "悪化").sum())
+            n_henko  = int((merged["_判定"] == "変化なし").sum())
+            rate     = n_kaizen / n_total * 100 if n_total > 0 else 0
+            _results.append({
+                "merged": merged, "camps": camps,
+                "stats": (n_total, n_kaizen, n_akka, n_henko, rate),
+                "anls_hist_fname": anls_hist_fname, "label": label,
+                "period_days": period_days, "n_before": len(before_df),
+                "n_history": n_history, "id_col": id_col,
+                "period": _period_str,
+            })
+        st.session_state[f"{_sk}_result"] = _results
     if f"{_sk}_result" not in st.session_state:
         return
-    res      = st.session_state[f"{_sk}_result"]
-    merged   = res["merged"]
-    camps    = res["camps"]
-    n_total, n_kaizen, n_akka, n_henko, rate = res["stats"]
-    anls_hist_fname = res["anls_hist_fname"]
-    res_id_col = res.get("id_col", id_col)
-    st.markdown(_anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate), unsafe_allow_html=True)
-    n_history = res.get("n_history")
-    if n_history is not None:
-        n_unmatched = n_history - n_total
-        st.info(f"変更履歴: {n_history}件 ｜ CSV一致: {n_total}件 ｜ 不一致: {n_unmatched}件 ｜ 分析対象: {n_total}件")
-    sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"] + camps, key=f"{_sk}_camp")
-    view = merged if sel_camp == "全キャンペーン" else merged[merged["campaign_theme"] == sel_camp].copy() if "campaign_theme" in merged.columns else merged
-    with st.expander("📊 キャンペーン別サマリー", expanded=True):
-        st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
-    st.markdown("#### 📋 対象一覧")
-    _anls_render_list(view, res_id_col)
-    if st.button("💾 分析結果を保存", key=f"{_sk}_save"):
-        _recs = _anls_load(anls_hist_fname)
-        _agg = _anls_aggregate_before_after(merged)
-        _detail = _anls_build_detail(merged, res_id_col)
-        _recs.append({"id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
-                      "saved_at": _anls_dt.date.today().isoformat(), "type": label,
-                      "period_days": period_days, "n_before": res["n_before"],
-                      "n_matched": n_total, "n_kaizen": n_kaizen, "n_akka": n_akka,
-                      "n_henko": n_henko, "rate": round(rate, 1), "camps": camps,
-                      **_agg, "detail": _detail})
-        _anls_save(anls_hist_fname, _recs)
-        st.success("✅ 分析結果を保存しました。")
+    for _ri, res in enumerate(st.session_state[f"{_sk}_result"]):
+        merged   = res["merged"]
+        camps    = res["camps"]
+        n_total, n_kaizen, n_akka, n_henko, rate = res["stats"]
+        anls_hist_fname = res["anls_hist_fname"]
+        res_id_col = res.get("id_col", id_col)
+        st.markdown(_anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate), unsafe_allow_html=True)
+        n_history = res.get("n_history")
+        if n_history is not None:
+            n_unmatched = n_history - n_total
+            st.info(f"変更履歴: {n_history}件 ｜ CSV一致: {n_total}件 ｜ 不一致: {n_unmatched}件 ｜ 分析対象: {n_total}件")
+        sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"] + camps, key=f"{_sk}_{_ri}_camp")
+        view = merged if sel_camp == "全キャンペーン" else merged[merged["campaign_theme"] == sel_camp].copy() if "campaign_theme" in merged.columns else merged
+        with st.expander("📊 キャンペーン別サマリー", expanded=True):
+            st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
+        st.markdown("#### 📋 対象一覧")
+        _anls_render_list(view, res_id_col)
+        if st.button("💾 分析結果を保存", key=f"{_sk}_{_ri}_save"):
+            _recs = _anls_load(anls_hist_fname)
+            _agg = _anls_aggregate_before_after(merged)
+            _detail = _anls_build_detail(merged, res_id_col)
+            _recs.append({"id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
+                          "saved_at": _anls_dt.date.today().isoformat(), "type": label,
+                          "period_days": period_days, "n_before": res["n_before"],
+                          "n_matched": n_total, "n_kaizen": n_kaizen, "n_akka": n_akka,
+                          "n_henko": n_henko, "rate": round(rate, 1), "camps": camps,
+                          "period": res.get("period"),
+                          **_agg, "detail": _detail})
+            _anls_save(anls_hist_fname, _recs)
+            st.success("✅ 分析結果を保存しました。")
     with st.expander("📂 保存済み分析履歴", expanded=False):
         _recs = _anls_load(anls_hist_fname)
         _anls_render_saved_report(_recs, label, anls_hist_fname)
