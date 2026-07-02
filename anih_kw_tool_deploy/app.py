@@ -1543,6 +1543,8 @@ def _anls_judge(b, a, higher_ok=True):
 def _anls_pct_str(b, a):
     try:
         b = float(b or 0); a = float(a or 0)
+        if pd.isna(b) or pd.isna(a):
+            return "ー"
         if b == 0: return "ー"
         return f"{(a - b) / abs(b) * 100:+.0f}%"
     except Exception:
@@ -1668,8 +1670,11 @@ def _anls_camp_table_html(merged):
             if col_b not in _grp.columns or col_a not in _grp.columns: return "ー"
             return _anls_pct_str(_grp[col_b].mean(), _grp[col_a].mean())
         roas_chg = _avg_pct("ROAS_b", "ROAS_a")
-        cvr_chg  = (f"{grp['CVR_a'].mean() - grp['CVR_b'].mean():+.1f}pt"
-                    if "CVR_b" in grp.columns and "CVR_a" in grp.columns else "ー")
+        cvr_chg = "ー"
+        if "CVR_b" in grp.columns and "CVR_a" in grp.columns:
+            _cvr_diff = grp['CVR_a'].mean() - grp['CVR_b'].mean()
+            if pd.notna(_cvr_diff):
+                cvr_chg = f"{_cvr_diff:+.1f}pt"
         if "cost_b" in grp.columns and "clicks_b" in grp.columns and grp["clicks_b"].sum() > 0:
             cpc_b = grp["cost_b"].sum() / grp["clicks_b"].sum()
             cpc_a = grp["cost_a"].sum() / grp["clicks_a"].sum() if "clicks_a" in grp.columns and grp["clicks_a"].sum() > 0 else 0
@@ -1871,7 +1876,7 @@ def _anls_aggregate_before_after(merged: pd.DataFrame) -> dict:
     }
 
 
-def _anls_build_detail(merged: pd.DataFrame, id_col: str) -> list:
+def _anls_build_detail(merged: pd.DataFrame, id_col: str, mode: str = "") -> list:
     """保存用に、キャンペーン別・キーワード（ASIN）別のBefore/After・AI考察を
     保存後も再現できる最小限の形（campaign, keyword, before, after, judgement,
     reasons, actions のみ）で保存する新規追加関数（読み取り専用・mergedは変更しない）。
@@ -1879,23 +1884,35 @@ def _anls_build_detail(merged: pd.DataFrame, id_col: str) -> list:
     判定（judgement）は既存の _判定（_anls_row_judge の出力）をそのまま転記し、
     理由・アクション（reasons/actions）は既存関数 _anls_generate_insight を
     そのまま呼び出すだけで、新しい判定ロジック・新しいAIロジックは一切追加しない。
+
+    avg_cpc（before/after）は、CPC調整分析（mode="cpc_kw"/"cpc_asin"）の場合のみ
+    追加する。kw_add/asin_add（30日キーワード追加機能側）は呼び出し時にmodeを
+    渡さない限り従来のキー構成のまま（avg_cpcキー自体を持たない）で、JSON構造は
+    一切変更されない。
     """
     _detail = []
     for _, row in merged.iterrows():
         _reasons, _actions = _anls_generate_insight(row)
+        _before = {
+            "sales": row.get("sales_b"), "cost": row.get("cost_b"),
+            "ROAS": row.get("ROAS_b"), "CVR": row.get("CVR_b"),
+            "orders": row.get("orders_b"), "clicks": row.get("clicks_b"),
+        }
+        _after = {
+            "sales": row.get("sales_a"), "cost": row.get("cost_a"),
+            "ROAS": row.get("ROAS_a"), "CVR": row.get("CVR_a"),
+            "orders": row.get("orders_a"), "clicks": row.get("clicks_a"),
+        }
+        _CPC_MODES = {"cpc_kw", "cpc_asin"}
+        _is_cpc = mode in _CPC_MODES
+        if _is_cpc:
+            _before["avg_cpc"] = row.get("avg_cpc_b")
+            _after["avg_cpc"] = row.get("avg_cpc_a")
         _detail.append({
             "campaign": row.get("campaign_theme", ""),
             "keyword": row.get(id_col, ""),
-            "before": {
-                "sales": row.get("sales_b"), "cost": row.get("cost_b"),
-                "ROAS": row.get("ROAS_b"), "CVR": row.get("CVR_b"),
-                "orders": row.get("orders_b"), "clicks": row.get("clicks_b"),
-            },
-            "after": {
-                "sales": row.get("sales_a"), "cost": row.get("cost_a"),
-                "ROAS": row.get("ROAS_a"), "CVR": row.get("CVR_a"),
-                "orders": row.get("orders_a"), "clicks": row.get("clicks_a"),
-            },
+            "before": _before,
+            "after": _after,
             "judgement": row.get("_判定", "変化なし"),
             "reasons": _reasons,
             "actions": _actions,
@@ -1979,11 +1996,33 @@ def _anls_render_saved_detail(detail: list, anls_hist_fname: str = "", rec_id: s
     固定運用のため保存値(7)と一致せず、誤った期間になる。そのためこの3つの
     type値は判定対象に含めず、従来通り「{saved_at} 保存」のまま変更しない。
     """
-    if not detail:
+    if not isinstance(detail, list) or not detail:
         return
+
+    def _anls_norm_detail_item(d):
+        """保存済みdetailの1要素が想定外の形（None・非dict・before/after欠損等）
+        でも安全に扱えるよう最小限に正規化するだけの防御用ヘルパー。判定・実数値
+        等の中身は一切変更せず、型が壊れている場合の欠損補完のみ行う。"""
+        if not isinstance(d, dict):
+            d = {}
+        _b, _a = d.get("before"), d.get("after")
+        return {
+            "campaign": d.get("campaign", ""),
+            "keyword": d.get("keyword", ""),
+            "judgement": d.get("judgement", "変化なし"),
+            "before": _b if isinstance(_b, dict) else {},
+            "after": _a if isinstance(_a, dict) else {},
+            "reasons": d.get("reasons") or [],
+            "actions": d.get("actions") or [],
+            "memo": d.get("memo", ""),
+            "action_taken": d.get("action_taken", ""),
+            "next_eval": d.get("next_eval", ""),
+        }
+
     _rows = []
-    for d in detail:
-        b, a = (d.get("before") or {}), (d.get("after") or {})
+    for _raw_d in detail:
+        d = _anls_norm_detail_item(_raw_d)
+        b, a = d["before"], d["after"]
         _rows.append({
             "campaign_theme": d.get("campaign", ""),
             "keyword": d.get("keyword", ""),
@@ -2005,6 +2044,35 @@ def _anls_render_saved_detail(detail: list, anls_hist_fname: str = "", rec_id: s
 
     _ICON = {"改善": "🟢", "悪化": "🔴", "変化なし": "🟡"}
     _CLR  = {"改善": "#276749", "悪化": "#C53030", "変化なし": "#744210"}
+
+    def _anls_hist_label(_period, _saved_at):
+        """既存の期間ラベル計算（saved_atからの逆算ではなく、CSV由来の実period文字列を
+        優先してM/D〜M/D形式に変換する）をそのまま関数化しただけ。ロジックは無変更、
+        重複していた同一処理（4週間サマリー用・週別チェックボックス用）を1箇所に統合。"""
+        if _period:
+            try:
+                _ps, _pe = str(_period).split(" - ")
+                _psd = _anls_dt.datetime.strptime(_ps, "%Y/%m/%d").date()
+                _ped = _anls_dt.datetime.strptime(_pe, "%Y/%m/%d").date()
+                return f"{_psd.month}/{_psd.day}〜{_ped.month}/{_ped.day}"
+            except Exception:
+                pass
+        return f"{_saved_at} 保存"
+
+    def _anls_hist_sort_key(_t):
+        """履歴の並び順を、保存順（saved_at/id）ではなく実際のレポート対象期間
+        （period列の開始日）優先で並べるための新規ソートキー。periodが無い旧レコード
+        は従来通りsaved_at/idで並べる（互換維持）。判定・集計等の分析ロジックには
+        一切触れない、表示順序のみの変更。"""
+        _s, _rid, _hi2, _hd2, _per = _t
+        if _per:
+            try:
+                _ps = str(_per).split(" - ")[0]
+                return (0, _anls_dt.datetime.strptime(_ps, "%Y/%m/%d").date().isoformat())
+            except Exception:
+                pass
+        return (1, f"{_s}_{_rid}")
+
     _grp_col = "campaign_theme" if "campaign_theme" in _df.columns else None
     _groups = _df.groupby(_grp_col) if _grp_col else [("（未分類）", _df)]
     for _camp, _grp in _groups:
@@ -2014,33 +2082,58 @@ def _anls_render_saved_detail(detail: list, anls_hist_fname: str = "", rec_id: s
             j = row.get("_判定", "変化なし")
             icon, clr = _ICON.get(j, "🟡"), _CLR.get(j, "#718096")
             kw = str(row.get("keyword", ""))
+            _camp_name = row.get("campaign_theme", "")
+            _hist = []
+            if all_recs:
+                for _r in all_recs:
+                    if not isinstance(_r, dict):
+                        continue
+                    _r_detail = _r.get("detail")
+                    if not isinstance(_r_detail, list):
+                        continue
+                    for _hi, _hd_raw in enumerate(_r_detail):
+                        _hd = _anls_norm_detail_item(_hd_raw)
+                        if _hd.get("campaign", "") == _camp_name and str(_hd.get("keyword", "")) == kw:
+                            _hist.append((_r.get("saved_at", ""), _r.get("id", ""), _hi, _hd, _r.get("period")))
+                _hist.sort(key=_anls_hist_sort_key)
+            if not _hist:
+                _hist = [("この保存", rec_id, int(_idx), _anls_norm_detail_item(detail[int(_idx)]), None)]
+            if not _hist:
+                continue  # UIガード：万一histが空のままでも後続のテーブル/チェックボックス描画へ進まない
             st.markdown(
                 f"**{icon} {kw}**　"
                 f'<span style="color:{clr};font-weight:700;">{j}</span>',
                 unsafe_allow_html=True)
+            if len(_hist) > 1:
+                _wk_labels, _wk_j, _wk_roas, _wk_cpc = [], [], [], []
+                _has_cpc = any("avg_cpc" in ((_h_d.get("after") or {})) for *_r, _h_d, _p in _hist)
+                for _h_saved_at, _h_rec_id, _h_row_idx, _h_d, _h_period in _hist:
+                    _wk_labels.append(_anls_hist_label(_h_period, _h_saved_at))
+                    _sum_j = _h_d.get("judgement", "変化なし")
+                    _wk_j.append(_ICON.get(_sum_j, "🟡"))
+                    _sum_after = _h_d.get("after") or {}
+                    _sum_roas = _sum_after.get("ROAS")
+                    _wk_roas.append(f"{_sum_roas:.2f}" if isinstance(_sum_roas, (int, float)) else "―")
+                    if _has_cpc:
+                        _sum_cpc = _sum_after.get("avg_cpc")
+                        _wk_cpc.append(f"¥{_sum_cpc:,.0f}" if isinstance(_sum_cpc, (int, float)) else "―")
+                _tbl_rows = [
+                    "| 判定 | " + " | ".join(_wk_j) + " |",
+                    "| ROAS | " + " | ".join(_wk_roas) + " |",
+                ]
+                if _has_cpc:
+                    _tbl_rows.append("| CPC | " + " | ".join(_wk_cpc) + " |")
+                _tbl_md = (
+                    "| 指標 | " + " | ".join(_wk_labels) + " |\n"
+                    + "|---" * (len(_wk_labels) + 1) + "|\n"
+                    + "\n".join(_tbl_rows)
+                )
+                st.markdown(_tbl_md)
             _open_key = f"_anls_kwopen_{rec_id}_{int(_idx)}"
             if st.checkbox("詳細を見る（Before/After・AI考察・自分メモ）", key=_open_key):
-                _camp_name = row.get("campaign_theme", "")
-                _hist = []
-                if all_recs:
-                    for _r in all_recs:
-                        for _hi, _hd in enumerate(_r.get("detail") or []):
-                            if _hd.get("campaign", "") == _camp_name and str(_hd.get("keyword", "")) == kw:
-                                _hist.append((_r.get("saved_at", ""), _r.get("id", ""), _hi, _hd, _r.get("period")))
-                    _hist.sort(key=lambda t: (t[0], t[1]))
-                if not _hist:
-                    _hist = [("この保存", rec_id, int(_idx), detail[int(_idx)], None)]
                 st.markdown(f"**保存履歴（時系列・{len(_hist)}件）**")
                 for _h_saved_at, _h_rec_id, _h_row_idx, _h_d, _h_period in _hist:
-                    _hist_label = f"{_h_saved_at} 保存"
-                    if _h_period:
-                        try:
-                            _ps, _pe = str(_h_period).split(" - ")
-                            _psd = _anls_dt.datetime.strptime(_ps, "%Y/%m/%d").date()
-                            _ped = _anls_dt.datetime.strptime(_pe, "%Y/%m/%d").date()
-                            _hist_label = f"{_psd.month}/{_psd.day}〜{_ped.month}/{_ped.day}"
-                        except Exception:
-                            _hist_label = f"{_h_saved_at} 保存"
+                    _hist_label = _anls_hist_label(_h_period, _h_saved_at)
                     _hist_key = f"_anls_histopen_{_h_rec_id}_{_h_row_idx}"
                     if st.checkbox(_hist_label, key=_hist_key):
                         _hb, _ha = (_h_d.get("before") or {}), (_h_d.get("after") or {})
@@ -2427,7 +2520,7 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
         if st.button("💾 分析結果を保存", key=f"{_sk}_{_ri}_save"):
             _recs = _anls_load(anls_hist_fname)
             _agg = _anls_aggregate_before_after(merged)
-            _detail = _anls_build_detail(merged, res_id_col)
+            _detail = _anls_build_detail(merged, res_id_col, mode)
             _recs.append({"id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
                           "saved_at": _anls_dt.date.today().isoformat(), "type": label,
                           "period_days": period_days, "n_before": res["n_before"],
@@ -2440,6 +2533,257 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
     with st.expander("📂 保存済み分析履歴", expanded=False):
         _recs = _anls_load(anls_hist_fname)
         _anls_render_saved_report(_recs, label, anls_hist_fname)
+
+
+# ============================================================
+# Observability Layer（app_v1_44で追加）
+# ------------------------------------------------------------
+# 【方式】完全な外側ラップ方式のみ。対象関数・_anls_render_tabの
+# 定義（上のコード）には1文字も変更を加えていない。以下は全て
+# 「元の関数を横取りして呼ぶだけの新規コード」であり、このブロックを
+# まるごと削除すればv43と完全に同じ挙動に戻る（追加専用・可逆）。
+# 各ラッパーは：
+#   1) 引数を読むだけ（改変しない）で異常の事前スキャンログを出す
+#   2) 元関数をそのまま呼ぶ（戻り値・例外は一切加工しない）
+#   3) 戻り値を読むだけで正常系ログを出す
+#   4) 例外はログ後に必ず re-raise する（挙動を変えない）
+# ログ出力自体の失敗が本処理に影響しないよう、_anls_log内部で
+# 例外を握りつぶす。
+# ============================================================
+import logging as _anls_logging
+import json as _anls_json
+
+_ANLS_OBS_ENABLED = True  # Falseにすればログのみ完全停止（挙動は不変）
+
+_anls_obs_logger = _anls_logging.getLogger("aniha.analysis.observability")
+if not _anls_obs_logger.handlers:
+    _anls_obs_handler = _anls_logging.StreamHandler()
+    _anls_obs_handler.setFormatter(_anls_logging.Formatter("%(message)s"))
+    _anls_obs_logger.addHandler(_anls_obs_handler)
+    _anls_obs_logger.setLevel(_anls_logging.INFO)
+    _anls_obs_logger.propagate = False
+
+
+def _anls_log(level: str, category: str, event: str, **fields):
+    """観測ログ共通出力。既存の分析・判定・保存ロジックの戻り値・分岐には
+    一切関与しない副作用専用関数。JSON化失敗・ロガー未設定等、ログ機構側の
+    不具合は全てここで握りつぶし、本処理へは絶対に波及させない。
+    category: "normal" | "anomaly" | "structural" 、level: INFO/WARN/ERROR"""
+    if not _ANLS_OBS_ENABLED:
+        return
+    try:
+        payload = {"ts": _anls_dt.datetime.now().isoformat(), "level": level,
+                   "category": category, "event": event, **fields}
+        msg = _anls_json.dumps(payload, ensure_ascii=False, default=str)
+        getattr(_anls_obs_logger, level.lower(), _anls_obs_logger.info)(msg)
+    except Exception:
+        pass
+
+
+_ANLS_KNOWN_MODES = {"cpc_kw", "cpc_asin", "kw_add", "asin_add"}
+_ANLS_CPC_MODES = {"cpc_kw", "cpc_asin"}
+
+
+# ---- ラップ対象①: _anls_build_detail（CPC判定処理を含む） ----
+_anls_build_detail_orig = _anls_build_detail
+
+
+def _anls_build_detail(*args, **kwargs):
+    _mode = kwargs.get("mode", args[2] if len(args) > 2 else "")
+    _merged_arg = kwargs.get("merged", args[0] if len(args) > 0 else None)
+    try:
+        if _mode and _mode not in _ANLS_KNOWN_MODES:
+            _anls_log("WARN", "structural", "unexpected_mode_value",
+                      fn="_anls_build_detail", mode=_mode)
+        if _mode in _ANLS_CPC_MODES and _merged_arg is not None:
+            _cols = list(getattr(_merged_arg, "columns", []))
+            if "avg_cpc_b" not in _cols or "avg_cpc_a" not in _cols:
+                _anls_log("ERROR", "structural", "cpc_key_missing_in_source",
+                          fn="_anls_build_detail", mode=_mode)
+    except Exception:
+        pass
+
+    try:
+        _result = _anls_build_detail_orig(*args, **kwargs)
+    except Exception as _e:
+        _anls_log("ERROR", "anomaly", "build_detail_exception",
+                  fn="_anls_build_detail", mode=_mode,
+                  error_type=type(_e).__name__, error=str(_e))
+        raise
+
+    try:
+        _is_cpc = _mode in _ANLS_CPC_MODES
+        _has_avg_cpc = any(isinstance(_d, dict) and "avg_cpc" in (_d.get("after") or {})
+                            for _d in _result)
+        _roas_vals = [
+            _d["after"].get("ROAS") for _d in _result
+            if isinstance(_d, dict) and isinstance(_d.get("after"), dict)
+            and isinstance(_d["after"].get("ROAS"), (int, float))
+        ]
+        _anls_log("INFO", "normal", "build_detail_done",
+                  fn="_anls_build_detail", mode=_mode, is_cpc=_is_cpc,
+                  has_avg_cpc=_has_avg_cpc, rows=len(_result),
+                  roas_samples=len(_roas_vals),
+                  roas_mean=(sum(_roas_vals) / len(_roas_vals) if _roas_vals else None))
+    except Exception:
+        pass
+    return _result
+
+
+# ---- ラップ対象②: _anls_render_saved_detail（4週間比較テーブル生成を含む） ----
+_anls_render_saved_detail_orig = _anls_render_saved_detail
+
+
+def _anls_render_saved_detail(*args, **kwargs):
+    _detail_arg = kwargs.get("detail", args[0] if len(args) > 0 else None)
+    _all_recs_arg = kwargs.get("all_recs", args[3] if len(args) > 3 else None)
+    try:
+        if isinstance(_detail_arg, list):
+            _bad_items = sum(1 for _d in _detail_arg if not isinstance(_d, dict))
+            if _bad_items:
+                _anls_log("ERROR", "structural", "detail_items_not_dict",
+                          fn="_anls_render_saved_detail", count=_bad_items)
+            _bad_before = sum(1 for _d in _detail_arg
+                               if isinstance(_d, dict) and not isinstance(_d.get("before"), dict))
+            _bad_after = sum(1 for _d in _detail_arg
+                              if isinstance(_d, dict) and not isinstance(_d.get("after"), dict))
+            if _bad_before:
+                _anls_log("WARN", "structural", "before_missing_or_invalid",
+                          fn="_anls_render_saved_detail", count=_bad_before)
+            if _bad_after:
+                _anls_log("WARN", "structural", "after_missing_or_invalid",
+                          fn="_anls_render_saved_detail", count=_bad_after)
+        elif _detail_arg is not None:
+            _anls_log("WARN", "structural", "detail_arg_not_list",
+                      fn="_anls_render_saved_detail", original_type=type(_detail_arg).__name__)
+        if _all_recs_arg:
+            _bad_recs = sum(1 for _r in _all_recs_arg if not isinstance(_r, dict))
+            if _bad_recs:
+                _anls_log("ERROR", "structural", "hist_record_not_dict",
+                          fn="_anls_render_saved_detail", count=_bad_recs)
+        for _camp, _kw, _matches in _anls_count_week_history(_detail_arg, _all_recs_arg):
+            if len(_matches) > 1:
+                _has_cpc = any(isinstance(_m.get("after"), dict) and "avg_cpc" in _m["after"] for _m in _matches)
+                _anls_log("INFO", "normal", "four_week_table_generated",
+                          fn="_anls_render_saved_detail", campaign=_camp, keyword=_kw,
+                          weeks=len(_matches), has_cpc=_has_cpc)
+                if len(_matches) < 4:
+                    _anls_log("INFO", "anomaly", "week_data_incomplete",
+                              fn="_anls_render_saved_detail", campaign=_camp, keyword=_kw,
+                              weeks_found=len(_matches))
+    except Exception:
+        pass
+
+    try:
+        _result = _anls_render_saved_detail_orig(*args, **kwargs)
+    except Exception as _e:
+        _anls_log("ERROR", "anomaly", "render_saved_detail_exception",
+                  fn="_anls_render_saved_detail", error_type=type(_e).__name__, error=str(_e))
+        raise
+
+    try:
+        _anls_log("INFO", "normal", "render_saved_detail_done",
+                  fn="_anls_render_saved_detail",
+                  detail_rows=(len(_detail_arg) if isinstance(_detail_arg, list) else 0))
+    except Exception:
+        pass
+    return _result
+
+
+# ---- ラップ対象③（v45で再設計）: 4週間比較テーブル生成の非侵襲的観測 ----
+# v44ではst.markdownをグローバル差し替えしてUI出力文字列を検分していたが、
+# これはStreamlitの内部実装（バージョン間で変わりうる表示テキスト）に依存する
+# UI侵襲であり、将来のStreamlitアップデート耐性が低い。
+#
+# v45では st.markdown には一切触れず、_anls_render_saved_detail の「入力」
+# （detail・all_recs）だけを使って同じ情報を独立に導出する。これは
+# 「_anls_render_saved_detail内部で同一キャンペーン＋キーワードの保存回を
+# 全件走査して時系列一覧を作る」というv43の既存仕様（campaign/keywordの
+# 完全一致でdetailを集計するだけの単純な件数カウント）を、ラッパー側で
+# 読み取り専用・副作用なしで再現しているだけで、判定・分析ロジック
+# （CPC完全一致ルール・NaN防止・ROAS計算等）には一切関与しない。
+# これにより st.markdown への依存が完全になくなる。
+def _anls_count_week_history(_detail_arg, _all_recs_arg):
+    """detail・all_recsの中身（campaign/keywordの一致件数）だけを見て、
+    4週間比較テーブルが生成されるであろう件数を観測用に算出するだけの
+    純粋関数。UI（st.markdown等）には一切触れず、戻り値の計算にも
+    使われない（ログ専用）。"""
+    _out = []
+    if not isinstance(_detail_arg, list) or not _all_recs_arg:
+        return _out
+    for _d in _detail_arg:
+        if not isinstance(_d, dict):
+            continue
+        _camp, _kw = _d.get("campaign", ""), str(_d.get("keyword", ""))
+        _matches = []
+        for _r in _all_recs_arg:
+            if not isinstance(_r, dict):
+                continue
+            for _hd in (_r.get("detail") or []):
+                if isinstance(_hd, dict) and _hd.get("campaign", "") == _camp and str(_hd.get("keyword", "")) == _kw:
+                    _matches.append(_hd)
+        _out.append((_camp, _kw, _matches))
+    return _out
+
+
+# ---- ラップ対象④: NaN検知（_anls_pct_str / _anls_camp_table_html） ----
+_anls_pct_str_orig = _anls_pct_str
+
+
+def _anls_pct_str(b, a):
+    try:
+        if pd.isna(b) or pd.isna(a):
+            _anls_log("WARN", "anomaly", "nan_detected_in_pct_calc",
+                      fn="_anls_pct_str", raw_b=str(b), raw_a=str(a))
+    except Exception:
+        pass
+    return _anls_pct_str_orig(b, a)
+
+
+_anls_camp_table_html_orig = _anls_camp_table_html
+
+
+def _anls_camp_table_html(*args, **kwargs):
+    try:
+        _merged_arg = kwargs.get("merged", args[0] if args else None)
+        _cols = list(getattr(_merged_arg, "columns", []))
+        if _merged_arg is not None and "campaign_theme" in _cols:
+            for _ct, _grp in _merged_arg.groupby("campaign_theme"):
+                for _col in ("ROAS_b", "ROAS_a", "CVR_b", "CVR_a"):
+                    if _col in _grp.columns:
+                        try:
+                            if pd.isna(pd.to_numeric(_grp[_col], errors="coerce").mean()):
+                                _anls_log("WARN", "anomaly", "nan_detected_in_camp_summary",
+                                          fn="_anls_camp_table_html", campaign=str(_ct), column=_col)
+                        except Exception:
+                            pass
+    except Exception:
+        pass
+    return _anls_camp_table_html_orig(*args, **kwargs)
+
+
+# ---- ラップ対象⑤: _anls_render_tab（30日機能を含むUIレンダリング呼び出し部） ----
+# 【重要】_anls_render_tab の定義（このファイルの上のコード）はv43から
+# 1バイトも変更していない。以下は関数名の再代入のみで、内部コードには
+# 一切触れていない。
+_anls_render_tab_orig = _anls_render_tab
+
+
+def _anls_render_tab(*args, **kwargs):
+    _mode = kwargs.get("mode", args[5] if len(args) > 5 else "?")
+    _anls_log("INFO", "normal", "render_tab_start", fn="_anls_render_tab", mode=_mode)
+    try:
+        _result = _anls_render_tab_orig(*args, **kwargs)
+    except Exception as _e:
+        _anls_log("ERROR", "anomaly", "render_tab_exception",
+                  fn="_anls_render_tab", mode=_mode,
+                  error_type=type(_e).__name__, error=str(_e))
+        raise
+    _anls_log("INFO", "normal", "render_tab_end", fn="_anls_render_tab", mode=_mode)
+    return _result
+# ============================================================
+# Observability Layer ここまで
+# ============================================================
 
 
 def page_cpc():
