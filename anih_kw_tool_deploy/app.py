@@ -461,13 +461,27 @@ with _h2:
 st.markdown("---")
 
 # ─── File Upload ────────────────────────────────────
+# 【UI分割のみ】以下は表示上、期間別（7日・30日・基準）に3分割しただけであり、
+# 既存の処理パイプライン・分析・CPC調整ロジックには一切変更を加えていない。
+# 「基準レポートCSV」だけが従来通り変数 sf（key="sf", on_change=clear）として
+# 既存の全ロジックへ渡され、7日・30日は保持専用の新規変数（st.session_state）に
+# 格納するのみで、以降のどの処理からも一切参照されない。
 _u1, _u2 = st.columns([7, 2])
 with _u1:
     st.markdown("""<div style="font-size:.88rem;font-weight:600;color:#4A5568;margin-bottom:4px;">
         📊 Amazon検索用語レポート
         <span style="font-weight:400;color:#718096;">※「検索用語」と「ターゲティング」列を含めて出力してください</span>
     </div>""", unsafe_allow_html=True)
-    sf = st.file_uploader("検索用語レポート", type="csv", key="sf", on_change=clear, label_visibility="collapsed")
+    st.markdown("**📅 7日レポートCSVをアップロード**")
+    st.session_state["sf_7d_hold"] = st.file_uploader(
+        "7日レポートCSV（検索用語）", type="csv", key="sf_7d_hold_uploader", label_visibility="collapsed")
+    if st.session_state.get("sf_7d_hold"): st.success(f"✓ {st.session_state['sf_7d_hold'].name}")
+    st.markdown("**📅 30日レポートCSVをアップロード**")
+    st.session_state["sf_30d_hold"] = st.file_uploader(
+        "30日レポートCSV（検索用語）", type="csv", key="sf_30d_hold_uploader", label_visibility="collapsed")
+    if st.session_state.get("sf_30d_hold"): st.success(f"✓ {st.session_state['sf_30d_hold'].name}")
+    st.markdown("**📊 基準レポートCSVをアップロード**")
+    sf = st.file_uploader("基準レポートCSV（検索用語）", type="csv", key="sf", on_change=clear, label_visibility="collapsed")
     if sf: st.success(f"✓ {sf.name}")
 with _u2:
     st.markdown("**　**")
