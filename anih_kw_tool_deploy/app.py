@@ -2661,16 +2661,15 @@ def _anls_render_saved_detail(*args, **kwargs):
             if _bad_recs:
                 _anls_log("ERROR", "structural", "hist_record_not_dict",
                           fn="_anls_render_saved_detail", count=_bad_recs)
-        for _camp, _kw, _matches in _anls_count_week_history(_detail_arg, _all_recs_arg):
-            if len(_matches) > 1:
-                _has_cpc = any(isinstance(_m.get("after"), dict) and "avg_cpc" in _m["after"] for _m in _matches)
-                _anls_log("INFO", "normal", "four_week_table_generated",
-                          fn="_anls_render_saved_detail", campaign=_camp, keyword=_kw,
-                          weeks=len(_matches), has_cpc=_has_cpc)
-                if len(_matches) < 4:
-                    _anls_log("INFO", "anomaly", "week_data_incomplete",
-                              fn="_anls_render_saved_detail", campaign=_camp, keyword=_kw,
-                              weeks_found=len(_matches))
+        _hist_count = len(_all_recs_arg) if isinstance(_all_recs_arg, list) else 0
+        _detail_count = len(_detail_arg) if isinstance(_detail_arg, list) else 0
+        _has_avg_cpc = any(
+            isinstance(_d, dict) and isinstance(_d.get("after"), dict) and "avg_cpc" in _d["after"]
+            for _d in (_detail_arg or []) if isinstance(_detail_arg, list)
+        )
+        _anls_log("INFO", "normal", "hist_reference_summary",
+                  fn="_anls_render_saved_detail", hist_count=_hist_count,
+                  detail_count=_detail_count, has_avg_cpc=_has_avg_cpc)
     except Exception:
         pass
 
@@ -2690,40 +2689,18 @@ def _anls_render_saved_detail(*args, **kwargs):
     return _result
 
 
-# ---- ラップ対象③（v45で再設計）: 4週間比較テーブル生成の非侵襲的観測 ----
-# v44ではst.markdownをグローバル差し替えしてUI出力文字列を検分していたが、
-# これはStreamlitの内部実装（バージョン間で変わりうる表示テキスト）に依存する
-# UI侵襲であり、将来のStreamlitアップデート耐性が低い。
-#
-# v45では st.markdown には一切触れず、_anls_render_saved_detail の「入力」
-# （detail・all_recs）だけを使って同じ情報を独立に導出する。これは
-# 「_anls_render_saved_detail内部で同一キャンペーン＋キーワードの保存回を
-# 全件走査して時系列一覧を作る」というv43の既存仕様（campaign/keywordの
-# 完全一致でdetailを集計するだけの単純な件数カウント）を、ラッパー側で
-# 読み取り専用・副作用なしで再現しているだけで、判定・分析ロジック
-# （CPC完全一致ルール・NaN防止・ROAS計算等）には一切関与しない。
-# これにより st.markdown への依存が完全になくなる。
-def _anls_count_week_history(_detail_arg, _all_recs_arg):
-    """detail・all_recsの中身（campaign/keywordの一致件数）だけを見て、
-    4週間比較テーブルが生成されるであろう件数を観測用に算出するだけの
-    純粋関数。UI（st.markdown等）には一切触れず、戻り値の計算にも
-    使われない（ログ専用）。"""
-    _out = []
-    if not isinstance(_detail_arg, list) or not _all_recs_arg:
-        return _out
-    for _d in _detail_arg:
-        if not isinstance(_d, dict):
-            continue
-        _camp, _kw = _d.get("campaign", ""), str(_d.get("keyword", ""))
-        _matches = []
-        for _r in _all_recs_arg:
-            if not isinstance(_r, dict):
-                continue
-            for _hd in (_r.get("detail") or []):
-                if isinstance(_hd, dict) and _hd.get("campaign", "") == _camp and str(_hd.get("keyword", "")) == _kw:
-                    _matches.append(_hd)
-        _out.append((_camp, _kw, _matches))
-    return _out
+# ---- ラップ対象③（v46で純粋観測型に変更）: hist/detailの参照のみ ----
+# v45では「同一campaign+keywordの保存回数」をラッパー内で再計算しており、
+# これは_anls_render_saved_detail内部のhist構築アルゴリズム（マッチング
+# ロジック）を観測レイヤ側に複製することに等しく、コアロジックとの二重化・
+# 将来の仕様ズレリスクを生んでいた。v46ではこの再計算処理を完全に削除し、
+# 観測は「渡された引数の件数・キー存在有無を参照するだけ」に限定する
+# （フィルタリング・マッチング・集計は一切行わない）。
+# 削除: _anls_count_week_history（本関数そのものを削除）
+# 削除: four_week_table_generated / week_data_incomplete ログ
+#       （campaign/keywordマッチングに基づく再計算だったため）
+# 追加: hist_reference_summary（all_recsの件数・detailの件数・avg_cpc
+#       キーの存在有無を、フィルタなしでそのまま参照するだけのログ）
 
 
 # ---- ラップ対象④: NaN検知（_anls_pct_str / _anls_camp_table_html） ----
