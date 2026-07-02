@@ -1945,7 +1945,8 @@ def _anls_save_next_eval(anls_hist_fname: str, rec_id: str, row_idx: int, next_e
     _anls_save(anls_hist_fname, _recs2)
 
 
-def _anls_render_saved_detail(detail: list, anls_hist_fname: str = "", rec_id: str = ""):
+def _anls_render_saved_detail(detail: list, anls_hist_fname: str = "", rec_id: str = "",
+                              all_recs: list = None, rtype: str = ""):
     """保存済みdetail（_anls_build_detail の出力そのまま）から、
     ライブ画面（分析結果タブ）で使用している既存関数（_anls_camp_table_html,
     _anls_detail_html, _anls_generate_insight）をそのまま呼び出して
@@ -1961,6 +1962,22 @@ def _anls_render_saved_detail(detail: list, anls_hist_fname: str = "", rec_id: s
     判定・理由・アクションの計算ロジックは既存の _anls_generate_insight を
     そのまま呼び出すだけで、新しい判定ロジック・新しいAIロジックは
     一切追加しない。
+
+    all_recs（同じanls_hist_fnameの全レコード）を渡した場合、同一
+    campaign+keywordの過去の保存回を _anls_load 済みデータの中から
+    検索して時系列一覧を作るだけで、新しい集計・新しい計算は行わない。
+
+    rtype（保存レコードの既存フィールド"type"の値）が、実際にコード上で
+    使用されているCPC系のtype値（"キーワードCPC分析","商品CPC分析",
+    "動画CPC分析"）のいずれかに完全一致する場合のみ、履歴一覧のラベルを
+    既存の saved_at・period_days（どちらも保存済みの既存フィールド）から
+    計算した比較対象期間（例: 6/9〜6/15）に置き換える。文字列の部分一致
+    （"CPC" in rtype）ではなく、_anls_render_tab の実際の呼び出し箇所6件を
+    確認して得た正確なtype値との完全一致（set内包）で判定する。
+    period_daysはCPC系（cpc_kw/cpc_asin）では実際の比較日数と一致しているが、
+    kw_add/asin_add（"KW追加分析","商品追加分析","動画追加分析"）は表示上30日
+    固定運用のため保存値(7)と一致せず、誤った期間になる。そのためこの3つの
+    type値は判定対象に含めず、従来通り「{saved_at} 保存」のまま変更しない。
     """
     if not detail:
         return
@@ -2001,33 +2018,57 @@ def _anls_render_saved_detail(detail: list, anls_hist_fname: str = "", rec_id: s
                 f"**{icon} {kw}**　"
                 f'<span style="color:{clr};font-weight:700;">{j}</span>',
                 unsafe_allow_html=True)
-            st.markdown(_anls_detail_html(row, "keyword"), unsafe_allow_html=True)
-            _reasons, _actions = _anls_generate_insight(row)
-            _reason_hdr = f"{j}理由" if j in ("改善", "悪化") else "理由"
-            st.markdown(f"**{_reason_hdr}**\n" + "\n".join(_reasons))
-            st.markdown("**■ 広告運用で触るべき項目**\n" + "\n".join(_actions))
-            if anls_hist_fname and rec_id:
-                _memo_key = f"_anls_memo_{rec_id}_{int(_idx)}"
-                if _memo_key not in st.session_state:
-                    st.session_state[_memo_key] = row.get("memo", "") or ""
-                st.text_area(
-                    "自分メモ", key=_memo_key,
-                    on_change=_anls_save_memo,
-                    args=(anls_hist_fname, rec_id, int(_idx), _memo_key))
-                _action_key = f"_anls_action_{rec_id}_{int(_idx)}"
-                if _action_key not in st.session_state:
-                    st.session_state[_action_key] = row.get("action_taken", "") or ""
-                st.text_area(
-                    "実施したこと", key=_action_key,
-                    on_change=_anls_save_action_taken,
-                    args=(anls_hist_fname, rec_id, int(_idx), _action_key))
-                _next_eval_key = f"_anls_next_eval_{rec_id}_{int(_idx)}"
-                if _next_eval_key not in st.session_state:
-                    st.session_state[_next_eval_key] = row.get("next_eval", "") or ""
-                st.text_area(
-                    "次回評価", key=_next_eval_key,
-                    on_change=_anls_save_next_eval,
-                    args=(anls_hist_fname, rec_id, int(_idx), _next_eval_key))
+            _open_key = f"_anls_kwopen_{rec_id}_{int(_idx)}"
+            if st.checkbox("詳細を見る（Before/After・AI考察・自分メモ）", key=_open_key):
+                _camp_name = row.get("campaign_theme", "")
+                _hist = []
+                if all_recs:
+                    for _r in all_recs:
+                        for _hi, _hd in enumerate(_r.get("detail") or []):
+                            if _hd.get("campaign", "") == _camp_name and str(_hd.get("keyword", "")) == kw:
+                                _hist.append((_r.get("saved_at", ""), _r.get("id", ""), _hi, _hd, _r.get("period_days")))
+                    _hist.sort(key=lambda t: (t[0], t[1]))
+                if not _hist:
+                    _hist = [("この保存", rec_id, int(_idx), detail[int(_idx)], None)]
+                st.markdown(f"**保存履歴（時系列・{len(_hist)}件）**")
+                _CPC_TYPES = {"キーワードCPC分析", "商品CPC分析", "動画CPC分析"}
+                _is_cpc = rtype in _CPC_TYPES
+                for _h_saved_at, _h_rec_id, _h_row_idx, _h_d, _h_period_days in _hist:
+                    _hist_label = f"{_h_saved_at} 保存"
+                    if _is_cpc and _h_period_days:
+                        try:
+                            _p_end = _anls_dt.date.fromisoformat(_h_saved_at)
+                            _p_start = _p_end - _anls_dt.timedelta(days=int(_h_period_days) - 1)
+                            _hist_label = f"{_p_start.month}/{_p_start.day}〜{_p_end.month}/{_p_end.day}"
+                        except Exception:
+                            _hist_label = f"{_h_saved_at} 保存（期間不明）"
+                    _hist_key = f"_anls_histopen_{_h_rec_id}_{_h_row_idx}"
+                    if st.checkbox(_hist_label, key=_hist_key):
+                        _hb, _ha = (_h_d.get("before") or {}), (_h_d.get("after") or {})
+                        _hrow = {
+                            "keyword": kw,
+                            "sales_b": _hb.get("sales"), "sales_a": _ha.get("sales"),
+                            "cost_b": _hb.get("cost"), "cost_a": _ha.get("cost"),
+                            "ROAS_b": _hb.get("ROAS"), "ROAS_a": _ha.get("ROAS"),
+                            "CVR_b": _hb.get("CVR"), "CVR_a": _ha.get("CVR"),
+                            "orders_b": _hb.get("orders"), "orders_a": _ha.get("orders"),
+                            "clicks_b": _hb.get("clicks"), "clicks_a": _ha.get("clicks"),
+                            "_判定": _h_d.get("judgement", "変化なし"),
+                        }
+                        st.markdown(_anls_detail_html(_hrow, "keyword"), unsafe_allow_html=True)
+                        _h_j = _hrow["_判定"]
+                        _h_reasons, _h_actions = _anls_generate_insight(_hrow)
+                        _h_reason_hdr = f"{_h_j}理由" if _h_j in ("改善", "悪化") else "理由"
+                        st.markdown(f"**{_h_reason_hdr}**\n" + "\n".join(_h_reasons))
+                        st.markdown("**■ 広告運用で触るべき項目**\n" + "\n".join(_h_actions))
+                        if anls_hist_fname:
+                            _h_memo_key = f"_anls_memo_{_h_rec_id}_{_h_row_idx}"
+                            if _h_memo_key not in st.session_state:
+                                st.session_state[_h_memo_key] = _h_d.get("memo", "") or ""
+                            st.text_area(
+                                "自分メモ", key=_h_memo_key,
+                                on_change=_anls_save_memo,
+                                args=(anls_hist_fname, _h_rec_id, _h_row_idx, _h_memo_key))
 
 
 def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = ""):
@@ -2220,7 +2261,7 @@ def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = "")
             _row_detail = rec.get("detail")
             if _row_detail:
                 st.markdown("---")
-                _anls_render_saved_detail(_row_detail, anls_hist_fname, rec.get("id"))
+                _anls_render_saved_detail(_row_detail, anls_hist_fname, rec.get("id"), recs, rtype)
 
 
 def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
