@@ -1871,7 +1871,166 @@ def _anls_aggregate_before_after(merged: pd.DataFrame) -> dict:
     }
 
 
-def _anls_render_saved_report(recs: list, label: str):
+def _anls_build_detail(merged: pd.DataFrame, id_col: str) -> list:
+    """保存用に、キャンペーン別・キーワード（ASIN）別のBefore/After・AI考察を
+    保存後も再現できる最小限の形（campaign, keyword, before, after, judgement,
+    reasons, actions のみ）で保存する新規追加関数（読み取り専用・mergedは変更しない）。
+
+    判定（judgement）は既存の _判定（_anls_row_judge の出力）をそのまま転記し、
+    理由・アクション（reasons/actions）は既存関数 _anls_generate_insight を
+    そのまま呼び出すだけで、新しい判定ロジック・新しいAIロジックは一切追加しない。
+    """
+    _detail = []
+    for _, row in merged.iterrows():
+        _reasons, _actions = _anls_generate_insight(row)
+        _detail.append({
+            "campaign": row.get("campaign_theme", ""),
+            "keyword": row.get(id_col, ""),
+            "before": {
+                "sales": row.get("sales_b"), "cost": row.get("cost_b"),
+                "ROAS": row.get("ROAS_b"), "CVR": row.get("CVR_b"),
+                "orders": row.get("orders_b"), "clicks": row.get("clicks_b"),
+            },
+            "after": {
+                "sales": row.get("sales_a"), "cost": row.get("cost_a"),
+                "ROAS": row.get("ROAS_a"), "CVR": row.get("CVR_a"),
+                "orders": row.get("orders_a"), "clicks": row.get("clicks_a"),
+            },
+            "judgement": row.get("_判定", "変化なし"),
+            "reasons": _reasons,
+            "actions": _actions,
+        })
+    return _detail
+
+
+def _anls_save_memo(anls_hist_fname: str, rec_id: str, row_idx: int, memo_key: str):
+    """保存済みレポートの「自分メモ」欄が編集されたときに、既存のJSON読み書き
+    （_anls_load/_anls_save）だけを使って該当レコードのdetail[row_idx]へ
+    memoを書き戻す新規追加関数。新しい保存ボタン・新しいJSONファイルは作らず、
+    既存の保存処理（_anls_save）をそのまま流用する。他のキー・他のレコードは
+    一切変更しない。"""
+    _recs2 = _anls_load(anls_hist_fname)
+    for _r in _recs2:
+        if _r.get("id") == rec_id and isinstance(_r.get("detail"), list) and 0 <= row_idx < len(_r["detail"]):
+            _r["detail"][row_idx]["memo"] = st.session_state.get(memo_key, "")
+            break
+    _anls_save(anls_hist_fname, _recs2)
+
+
+def _anls_save_action_taken(anls_hist_fname: str, rec_id: str, row_idx: int, action_key: str):
+    """保存済みレポートの「実施したこと」欄が編集されたときに、既存のJSON読み書き
+    （_anls_load/_anls_save）だけを使って該当レコードのdetail[row_idx]へ
+    action_takenを書き戻す新規追加関数。_anls_save_memo/_anls_save_next_eval と
+    全く同じ仕組みをそのまま流用しており、新しい保存ボタン・新しいJSONファイルは
+    作らない。他のキー・他のレコードは一切変更しない。"""
+    _recs2 = _anls_load(anls_hist_fname)
+    for _r in _recs2:
+        if _r.get("id") == rec_id and isinstance(_r.get("detail"), list) and 0 <= row_idx < len(_r["detail"]):
+            _r["detail"][row_idx]["action_taken"] = st.session_state.get(action_key, "")
+            break
+    _anls_save(anls_hist_fname, _recs2)
+
+
+def _anls_save_next_eval(anls_hist_fname: str, rec_id: str, row_idx: int, next_eval_key: str):
+    """保存済みレポートの「次回評価」欄が編集されたときに、既存のJSON読み書き
+    （_anls_load/_anls_save）だけを使って該当レコードのdetail[row_idx]へ
+    next_evalを書き戻す新規追加関数。_anls_save_memo と全く同じ仕組みを
+    そのまま流用しており、新しい保存ボタン・新しいJSONファイルは作らない。
+    他のキー・他のレコードは一切変更しない。"""
+    _recs2 = _anls_load(anls_hist_fname)
+    for _r in _recs2:
+        if _r.get("id") == rec_id and isinstance(_r.get("detail"), list) and 0 <= row_idx < len(_r["detail"]):
+            _r["detail"][row_idx]["next_eval"] = st.session_state.get(next_eval_key, "")
+            break
+    _anls_save(anls_hist_fname, _recs2)
+
+
+def _anls_render_saved_detail(detail: list, anls_hist_fname: str = "", rec_id: str = ""):
+    """保存済みdetail（_anls_build_detail の出力そのまま）から、
+    ライブ画面（分析結果タブ）で使用している既存関数（_anls_camp_table_html,
+    _anls_detail_html, _anls_generate_insight）をそのまま呼び出して
+    サマリー→キャンペーン→キーワード（ASIN）→Before/After→AI考察の順に
+    再現する新規追加関数。
+
+    【Streamlit制約】この関数の呼び出し元はすでに
+    「📂 保存済み分析履歴」expander → 各保存日カードexpander という
+    2重のexpanderの内側であり、st.expanderをこれ以上ネストすると
+    実行時エラー（Expanders may not be nested）になる。そのため
+    _anls_render_list（内部でst.expanderを使う）は使わず、キャンペーン・
+    キーワードとも見出し（st.markdown）と区切り線（---）のみで整理する。
+    判定・理由・アクションの計算ロジックは既存の _anls_generate_insight を
+    そのまま呼び出すだけで、新しい判定ロジック・新しいAIロジックは
+    一切追加しない。
+    """
+    if not detail:
+        return
+    _rows = []
+    for d in detail:
+        b, a = (d.get("before") or {}), (d.get("after") or {})
+        _rows.append({
+            "campaign_theme": d.get("campaign", ""),
+            "keyword": d.get("keyword", ""),
+            "sales_b": b.get("sales"), "sales_a": a.get("sales"),
+            "cost_b": b.get("cost"), "cost_a": a.get("cost"),
+            "ROAS_b": b.get("ROAS"), "ROAS_a": a.get("ROAS"),
+            "CVR_b": b.get("CVR"), "CVR_a": a.get("CVR"),
+            "orders_b": b.get("orders"), "orders_a": a.get("orders"),
+            "clicks_b": b.get("clicks"), "clicks_a": a.get("clicks"),
+            "_判定": d.get("judgement", "変化なし"),
+            "memo": d.get("memo", ""),
+            "action_taken": d.get("action_taken", ""),
+            "next_eval": d.get("next_eval", ""),
+        })
+    _df = pd.DataFrame(_rows)
+
+    st.markdown("**サマリー ｜ キャンペーン別**")
+    st.markdown(_anls_camp_table_html(_df), unsafe_allow_html=True)
+
+    _ICON = {"改善": "🟢", "悪化": "🔴", "変化なし": "🟡"}
+    _CLR  = {"改善": "#276749", "悪化": "#C53030", "変化なし": "#744210"}
+    _grp_col = "campaign_theme" if "campaign_theme" in _df.columns else None
+    _groups = _df.groupby(_grp_col) if _grp_col else [("（未分類）", _df)]
+    for _camp, _grp in _groups:
+        st.markdown("---")
+        st.markdown(f"**📁 キャンペーン：{_camp or '（未分類）'}（{len(_grp)}件）**")
+        for _idx, row in _grp.iterrows():
+            j = row.get("_判定", "変化なし")
+            icon, clr = _ICON.get(j, "🟡"), _CLR.get(j, "#718096")
+            kw = str(row.get("keyword", ""))
+            st.markdown(
+                f"**{icon} {kw}**　"
+                f'<span style="color:{clr};font-weight:700;">{j}</span>',
+                unsafe_allow_html=True)
+            st.markdown(_anls_detail_html(row, "keyword"), unsafe_allow_html=True)
+            _reasons, _actions = _anls_generate_insight(row)
+            _reason_hdr = f"{j}理由" if j in ("改善", "悪化") else "理由"
+            st.markdown(f"**{_reason_hdr}**\n" + "\n".join(_reasons))
+            st.markdown("**■ 広告運用で触るべき項目**\n" + "\n".join(_actions))
+            if anls_hist_fname and rec_id:
+                _memo_key = f"_anls_memo_{rec_id}_{int(_idx)}"
+                if _memo_key not in st.session_state:
+                    st.session_state[_memo_key] = row.get("memo", "") or ""
+                st.text_area(
+                    "自分メモ", key=_memo_key,
+                    on_change=_anls_save_memo,
+                    args=(anls_hist_fname, rec_id, int(_idx), _memo_key))
+                _action_key = f"_anls_action_{rec_id}_{int(_idx)}"
+                if _action_key not in st.session_state:
+                    st.session_state[_action_key] = row.get("action_taken", "") or ""
+                st.text_area(
+                    "実施したこと", key=_action_key,
+                    on_change=_anls_save_action_taken,
+                    args=(anls_hist_fname, rec_id, int(_idx), _action_key))
+                _next_eval_key = f"_anls_next_eval_{rec_id}_{int(_idx)}"
+                if _next_eval_key not in st.session_state:
+                    st.session_state[_next_eval_key] = row.get("next_eval", "") or ""
+                st.text_area(
+                    "次回評価", key=_next_eval_key,
+                    on_change=_anls_save_next_eval,
+                    args=(anls_hist_fname, rec_id, int(_idx), _next_eval_key))
+
+
+def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = ""):
     """保存済み分析履歴（recsは_anls_load()の戻り値そのまま）を、
     DataFrameの代わりにカード形式の「分析レポート」として表示する追加関数。
 
@@ -2058,6 +2217,11 @@ def _anls_render_saved_report(recs: list, label: str):
             else:
                 st.caption("前回の保存履歴はありません（初回保存）。")
 
+            _row_detail = rec.get("detail")
+            if _row_detail:
+                st.markdown("---")
+                _anls_render_saved_detail(_row_detail, anls_hist_fname, rec.get("id"))
+
 
 def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                      anls_hist_fname: str, csv_key: str, label: str,
@@ -2205,17 +2369,18 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
     if st.button("💾 分析結果を保存", key=f"{_sk}_save"):
         _recs = _anls_load(anls_hist_fname)
         _agg = _anls_aggregate_before_after(merged)
+        _detail = _anls_build_detail(merged, res_id_col)
         _recs.append({"id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
                       "saved_at": _anls_dt.date.today().isoformat(), "type": label,
                       "period_days": period_days, "n_before": res["n_before"],
                       "n_matched": n_total, "n_kaizen": n_kaizen, "n_akka": n_akka,
                       "n_henko": n_henko, "rate": round(rate, 1), "camps": camps,
-                      **_agg})
+                      **_agg, "detail": _detail})
         _anls_save(anls_hist_fname, _recs)
         st.success("✅ 分析結果を保存しました。")
     with st.expander("📂 保存済み分析履歴", expanded=False):
         _recs = _anls_load(anls_hist_fname)
-        _anls_render_saved_report(_recs, label)
+        _anls_render_saved_report(_recs, label, anls_hist_fname)
 
 
 def page_cpc():
