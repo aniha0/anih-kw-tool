@@ -2396,6 +2396,99 @@ def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = "")
                 _anls_render_saved_detail(_row_detail, anls_hist_fname, rec.get("id"), recs, rtype)
 
 
+# ── 複数CSV比較表 用ヘルパー（新規・追加専用） ─────────────────
+# 【重要】before/after・判定・ROAS等の値は既存の _anls_build_detail をそのまま
+# 呼び出した結果のみを使い、新しい判定式・新しい集計式は一切追加しない。
+# campaign_name × keyword(またはasin) の対応付けは、_results や
+# _anls_build_detail の出力の並び順・インデックス位置には一切依存せず、
+# 各ファイルの merged から作った (campaign_theme, id_col値) → campaign_name の
+# 値ベース辞書と、_anls_build_detail の出力が持つ campaign（campaign_theme）・
+# keyword値を突き合わせることで実現する（位置対応は不使用）。
+def _anls_build_multi_period_table(_results: list, id_col: str, mode: str) -> list:
+    def _period_end_date(period_str):
+        if not period_str:
+            return _anls_dt.date.min
+        try:
+            _pe = str(period_str).split(" - ")[1]
+            return _anls_dt.datetime.strptime(_pe, "%Y/%m/%d").date()
+        except Exception:
+            return _anls_dt.date.min
+
+    # ②：最新の判定はアップロード順ではなく、期間の終了日（既存の _period_str）で決める
+    _sorted = sorted(_results, key=lambda r: _period_end_date(r.get("period")))
+
+    # ③：campaign_name × id_col(keyword/asin) の値ベース辞書で対応付ける。
+    # 【重要】_anls_build_detail の出力は campaign 値が campaign_theme であり
+    # campaign_name を持たないため、campaign_theme×keyword を中継キーにすると、
+    # 同一テーマ内で複数の campaign_name が同じキーワードを持つ場合に取り違えが
+    # 起こり得る（テスト時に実際に検出）。そのため今回は _anls_build_detail を
+    # 経由せず、merged 自身が持つ既存カラム（campaign_name / id_col / 既存の
+    # 判定列 "_判定" / 既存のROAS_a）を直接読むだけにする。値はすべて既存の
+    # _anls_row_judge・既存のbefore/after結合が計算済みのものをそのまま参照し、
+    # 新しい判定式・新しい集計式は一切追加しない。リストの並び順・インデックス
+    # 位置には一切依存しない。
+    _per_file = []  # 期間の古い順: [(period_label, {(campaign_name, kw): {judgement, roas}}), ...]
+    for _res in _sorted:
+        _merged = _res["merged"]
+        _by_key = {}
+        if all(c in _merged.columns for c in ("campaign_name", id_col, "_判定")):
+            for _, _row in _merged.iterrows():
+                _key = (_row.get("campaign_name", ""), str(_row.get(id_col, "")))
+                _by_key[_key] = {
+                    "judgement": _row.get("_判定", "変化なし"),
+                    "roas": _row.get("ROAS_a"),
+                }
+        _label = _res.get("period") or "（期間不明）"
+        _per_file.append((_label, _by_key))
+
+    if not _per_file:
+        return []
+
+    # ③：比較表の行（軸）は最新CSV（_per_fileの末尾）のキー一覧のみを採用
+    _latest_label, _latest_by_key = _per_file[-1]
+    _rows = []
+    for (_cname, _kw) in _latest_by_key.keys():
+        _cells = []
+        for _label, _by_key in _per_file:
+            _v = _by_key.get((_cname, _kw))
+            if _v is None:
+                _cells.append({"period_label": _label, "judgement": None, "roas": None})
+            else:
+                _cells.append({
+                    "period_label": _label,
+                    "judgement": _v.get("judgement", "変化なし"),
+                    "roas": _v.get("roas"),
+                })
+        _rows.append({"campaign_name": _cname, "keyword": _kw, "cells": _cells})
+    return _rows
+
+
+def _anls_render_multi_period_table(_rows: list) -> None:
+    if not _rows:
+        st.info("比較対象のキーワードがありません。")
+        return
+    st.markdown("#### 📊 複数期間比較表")
+    st.caption("最新CSVのキーワードを基準に表示しています。過去CSVに存在しない場合は「データなし」と表示されます。")
+    _icon_map = {"改善": "🟢", "悪化": "🔴", "変化なし": "🟡"}
+    for _row in _rows:
+        st.markdown(f"**{_row['campaign_name']}｜{_row['keyword']}**")
+        _labels = [c["period_label"] for c in _row["cells"]]
+        _j_cells = [
+            (_icon_map.get(c["judgement"], "") + c["judgement"]) if c["judgement"] else "データなし"
+            for c in _row["cells"]
+        ]
+        _r_cells = [
+            f"{c['roas']:.2f}" if isinstance(c["roas"], (int, float)) else "データなし"
+            for c in _row["cells"]
+        ]
+        _hdr = "| 指標 | " + " | ".join(_labels) + " |"
+        _sep = "|---" * (len(_labels) + 1) + "|"
+        _jr  = "| 判定 | " + " | ".join(_j_cells) + " |"
+        _rr  = "| ROAS | " + " | ".join(_r_cells) + " |"
+        st.markdown("\n".join([_hdr, _sep, _jr, _rr]))
+        st.markdown("---")
+
+
 def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                      anls_hist_fname: str, csv_key: str, label: str,
                      mode: str,
@@ -2555,36 +2648,43 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
         st.session_state[f"{_sk}_result"] = _results
     if f"{_sk}_result" not in st.session_state:
         return
-    for _ri, res in enumerate(st.session_state[f"{_sk}_result"]):
-        merged   = res["merged"]
-        camps    = res["camps"]
-        n_total, n_kaizen, n_akka, n_henko, rate = res["stats"]
-        anls_hist_fname = res["anls_hist_fname"]
-        res_id_col = res.get("id_col", id_col)
-        st.markdown(_anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate), unsafe_allow_html=True)
-        n_history = res.get("n_history")
-        if n_history is not None:
-            n_unmatched = n_history - n_total
-            st.info(f"変更履歴: {n_history}件 ｜ CSV一致: {n_total}件 ｜ 不一致: {n_unmatched}件 ｜ 分析対象: {n_total}件")
-        sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"] + camps, key=f"{_sk}_{_ri}_camp")
-        view = merged if sel_camp == "全キャンペーン" else merged[merged["campaign_theme"] == sel_camp].copy() if "campaign_theme" in merged.columns else merged
-        with st.expander("📊 キャンペーン別サマリー", expanded=True):
-            st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
-        st.markdown("#### 📋 対象一覧")
-        _anls_render_list(view, res_id_col)
-        if st.button("💾 分析結果を保存", key=f"{_sk}_{_ri}_save"):
-            _recs = _anls_load(anls_hist_fname)
-            _agg = _anls_aggregate_before_after(merged)
-            _detail = _anls_build_detail(merged, res_id_col, mode)
-            _recs.append({"id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
-                          "saved_at": _anls_dt.date.today().isoformat(), "type": label,
-                          "period_days": period_days, "n_before": res["n_before"],
-                          "n_matched": n_total, "n_kaizen": n_kaizen, "n_akka": n_akka,
-                          "n_henko": n_henko, "rate": round(rate, 1), "camps": camps,
-                          "period": res.get("period"),
-                          **_agg, "detail": _detail})
-            _anls_save(anls_hist_fname, _recs)
-            st.success("✅ 分析結果を保存しました。")
+    _results_now = st.session_state[f"{_sk}_result"]
+    if len(_results_now) >= 2:
+        # 複数CSV時：①保存機能なし ②③は _anls_build_multi_period_table 側で対応。
+        # ファイルごとの独立結果パネル（サマリー・対象一覧・保存ボタン）は表示しない。
+        _cmp_rows = _anls_build_multi_period_table(_results_now, id_col, mode)
+        _anls_render_multi_period_table(_cmp_rows)
+    else:
+        for _ri, res in enumerate(_results_now):
+            merged   = res["merged"]
+            camps    = res["camps"]
+            n_total, n_kaizen, n_akka, n_henko, rate = res["stats"]
+            anls_hist_fname = res["anls_hist_fname"]
+            res_id_col = res.get("id_col", id_col)
+            st.markdown(_anls_summary_html(n_total, n_kaizen, n_akka, n_henko, rate), unsafe_allow_html=True)
+            n_history = res.get("n_history")
+            if n_history is not None:
+                n_unmatched = n_history - n_total
+                st.info(f"変更履歴: {n_history}件 ｜ CSV一致: {n_total}件 ｜ 不一致: {n_unmatched}件 ｜ 分析対象: {n_total}件")
+            sel_camp = st.selectbox("キャンペーン絞り込み", ["全キャンペーン"] + camps, key=f"{_sk}_{_ri}_camp")
+            view = merged if sel_camp == "全キャンペーン" else merged[merged["campaign_theme"] == sel_camp].copy() if "campaign_theme" in merged.columns else merged
+            with st.expander("📊 キャンペーン別サマリー", expanded=True):
+                st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
+            st.markdown("#### 📋 対象一覧")
+            _anls_render_list(view, res_id_col)
+            if st.button("💾 分析結果を保存", key=f"{_sk}_{_ri}_save"):
+                _recs = _anls_load(anls_hist_fname)
+                _agg = _anls_aggregate_before_after(merged)
+                _detail = _anls_build_detail(merged, res_id_col, mode)
+                _recs.append({"id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
+                              "saved_at": _anls_dt.date.today().isoformat(), "type": label,
+                              "period_days": period_days, "n_before": res["n_before"],
+                              "n_matched": n_total, "n_kaizen": n_kaizen, "n_akka": n_akka,
+                              "n_henko": n_henko, "rate": round(rate, 1), "camps": camps,
+                              "period": res.get("period"),
+                              **_agg, "detail": _detail})
+                _anls_save(anls_hist_fname, _recs)
+                st.success("✅ 分析結果を保存しました。")
     with st.expander("📂 保存済み分析履歴", expanded=False):
         _recs = _anls_load(anls_hist_fname)
         _anls_render_saved_report(_recs, label, anls_hist_fname)
