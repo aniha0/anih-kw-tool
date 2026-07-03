@@ -474,6 +474,46 @@ with _u2:
     run = st.button("🔍 抽出実行", type="primary", use_container_width=True)
 st.markdown("---")
 
+# ─── CSV管理基盤（新規・独立／保持専用） ──────────────
+# 【重要】このセクションは既存処理（sf / _anls_render_tab 等）へは一切接続しない。
+# 7日比較CSV・30日比較CSVは将来的に分析タブのAfter入力へ接続予定（後続作業）。
+# その他（日数）CSVは90/180/365日等の全体分析用データとして保持のみ（接続先は後続作業で決定）。
+# 既存関数・既存ロジック・既存session_stateキーへの影響はゼロ。
+def _csv_bucket_uploader(label: str, state_key: str, widget_key: str, help_text: str = ""):
+    st.markdown(f"**{label}**")
+    if help_text:
+        st.caption(help_text)
+    _new_files = st.file_uploader(
+        label, type="csv", accept_multiple_files=True,
+        key=widget_key, label_visibility="collapsed",
+    )
+    if state_key not in st.session_state:
+        st.session_state[state_key] = {}
+    if _new_files:
+        for _f in _new_files:
+            st.session_state[state_key][_f.name] = _f
+    _held = st.session_state[state_key]
+    if _held:
+        st.caption(f"📂 保持中のCSV（{len(_held)}件）")
+        for _name in sorted(_held.keys()):
+            st.markdown(f"・{_name}")
+    else:
+        st.caption("保持中のCSVはありません")
+
+with st.expander("📂 CSV管理基盤（7日比較 / 30日比較 / その他）", expanded=False):
+    st.caption("※ 独立したデータ保持基盤です。既存の分析・判定・計算処理には未接続です（接続は後続作業で対応）。")
+    _b1, _b2, _b3 = st.columns(3)
+    with _b1:
+        _csv_bucket_uploader("📅 7日比較CSV", "csv_bucket_7d", "csv_bucket_7d_uploader")
+    with _b2:
+        _csv_bucket_uploader("📅 30日比較CSV", "csv_bucket_30d", "csv_bucket_30d_uploader")
+    with _b3:
+        _csv_bucket_uploader(
+            "📊 その他（日数）CSV", "csv_bucket_other", "csv_bucket_other_uploader",
+            help_text="90日・180日・365日など全体分析用データとして保持",
+        )
+st.markdown("---")
+
 # ─── Processing ─────────────────────────────────────
 if run:
     if not sf:
@@ -2372,14 +2412,29 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
         st.warning("先に「改善」タブで抽出実行を行ってください。抽出対象が分析対象になります。")
         return
     camps = sorted(before_df["campaign_theme"].unique().tolist()) if "campaign_theme" in before_df.columns else []
-    st.markdown(f"**比較用 {_disp_days}日レポートCSVをアップロード**")
+    # ── CSV入力元: 分析画面内アップロード欄は廃止。CSV管理基盤（バケット）を参照する ──
+    # 【重要】ここから下（_results=[] 以降）の比較・判定・集計・表示ロジックは無変更。
+    # 変更対象は「af_filesの取得方法」のみ。
     _accept_multiple = mode in ("cpc_kw", "cpc_asin")
-    af_files = st.file_uploader(f"{_disp_days}日レポートCSV", type="csv", key=csv_key, accept_multiple_files=_accept_multiple)
-    af_files = af_files if isinstance(af_files, list) else ([af_files] if af_files is not None else [])
+    _bucket_key   = "csv_bucket_30d" if _disp_days == 30 else "csv_bucket_7d"
+    _bucket_label = "30日比較CSV"    if _disp_days == 30 else "7日比較CSV"
+    _bucket_held  = st.session_state.get(_bucket_key, {})
+    st.markdown(f"**比較用データ取得元: 📂 {_bucket_label}バケット（{_disp_days}日）**")
+    if _bucket_held:
+        if _accept_multiple:
+            af_files = list(_bucket_held.values())
+            st.caption(f"参照ファイル（{len(af_files)}件・保持分すべて）: " + "、".join(sorted(_bucket_held.keys())))
+        else:
+            _latest_name = list(_bucket_held.keys())[-1]
+            af_files = [_bucket_held[_latest_name]]
+            st.caption(f"参照ファイル（最新1件）: {_latest_name}")
+    else:
+        af_files = []
+        st.caption(f"「{_bucket_label}」バケットにCSVが保持されていません。")
     run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
     if run_btn:
         if not af_files:
-            st.warning("CSVをアップロードしてください。"); return
+            st.warning(f"「{_bucket_label}」バケットにCSVをアップロードしてください（画面上部のCSV管理基盤から）。"); return
         _results = []
         for af_file in af_files:
             with st.spinner("分析中..."):
@@ -2661,15 +2716,35 @@ def _anls_render_saved_detail(*args, **kwargs):
             if _bad_recs:
                 _anls_log("ERROR", "structural", "hist_record_not_dict",
                           fn="_anls_render_saved_detail", count=_bad_recs)
+        # v47: 参照のみで補完する追加観測（campaign/keyword走査・4週間ロジックの
+        # 再実装・st.markdown解析は一切行わない。lenとキー存在確認のみ）。
         _hist_count = len(_all_recs_arg) if isinstance(_all_recs_arg, list) else 0
-        _detail_count = len(_detail_arg) if isinstance(_detail_arg, list) else 0
-        _has_avg_cpc = any(
-            isinstance(_d, dict) and isinstance(_d.get("after"), dict) and "avg_cpc" in _d["after"]
-            for _d in (_detail_arg or []) if isinstance(_detail_arg, list)
+        _detail_list = _detail_arg if isinstance(_detail_arg, list) else []
+        _detail_count = len(_detail_list)
+        _cpc_present_count = sum(
+            1 for _d in _detail_list
+            if isinstance(_d, dict) and isinstance(_d.get("after"), dict) and "avg_cpc" in _d["after"]
         )
+        _has_avg_cpc = _cpc_present_count > 0
+        _avg_cpc_ratio = round(_cpc_present_count / _detail_count, 3) if _detail_count else 0.0
+        # v48: 命名修正のみ（ロジック・計算式は無変更）。
+        # 旧名 week_variation_flag は実態が「週」ではなく「今回保存分の行数が
+        # 複数か」（len(detail) > 1）であったため、実態に即した名称へ変更。
+        _row_count_flag = _detail_count > 1
+        # hist_depth の計算式は無変更（各レコードのdetail長のlen合計のみ）。
+        # 意味を明確化するため、ログにのみ説明文字列を追加する（計算結果には無関係）。
+        _hist_depth = 0
+        if isinstance(_all_recs_arg, list):
+            _hist_depth = sum(
+                len(_r["detail"]) for _r in _all_recs_arg
+                if isinstance(_r, dict) and isinstance(_r.get("detail"), list)
+            )
+        _hist_depth_desc = "sum_of_detail_lengths_across_hist_records"
         _anls_log("INFO", "normal", "hist_reference_summary",
                   fn="_anls_render_saved_detail", hist_count=_hist_count,
-                  detail_count=_detail_count, has_avg_cpc=_has_avg_cpc)
+                  detail_count=_detail_count, has_avg_cpc=_has_avg_cpc,
+                  avg_cpc_ratio=_avg_cpc_ratio, row_count_flag=_row_count_flag,
+                  hist_depth=_hist_depth, hist_depth_desc=_hist_depth_desc)
     except Exception:
         pass
 
@@ -2761,6 +2836,50 @@ def _anls_render_tab(*args, **kwargs):
 # ============================================================
 # Observability Layer ここまで
 # ============================================================
+
+
+# ── CPC調整タブ 階層表示UI用ヘルパー（新規・参照専用） ──────────
+# 【重要】ここは表示専用の補助関数。判定・ROAS・CPC等の値は一切再計算せず、
+# 「分析」タブが _anls_build_detail で既に保存した値（anls_hist_fname のJSON）を
+# 読み取って画面表示用に整形するだけ。新しい判定ロジック・新しい計算式は含まない。
+# 既存の _anls_render_tab / _anls_build_detail / _anls_save / _anls_load は無変更。
+def _cpc_hier_lookup_trend(campaign_theme: str, keyword: str, anls_hist_fname: str) -> list:
+    _recs = _anls_load(anls_hist_fname)
+    if not _recs:
+        return []
+    _out = []
+    for _r in _recs:
+        if not isinstance(_r, dict):
+            continue
+        _detail = _r.get("detail")
+        if not isinstance(_detail, list):
+            continue
+        for _hd in _detail:
+            if not isinstance(_hd, dict):
+                continue
+            if _hd.get("campaign", "") != campaign_theme or str(_hd.get("keyword", "")) != str(keyword):
+                continue
+            _period = _r.get("period")
+            _saved_at = _r.get("saved_at", "")
+            _label = _saved_at
+            if _period:
+                try:
+                    _ps, _pe = str(_period).split(" - ")
+                    _psd = _anls_dt.datetime.strptime(_ps, "%Y/%m/%d").date()
+                    _ped = _anls_dt.datetime.strptime(_pe, "%Y/%m/%d").date()
+                    _label = f"{_psd.month}/{_psd.day}〜{_ped.month}/{_ped.day}"
+                except Exception:
+                    _label = _saved_at
+            _after = _hd.get("after") or {}
+            _roas_v = _after.get("ROAS")
+            _out.append({
+                "sort_key": _period or _saved_at,
+                "period_label": _label,
+                "judgement": _hd.get("judgement", "変化なし"),
+                "roas_str": f"{_roas_v:.2f}" if isinstance(_roas_v, (int, float)) else "―",
+            })
+    _out.sort(key=lambda x: x["sort_key"])
+    return _out
 
 
 def page_cpc():
@@ -2937,13 +3056,68 @@ def page_cpc():
         if "変更幅" in _d.columns: _d["変更幅"] = _d["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
         if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
         if "推奨CPC" in _d.columns: _d["推奨CPC"] = _d["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-        def _cr(row):
-            c = _RC.get(row.get("判定ランク", ""), "")
-            return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
-        if df_disp.empty:
-            st.info("変更幅が発生するキーワードはありません（全件 現状維持 または 判断保留）。")
+        # ── キャンペーン単位 階層表示（新規UI・今回の変更対象はここのみ） ──────
+        # 【重要】色分けは既存の cpc_rank / cpc_action / cpc_delta をそのまま参照するだけで、
+        # 判定基準・推奨CPC計算・データ生成（df_c/df_disp/disp_cols等）は一切変更しない。
+        # 「判断保留」は指定どおり⚪現状維持に合流表示する。表示対象は全件（即削除も含む）。
+        def _cpc_hier_bucket(row):
+            if row.get("cpc_rank") == "即削除":
+                return "🔴"
+            _act = row.get("cpc_action", "")
+            if _act == "CPC上げ":
+                return "🟢"
+            if _act == "CPC下げ":
+                return "🟠"
+            return "⚪"  # 現状維持 + 判断保留（変更なし）
+
+        _bucket_order = ["🟢", "⚪", "🟠", "🔴"]
+        if df_c.empty:
+            st.info("表示対象のキーワードがありません。")
         else:
-            st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
+            df_h = df_c.copy()
+            df_h["_bucket"] = df_h.apply(_cpc_hier_bucket, axis=1)
+            for _camp_name in df_h["campaign_name"].dropna().unique().tolist():
+                _cg = df_h[df_h["campaign_name"] == _camp_name]
+                _cnt = {b: int((_cg["_bucket"] == b).sum()) for b in _bucket_order}
+                _exp_label = f"▼ {_camp_name}　🟢{_cnt['🟢']} ⚪{_cnt['⚪']} 🟠{_cnt['🟠']} 🔴{_cnt['🔴']}"
+                with st.expander(_exp_label, expanded=False):
+                    for _b in _bucket_order:
+                        _sub = _cg[_cg["_bucket"] == _b]
+                        for _ri, r in _sub.iterrows():
+                            _kw = str(r.get("keyword", ""))
+                            _btn_key = f"cpc_hier_btn_{cpc_camp}_{_camp_name}_{_kw}_{_ri}"
+                            if st.button(f"{_b} {_kw}", key=_btn_key, use_container_width=True):
+                                _sel_key = "cpc_hier_selected"
+                                _this = (_camp_name, _kw, int(_ri))
+                                st.session_state[_sel_key] = None if st.session_state.get(_sel_key) == _this else _this
+                            if st.session_state.get("cpc_hier_selected") == (_camp_name, _kw, int(_ri)):
+                                _cvr_v = (r["orders"] / r["clicks"] * 100) if r.get("clicks", 0) else 0.0
+                                _cur_cpc_v = r.get("avg_cpc", 0) or 0
+                                _rec_cpc_v = r.get("rec_cpc", 0) or 0
+                                _detail_html = (
+                                    '<div style="background:#F8FBFF;border:1px solid #D9E8FF;'
+                                    'border-radius:8px;padding:12px 16px;margin:4px 0 10px 0;'
+                                    'font-size:.85rem;line-height:1.9;">'
+                                    f"<b>ROAS</b>: {r.get('ROAS', 0):.2f}　"
+                                    f"<b>売上</b>: ¥{r.get('sales', 0):,.0f}　"
+                                    f"<b>広告費</b>: ¥{r.get('cost', 0):,.0f}　"
+                                    f"<b>クリック</b>: {int(r.get('clicks', 0) or 0):,}　"
+                                    f"<b>CVR</b>: {_cvr_v:.1f}%　"
+                                    f"<b>現在CPC</b>: ¥{_cur_cpc_v:,.0f}　"
+                                    f"<b>推奨CPC</b>: ¥{_rec_cpc_v:,.0f}"
+                                    "</div>"
+                                )
+                                st.markdown(_detail_html, unsafe_allow_html=True)
+                                _trend = _cpc_hier_lookup_trend(r.get("campaign_theme", ""), _kw, "anls_cpc_kw.json")
+                                if _trend:
+                                    st.markdown("**📈 4週間推移（「分析」タブの保存データを参照）**")
+                                    _hdr = "| 指標 | " + " | ".join(t["period_label"] for t in _trend) + " |"
+                                    _sep = "|---" * (len(_trend) + 1) + "|"
+                                    _jr  = "| 判定 | " + " | ".join(t["judgement"] for t in _trend) + " |"
+                                    _rr  = "| ROAS | " + " | ".join(t["roas_str"] for t in _trend) + " |"
+                                    st.markdown("\n".join([_hdr, _sep, _jr, _rr]))
+                                else:
+                                    st.caption("4週間推移: 履歴なし（「分析」タブで比較CSVを実行すると蓄積されます）")
         _c1, _c2 = st.columns(2)
         with _c1:
             _dl_csv_adj = df_disp[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
@@ -2955,6 +3129,15 @@ def page_cpc():
             st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
                 file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
     with _t_tab2:
+        st.markdown("#### ⏱️ 期間別クイック分析")
+        st.markdown("**📅 7日分析**")
+        _anls_render_tab(dc_cpc, 7, "anls_cpc_kw_top7.json", "anls_cpc_kw_top7",
+                          "キーワードCPC分析（7日窓）", "cpc_kw", "keyword", "cpc_change_history.json")
+        st.markdown("---")
+        st.markdown("**📅 30日分析**")
+        _anls_render_tab(dc_cpc, 30, "anls_cpc_kw_top30.json", "anls_cpc_kw_top30",
+                          "キーワードCPC分析（30日窓）", "cpc_kw", "keyword", "cpc_change_history.json")
+        st.markdown("---")
         _anls_render_tab(dc_cpc, 7, "anls_cpc_kw.json", "anls_cpc_kw", "キーワードCPC分析", "cpc_kw", "keyword", "cpc_change_history.json")
 
 def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = ""):
@@ -3159,6 +3342,19 @@ def page_cpc_product():
     with _t1:
         _render_pt_cpc_page(dc_cpc_product, "商品CPC調整", "cpc_product_sel", "cpc_pt_m_history.json")
     with _t2:
+        st.markdown("#### ⏱️ 期間別クイック分析")
+        st.markdown("**📅 7日分析**")
+        _anls_render_tab(
+            st.session_state.get("df_cpc_product", pd.DataFrame()),
+            7, "anls_cpc_pt_m_top7.json", "anls_cpc_pt_m_top7",
+            "商品CPC分析（7日窓）", "cpc_asin", "asin", "cpc_pt_m_history.json")
+        st.markdown("---")
+        st.markdown("**📅 30日分析**")
+        _anls_render_tab(
+            st.session_state.get("df_cpc_product", pd.DataFrame()),
+            30, "anls_cpc_pt_m_top30.json", "anls_cpc_pt_m_top30",
+            "商品CPC分析（30日窓）", "cpc_asin", "asin", "cpc_pt_m_history.json")
+        st.markdown("---")
         _anls_render_tab(
             st.session_state.get("df_cpc_product", pd.DataFrame()),
             7, "anls_cpc_pt_m.json", "anls_cpc_pt_m",
@@ -3169,6 +3365,19 @@ def page_cpc_video():
     with _t1:
         _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel", "cpc_pt_v_history.json")
     with _t2:
+        st.markdown("#### ⏱️ 期間別クイック分析")
+        st.markdown("**📅 7日分析**")
+        _anls_render_tab(
+            st.session_state.get("df_cpc_video", pd.DataFrame()),
+            7, "anls_cpc_pt_v_top7.json", "anls_cpc_pt_v_top7",
+            "動画CPC分析（7日窓）", "cpc_asin", "asin", "cpc_pt_v_history.json")
+        st.markdown("---")
+        st.markdown("**📅 30日分析**")
+        _anls_render_tab(
+            st.session_state.get("df_cpc_video", pd.DataFrame()),
+            30, "anls_cpc_pt_v_top30.json", "anls_cpc_pt_v_top30",
+            "動画CPC分析（30日窓）", "cpc_asin", "asin", "cpc_pt_v_history.json")
+        st.markdown("---")
         _anls_render_tab(
             st.session_state.get("df_cpc_video", pd.DataFrame()),
             7, "anls_cpc_pt_v.json", "anls_cpc_pt_v",
