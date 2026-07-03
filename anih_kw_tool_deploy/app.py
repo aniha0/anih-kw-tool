@@ -496,28 +496,52 @@ with _b2:
 with _b3:
     _csv_bucket_uploader("📊 その他CSV", "csv_bucket_other", "csv_bucket_other_uploader")
 
-sf = None
+if st.button("🗑 比較CSVをクリア", use_container_width=True):
+    for _bk in ("csv_bucket_7d", "csv_bucket_30d", "csv_bucket_other"):
+        st.session_state[_bk] = {}
+
+def _sf_earliest_by_period(_held_files):
+    # 「期間」列（既存の_anls_render_tabのcpc_kw等と同じ"YYYY/MM/DD - YYYY/MM/DD"形式）
+    # の開始日が最も古いファイルを選ぶ。rcsv/fcolは呼び出すのみで一切変更しない。
+    # ファイル名・アップロード順（保持順）は一切参照しない。「期間」列が1件も
+    # 解析できない場合はNoneを返す（順序によるフォールバックは行わない）。
+    _best_file = None
+    _best_start = None
+    for _f in _held_files:
+        try:
+            _df_peek = rcsv(_f)
+            _pc = fcol(_df_peek, ["期間"])
+            if not _pc:
+                continue
+            _parts = _df_peek[_pc].astype(str).str.split(" - ", expand=True)
+            _starts = pd.to_datetime(_parts[0], format="%Y/%m/%d", errors="coerce")
+            if _starts.notna().any():
+                _start_date = _starts.min()
+                if _best_start is None or _start_date < _best_start:
+                    _best_start = _start_date
+                    _best_file = _f
+        except Exception:
+            continue
+    return _best_file
+
+# 3バケットを差別せず「分析対象バケット」として統一的に扱う。
+# 順序（保持順・アップロード順）・ファイル名には一切依存せず、
+# 全バケット合算したCSV群の中から「期間」列の開始日が最も古い1件をsfとする。
+_all_held_files = []
 for _bk in ("csv_bucket_7d", "csv_bucket_30d", "csv_bucket_other"):
-    _held_files = list(st.session_state.get(_bk, {}).values())
-    if len(_held_files) == 1:
-        sf = _held_files[0]
-        break
+    _all_held_files.extend(st.session_state.get(_bk, {}).values())
+
+sf = None
+if len(_all_held_files) == 1:
+    sf = _all_held_files[0]
+elif len(_all_held_files) >= 2:
+    sf = _sf_earliest_by_period(_all_held_files)
 
 run = st.button("🚀 分析開始", type="primary", use_container_width=True)
 st.markdown("---")
 
 # ─── Processing ─────────────────────────────────────
 if run:
-    _active_csv_groups = [
-        _bk for _bk in ("csv_bucket_7d", "csv_bucket_30d", "csv_bucket_other")
-        if len(st.session_state.get(_bk, {})) >= 1
-    ]
-    if len(_active_csv_groups) >= 2:
-        st.error("同時に使用できるCSVグループは1つだけです。\n7日比較CSV・30日比較CSV・その他CSVのいずれか1つだけにCSVを保持してください。")
-        st.stop()
-    if _active_csv_groups == ["csv_bucket_other"] and len(st.session_state.get("csv_bucket_other", {})) >= 2:
-        st.error("その他CSVの複数ファイル比較分析は現在未対応です。\nその他CSVには1件のみCSVを保持してください。\n複数ファイルを比較分析する場合は、\n「7日比較CSV」または「30日比較CSV」をご利用ください。")
-        st.stop()
     if not sf:
         st.error("検索用語レポートをアップロードしてください"); st.stop()
     with st.spinner("分析中..."):
