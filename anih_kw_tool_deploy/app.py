@@ -3208,21 +3208,31 @@ def page_cpc():
             df_c = dc_cpc.copy()
         else:
             df_c = dc_cpc[dc_cpc["campaign_theme"] == cpc_camp].copy()
-        cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
-        st.markdown("---")
         kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
-        kc_ = st.columns(len(kpi_rks))
-        for _col, rk in zip(kc_, kpi_rks):
-            bg_map = {
-                "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
-                "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
-            }
-            _col.markdown(f'''<div class="kpi-card" style="background:{bg_map.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
-                <div class="kpi-label">{rk}</div>
-                <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{cnt[rk]}</div>
-                <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+        _bg_map_rank = {
+            "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
+            "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
+        }
+        def _render_rank_cards(_df_for_cnt):
+            _c = {r: int((_df_for_cnt["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
+            _kc = st.columns(len(kpi_rks))
+            for _col, rk in zip(_kc, kpi_rks):
+                _col.markdown(f'''<div class="kpi-card" style="background:{_bg_map_rank.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
+                    <div class="kpi-label">{rk}</div>
+                    <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{_c[rk]}</div>
+                    <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+            return _c
+        # ① 全体サマリー（全商品横断・選択に関係なく常時表示。集計方法・色は変更禁止）
+        cnt = _render_rank_cards(dc_cpc)
         if cnt["判断保留"] > 0:
             st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
+        st.markdown("---")
+        # ② キャンペーンサマリー（ローカル・選択キャンペーンに依存。表示専用・操作/フィルタ禁止。
+        # 集計方法・色は①と同一の _render_rank_cards をそのまま再利用する。
+        # 対象データは選択キャンペーンで既にフィルタ済みの df_c をそのまま使用し、
+        # 独自のループ・再フィルタは行わない（グローバル①とローカル②③の意味を分離）。
+        st.markdown(f"#### 🏢 キャンペーンサマリー　【{cpc_camp}】　総KW数：{len(df_c)}件")
+        _render_rank_cards(df_c)
         st.markdown("---")
         disp_cols = [c for c in ["campaign_name","ad_group","keyword","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
         _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","keyword":"KWテキスト",
@@ -3240,15 +3250,19 @@ def page_cpc():
         if "変更幅" in _d.columns: _d["変更幅"] = _d["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
         if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
         if "推奨CPC" in _d.columns: _d["推奨CPC"] = _d["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-        # ③ KW一覧（表示専用・全KW表示・フィルタなし。ランクは参照列のみで
-        # フィルタ・操作・計算には一切使用しない。既存の df_c（_cpc_apply_display_order
-        # 適用済み）をそのまま用いるため、CPC調整画面の並び順をそのまま継承する。
-        st.markdown("#### 📋 KW一覧（判定結果）")
+        # ③ KW一覧（実行対象抽出。推奨調整額(cpc_delta)≠0のKWのみ表示、0件時は
+        # 空画面防止のため全KWにフォールバック。ランクは参照列のみでフィルタ・操作・
+        # 計算には一切使用しない。既存の df_c（_cpc_apply_display_order適用済み）を
+        # そのまま用いるため、CPC調整画面の並び順をそのまま継承する。
+        st.markdown("#### 📋 KW一覧（実行対象）")
         if df_c.empty:
             st.info("表示対象のキーワードがありません。")
         else:
-            _kwl_cols = [c for c in ["keyword", "avg_cpc", "cpc_delta", "cpc_rank"] if c in df_c.columns]
-            _kwl = df_c[_kwl_cols].rename(columns={
+            _kwl_target = df_c[df_c["cpc_delta"] != 0].copy() if "cpc_delta" in df_c.columns else df_c.iloc[0:0]
+            if _kwl_target.empty:
+                _kwl_target = df_c.copy()
+            _kwl_cols = [c for c in ["keyword", "avg_cpc", "cpc_delta", "cpc_rank"] if c in _kwl_target.columns]
+            _kwl = _kwl_target[_kwl_cols].rename(columns={
                 "keyword": "keyword", "avg_cpc": "CPC", "cpc_delta": "推奨調整額", "cpc_rank": "ランク",
             }).copy()
             if "CPC" in _kwl.columns:
