@@ -2997,25 +2997,22 @@ def _cpc_hier_lookup_trend(campaign_theme: str, keyword: str, anls_hist_fname: s
                 continue
             _period = _r.get("period")
             _saved_at = _r.get("saved_at", "")
-            _label = _saved_at
-            if _period:
-                try:
-                    _ps, _pe = str(_period).split(" - ")
-                    _psd = _anls_dt.datetime.strptime(_ps, "%Y/%m/%d").date()
-                    _ped = _anls_dt.datetime.strptime(_pe, "%Y/%m/%d").date()
-                    _label = f"{_psd.month}/{_psd.day}〜{_ped.month}/{_ped.day}"
-                except Exception:
-                    _label = _saved_at
             _after = _hd.get("after") or {}
             _roas_v = _after.get("ROAS")
+            _cpc_v = _after.get("avg_cpc")
+            _cvr_v = _after.get("CVR")
+            _clicks_v = _after.get("clicks")
+            _sales_v = _after.get("sales")
             _out.append({
                 "sort_key": _period or _saved_at,
-                "period_label": _label,
-                "judgement": _hd.get("judgement", "変化なし"),
                 "roas_str": f"{_roas_v:.2f}" if isinstance(_roas_v, (int, float)) else "―",
+                "avg_cpc_str": f"{_cpc_v:,.0f}" if isinstance(_cpc_v, (int, float)) else "―",
+                "cvr_str": f"{_cvr_v:.1f}%" if isinstance(_cvr_v, (int, float)) else "―",
+                "clicks_str": f"{int(_clicks_v):,}" if isinstance(_clicks_v, (int, float)) else "―",
+                "sales_str": f"{_sales_v:,.0f}" if isinstance(_sales_v, (int, float)) else "―",
             })
     _out.sort(key=lambda x: x["sort_key"])
-    return _out
+    return _out[-4:]
 
 
 def page_cpc():
@@ -3246,12 +3243,19 @@ def page_cpc():
                                 st.markdown(_detail_html, unsafe_allow_html=True)
                                 _trend = _cpc_hier_lookup_trend(r.get("campaign_theme", ""), _kw, "anls_cpc_kw.json")
                                 if _trend:
-                                    st.markdown("**📈 4週間推移（「分析」タブの保存データを参照）**")
-                                    _hdr = "| 指標 | " + " | ".join(t["period_label"] for t in _trend) + " |"
-                                    _sep = "|---" * (len(_trend) + 1) + "|"
-                                    _jr  = "| 判定 | " + " | ".join(t["judgement"] for t in _trend) + " |"
-                                    _rr  = "| ROAS | " + " | ".join(t["roas_str"] for t in _trend) + " |"
-                                    st.markdown("\n".join([_hdr, _sep, _jr, _rr]))
+                                    _wk_labels = [f"Week{_i+1}" for _i in range(len(_trend))]
+                                    st.markdown("**📈 4週間推移**")
+                                    st.markdown("　" + "　→　".join(_wk_labels))
+                                    st.markdown("ROAS")
+                                    st.markdown("　" + "　→　".join(t["roas_str"] for t in _trend))
+                                    st.markdown("平均CPC")
+                                    st.markdown("　" + "　→　".join(t["avg_cpc_str"] for t in _trend))
+                                    st.markdown("CVR")
+                                    st.markdown("　" + "　→　".join(t["cvr_str"] for t in _trend))
+                                    st.markdown("クリック数")
+                                    st.markdown("　" + "　→　".join(t["clicks_str"] for t in _trend))
+                                    st.markdown("売上")
+                                    st.markdown("　" + "　→　".join(t["sales_str"] for t in _trend))
                                 else:
                                     st.caption("4週間推移: 履歴なし（「分析」タブで比較CSVを実行すると蓄積されます）")
         _c1, _c2 = st.columns(2)
