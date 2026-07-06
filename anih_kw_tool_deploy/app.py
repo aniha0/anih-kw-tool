@@ -3250,27 +3250,46 @@ def page_cpc():
         if "変更幅" in _d.columns: _d["変更幅"] = _d["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
         if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
         if "推奨CPC" in _d.columns: _d["推奨CPC"] = _d["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-        # ③ KW一覧（実行対象抽出。推奨調整額(cpc_delta)≠0のKWのみ表示、0件時は
-        # 空画面防止のため全KWにフォールバック。ランクは参照列のみでフィルタ・操作・
-        # 計算には一切使用しない。既存の df_c（_cpc_apply_display_order適用済み）を
-        # そのまま用いるため、CPC調整画面の並び順をそのまま継承する。
+        # ③ KW一覧（実行対象抽出のみ）。表示条件は以下2つを厳密AND評価する：
+        # ①cpc_delta が数値としてnon-zero（NaN/文字列は数値0として扱い除外）
+        # ②cpc_rank が判定保留・未確定・空ではない（確定済み状態のみ許可）
+        # 文字列比較は行わず、フィルタは描画前に完結させる（描画後の除外は行わない）。
+        # フィルタ結果が0件の場合も、ノイズ(±0・判定保留)を再度含める形での
+        # 「完全開示」は行わない（安全な部分開示。対象なしの場合はその旨を表示する）。
         st.markdown("#### 📋 KW一覧（実行対象）")
         if df_c.empty:
             st.info("表示対象のキーワードがありません。")
         else:
-            _kwl_target = df_c[df_c["cpc_delta"] != 0].copy() if "cpc_delta" in df_c.columns else df_c.iloc[0:0]
+            if "cpc_delta" in df_c.columns:
+                _cd_num = pd.to_numeric(df_c["cpc_delta"], errors="coerce").fillna(0.0)
+            else:
+                _cd_num = pd.Series(0.0, index=df_c.index)
+            _pending_vals = {"", "none", "nan", "n/a", "na", "pending", "保留", "判断保留"}
+            def _cpc_is_pending(_v):
+                if pd.isna(_v):
+                    return True
+                return str(_v).strip().lower() in _pending_vals
+            if "cpc_rank" in df_c.columns:
+                _rank_pending = df_c["cpc_rank"].apply(_cpc_is_pending)
+            else:
+                _rank_pending = pd.Series(False, index=df_c.index)
+            _valid_mask = (_cd_num != 0) & (~_rank_pending)
+            _kwl_target = df_c[_valid_mask].copy()
             if _kwl_target.empty:
-                _kwl_target = df_c.copy()
-            _kwl_cols = [c for c in ["keyword", "avg_cpc", "cpc_delta", "cpc_rank"] if c in _kwl_target.columns]
-            _kwl = _kwl_target[_kwl_cols].rename(columns={
-                "keyword": "keyword", "avg_cpc": "CPC", "cpc_delta": "推奨調整額", "cpc_rank": "ランク",
-            }).copy()
-            if "CPC" in _kwl.columns:
-                _kwl["CPC"] = _kwl["CPC"].apply(lambda x: f"{x:,.0f}円" if x else "—")
-            if "推奨調整額" in _kwl.columns:
-                _kwl["推奨調整額"] = _kwl["推奨調整額"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
-            _kwl.index = range(1, len(_kwl) + 1)
-            st.dataframe(_kwl, use_container_width=True, height=460)
+                st.info("調整対象のキーワードはありません（すべて変更不要または判定保留）。")
+            else:
+                _kwl_cols = [c for c in ["keyword", "avg_cpc", "cpc_delta", "cpc_rank"] if c in _kwl_target.columns]
+                _kwl = _kwl_target[_kwl_cols].rename(columns={
+                    "keyword": "keyword", "avg_cpc": "CPC", "cpc_delta": "推奨調整額", "cpc_rank": "ランク",
+                }).copy()
+                if "CPC" in _kwl.columns:
+                    _kwl["CPC"] = _kwl["CPC"].apply(lambda x: f"{x:,.0f}円" if x else "—")
+                if "推奨調整額" in _kwl.columns:
+                    _kwl["推奨調整額"] = pd.to_numeric(_kwl["推奨調整額"], errors="coerce").fillna(0.0).apply(
+                        lambda x: f"+{int(x)}円" if x > 0 else f"{int(x)}円" if x < 0 else "±0円"
+                    )
+                _kwl.index = range(1, len(_kwl) + 1)
+                st.dataframe(_kwl, use_container_width=True, height=460)
         st.markdown("---")
         _c1, _c2 = st.columns(2)
         with _c1:
