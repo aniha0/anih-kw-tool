@@ -2527,6 +2527,21 @@ def _anls_render_multi_period_table(_rows: list) -> None:
     if not _rows:
         st.info("比較対象のキーワードがありません。")
         return
+
+    # ① フォーマッタ関数をループ外(関数内トップレベル)へ移動。
+    # 再定義防止・実行コスト削減が目的で、書式ロジック自体は無変更。
+    def _fmt_roas(v):
+        return f"{v:.2f}" if isinstance(v, (int, float)) else "データなし"
+
+    def _fmt_avg_cpc(v):
+        return f"{v:,.0f}円" if isinstance(v, (int, float)) else "データなし"
+
+    def _fmt_clicks(v):
+        return f"{int(v):,}" if isinstance(v, (int, float)) else "データなし"
+
+    def _fmt_sales(v):
+        return f"{v/10000:.1f}万" if isinstance(v, (int, float)) else "データなし"
+
     st.markdown("#### 📊 複数期間比較表")
     st.caption("最新CSVのキーワードを基準に表示しています。過去CSVに存在しない場合は「データなし」と表示されます。")
     # 表示4項目(ROAS/平均CPC/クリック数/売上)をWeek1〜N横並びで表示する。CVRは
@@ -2536,25 +2551,21 @@ def _anls_render_multi_period_table(_rows: list) -> None:
     for _row in _rows:
         st.markdown(f"**{_row['campaign_name']}｜{_row['keyword']}**")
         _cells = _row["cells"]
+        if not _cells:
+            st.info("表示できる期間データがありません。")
+            continue
         _wk_labels = [f"Week{_i+1}" for _i in range(len(_cells))]
-
-        def _fmt_roas(v):
-            return f"{v:.2f}" if isinstance(v, (int, float)) else "データなし"
-
-        def _fmt_avg_cpc(v):
-            return f"{v:,.0f}円" if isinstance(v, (int, float)) else "データなし"
-
-        def _fmt_clicks(v):
-            return f"{int(v):,}" if isinstance(v, (int, float)) else "データなし"
-
-        def _fmt_sales(v):
-            return f"{v/10000:.1f}万" if isinstance(v, (int, float)) else "データなし"
-
-        st.markdown("　".join(_wk_labels))
-        st.markdown("ROAS　" + "　→　".join(_fmt_roas(c["roas"]) for c in _cells))
-        st.markdown("平均CPC　" + "　→　".join(_fmt_avg_cpc(c["avg_cpc"]) for c in _cells))
-        st.markdown("クリック数　" + "　→　".join(_fmt_clicks(c["clicks"]) for c in _cells))
-        st.markdown("売上　" + "　→　".join(_fmt_sales(c["sales"]) for c in _cells))
+        _wk_cols = [f"Week{_i+1}" for _i in range(len(_cells))]
+        _table_df = pd.DataFrame(
+            [
+                ["ROAS"]    + [_fmt_roas(c["roas"]) for c in _cells],
+                ["平均CPC"]  + [_fmt_avg_cpc(c["avg_cpc"]) for c in _cells],
+                ["クリック数"] + [_fmt_clicks(c["clicks"]) for c in _cells],
+                ["売上"]    + [_fmt_sales(c["sales"]) for c in _cells],
+            ],
+            columns=["指標"] + _wk_cols,
+        )
+        st.table(_table_df)
         st.markdown("---")
 
 
