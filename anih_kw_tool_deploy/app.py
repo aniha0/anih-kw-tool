@@ -279,9 +279,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-st.write("APP VERSION CHECK")
-st.write(__file__)
-
 st.markdown("""<style>
 /* ── サイドバー ── */
 [data-testid="stSidebar"] {
@@ -2467,7 +2464,6 @@ def _anls_build_multi_period_table(_results: list, id_col: str, mode: str) -> li
                     "judgement": _row.get("_判定", "変化なし"),
                     "roas": _row.get("ROAS_a"),
                     "avg_cpc": _row.get("avg_cpc_a"),
-                    "cvr": _row.get("CVR_a"),
                     "clicks": _row.get("clicks_a"),
                     "sales": _row.get("sales_a"),
                 }
@@ -2512,7 +2508,7 @@ def _anls_build_multi_period_table(_results: list, id_col: str, mode: str) -> li
             if _v is None:
                 _cells.append({
                     "period_label": _label, "judgement": None, "roas": None,
-                    "avg_cpc": None, "cvr": None, "clicks": None, "sales": None,
+                    "avg_cpc": None, "clicks": None, "sales": None,
                 })
             else:
                 _cells.append({
@@ -2520,7 +2516,6 @@ def _anls_build_multi_period_table(_results: list, id_col: str, mode: str) -> li
                     "judgement": _v.get("judgement", "変化なし"),
                     "roas": _v.get("roas"),
                     "avg_cpc": _v.get("avg_cpc"),
-                    "cvr": _v.get("cvr"),
                     "clicks": _v.get("clicks"),
                     "sales": _v.get("sales"),
                 })
@@ -2529,13 +2524,13 @@ def _anls_build_multi_period_table(_results: list, id_col: str, mode: str) -> li
 
 
 def _anls_render_multi_period_table(_rows: list) -> None:
-    st.write("DEBUG: _anls_render_multi_period_table")
     if not _rows:
         st.info("比較対象のキーワードがありません。")
         return
     st.markdown("#### 📊 複数期間比較表")
     st.caption("最新CSVのキーワードを基準に表示しています。過去CSVに存在しない場合は「データなし」と表示されます。")
-    # 表示5項目(ROAS/平均CPC/CVR/クリック数/売上)をWeek1〜N横並びで表示する。
+    # 表示4項目(ROAS/平均CPC/クリック数/売上)をWeek1〜N横並びで表示する。CVRは
+    # 今回の4週間推移表示からは取得・表示ともに行わない(他画面のCVR処理は無変更)。
     # 判定・改善悪化アイコン等の新しい評価表示は行わない。値はcellsのmerged由来
     # データをそのまま文字列整形するだけで、再計算・再集計は行わない。
     for _row in _rows:
@@ -2549,9 +2544,6 @@ def _anls_render_multi_period_table(_rows: list) -> None:
         def _fmt_avg_cpc(v):
             return f"{v:,.0f}円" if isinstance(v, (int, float)) else "データなし"
 
-        def _fmt_cvr(v):
-            return f"{v:.1f}%" if isinstance(v, (int, float)) else "データなし"
-
         def _fmt_clicks(v):
             return f"{int(v):,}" if isinstance(v, (int, float)) else "データなし"
 
@@ -2561,7 +2553,6 @@ def _anls_render_multi_period_table(_rows: list) -> None:
         st.markdown("　".join(_wk_labels))
         st.markdown("ROAS　" + "　→　".join(_fmt_roas(c["roas"]) for c in _cells))
         st.markdown("平均CPC　" + "　→　".join(_fmt_avg_cpc(c["avg_cpc"]) for c in _cells))
-        st.markdown("CVR　" + "　→　".join(_fmt_cvr(c["cvr"]) for c in _cells))
         st.markdown("クリック数　" + "　→　".join(_fmt_clicks(c["clicks"]) for c in _cells))
         st.markdown("売上　" + "　→　".join(_fmt_sales(c["sales"]) for c in _cells))
         st.markdown("---")
