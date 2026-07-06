@@ -2460,9 +2460,16 @@ def _anls_build_multi_period_table(_results: list, id_col: str, mode: str) -> li
         if all(c in _merged.columns for c in ("campaign_name", id_col, "_判定")):
             for _, _row in _merged.iterrows():
                 _key = (_row.get("campaign_name", ""), str(_row.get(id_col, "")))
+                # 表示5項目(ROAS/平均CPC/CVR/クリック数/売上)はmergedの既存列
+                # (ROAS_a/avg_cpc_a/CVR_a/clicks_a/sales_a)から.get()で読むだけ。
+                # 新しい計算・再集計は行わない。
                 _by_key[_key] = {
                     "judgement": _row.get("_判定", "変化なし"),
                     "roas": _row.get("ROAS_a"),
+                    "avg_cpc": _row.get("avg_cpc_a"),
+                    "cvr": _row.get("CVR_a"),
+                    "clicks": _row.get("clicks_a"),
+                    "sales": _row.get("sales_a"),
                 }
         _label = _res.get("period") or "（期間不明）"
         _per_file.append((_label, _by_key))
@@ -2472,46 +2479,91 @@ def _anls_build_multi_period_table(_results: list, id_col: str, mode: str) -> li
 
     # ③：比較表の行（軸）は最新CSV（_per_fileの末尾）のキー一覧のみを採用
     _latest_label, _latest_by_key = _per_file[-1]
+
+    # ── 表示順の一元化（新しい並べ替え条件は追加しない） ──────────────
+    # CPC調整画面（page_cpc）が最終的に決定した表示順を _cpc_apply_display_order
+    # 経由でそのまま呼び出して使うだけで、分析画面独自のsort_valuesは行わない。
+    # 対応するCPC調整画面が存在しないモード（kw_add/asin_add等）や、cpc_rank列が
+    # 存在しない場合は、従来どおり_latest_by_keyの挿入順（変更なし）を用いる。
+    _key_order = list(_latest_by_key.keys())
+    if mode == "cpc_kw" and "cpc_rank" in dc_cpc.columns:
+        _ordered_df = _cpc_apply_display_order(dc_cpc, _RANK_ORDER)
+        _priority = [
+            (str(_c), str(_k))
+            for _c, _k in zip(_ordered_df.get("campaign_name", []), _ordered_df.get(id_col, []))
+        ]
+        _seen = set()
+        _new_order = []
+        for _k in _priority:
+            if _k in _latest_by_key and _k not in _seen:
+                _new_order.append(_k)
+                _seen.add(_k)
+        for _k in _key_order:
+            if _k not in _seen:
+                _new_order.append(_k)
+                _seen.add(_k)
+        _key_order = _new_order
+
     _rows = []
-    for (_cname, _kw) in _latest_by_key.keys():
+    for (_cname, _kw) in _key_order:
         _cells = []
         for _label, _by_key in _per_file:
             _v = _by_key.get((_cname, _kw))
             if _v is None:
-                _cells.append({"period_label": _label, "judgement": None, "roas": None})
+                _cells.append({
+                    "period_label": _label, "judgement": None, "roas": None,
+                    "avg_cpc": None, "cvr": None, "clicks": None, "sales": None,
+                })
             else:
                 _cells.append({
                     "period_label": _label,
                     "judgement": _v.get("judgement", "変化なし"),
                     "roas": _v.get("roas"),
+                    "avg_cpc": _v.get("avg_cpc"),
+                    "cvr": _v.get("cvr"),
+                    "clicks": _v.get("clicks"),
+                    "sales": _v.get("sales"),
                 })
         _rows.append({"campaign_name": _cname, "keyword": _kw, "cells": _cells})
     return _rows
 
 
 def _anls_render_multi_period_table(_rows: list) -> None:
+    st.write("DEBUG: _anls_render_multi_period_table")
     if not _rows:
         st.info("比較対象のキーワードがありません。")
         return
     st.markdown("#### 📊 複数期間比較表")
     st.caption("最新CSVのキーワードを基準に表示しています。過去CSVに存在しない場合は「データなし」と表示されます。")
-    _icon_map = {"改善": "🟢", "悪化": "🔴", "変化なし": "🟡"}
+    # 表示5項目(ROAS/平均CPC/CVR/クリック数/売上)をWeek1〜N横並びで表示する。
+    # 判定・改善悪化アイコン等の新しい評価表示は行わない。値はcellsのmerged由来
+    # データをそのまま文字列整形するだけで、再計算・再集計は行わない。
     for _row in _rows:
         st.markdown(f"**{_row['campaign_name']}｜{_row['keyword']}**")
-        _labels = [c["period_label"] for c in _row["cells"]]
-        _j_cells = [
-            (_icon_map.get(c["judgement"], "") + c["judgement"]) if c["judgement"] else "データなし"
-            for c in _row["cells"]
-        ]
-        _r_cells = [
-            f"{c['roas']:.2f}" if isinstance(c["roas"], (int, float)) else "データなし"
-            for c in _row["cells"]
-        ]
-        _hdr = "| 指標 | " + " | ".join(_labels) + " |"
-        _sep = "|---" * (len(_labels) + 1) + "|"
-        _jr  = "| 判定 | " + " | ".join(_j_cells) + " |"
-        _rr  = "| ROAS | " + " | ".join(_r_cells) + " |"
-        st.markdown("\n".join([_hdr, _sep, _jr, _rr]))
+        _cells = _row["cells"]
+        _wk_labels = [f"Week{_i+1}" for _i in range(len(_cells))]
+
+        def _fmt_roas(v):
+            return f"{v:.2f}" if isinstance(v, (int, float)) else "データなし"
+
+        def _fmt_avg_cpc(v):
+            return f"{v:,.0f}円" if isinstance(v, (int, float)) else "データなし"
+
+        def _fmt_cvr(v):
+            return f"{v:.1f}%" if isinstance(v, (int, float)) else "データなし"
+
+        def _fmt_clicks(v):
+            return f"{int(v):,}" if isinstance(v, (int, float)) else "データなし"
+
+        def _fmt_sales(v):
+            return f"{v/10000:.1f}万" if isinstance(v, (int, float)) else "データなし"
+
+        st.markdown("　".join(_wk_labels))
+        st.markdown("ROAS　" + "　→　".join(_fmt_roas(c["roas"]) for c in _cells))
+        st.markdown("平均CPC　" + "　→　".join(_fmt_avg_cpc(c["avg_cpc"]) for c in _cells))
+        st.markdown("CVR　" + "　→　".join(_fmt_cvr(c["cvr"]) for c in _cells))
+        st.markdown("クリック数　" + "　→　".join(_fmt_clicks(c["clicks"]) for c in _cells))
+        st.markdown("売上　" + "　→　".join(_fmt_sales(c["sales"]) for c in _cells))
         st.markdown("---")
 
 
@@ -3018,10 +3070,23 @@ def _cpc_hier_lookup_trend(campaign_theme: str, keyword: str, anls_hist_fname: s
     return _out[-4:]
 
 
+# ── CPC調整の表示順ロジックを一元化するための共通定数・共通関数 ──────────
+# 【重要】以下はpage_cpc内に元々あった _RANK_ORDER と、tab1内にあった並べ替え
+# 処理（cat_t → df_c["_r"] → sort_values → drop → reset_index）を、値・条件を
+# 一切変更せずそのまま移しただけの共通化。新しい並べ替え基準は追加していない。
+_RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
+
+def _cpc_apply_display_order(df_c: pd.DataFrame, rank_order: list) -> pd.DataFrame:
+    cat_t = pd.CategoricalDtype(categories=rank_order, ordered=True)
+    df_c = df_c.copy()
+    df_c["_r"] = df_c["cpc_rank"].astype(cat_t)
+    df_c = df_c.sort_values(["_r", "ROAS"], ascending=[True, False]).drop(columns=["_r"]).reset_index(drop=True)
+    return df_c
+
+
 def page_cpc():
     _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
     with _t_tab1:
-        _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
         _RC = {
             "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
             "A":   "#2C7A7B", "B": "#2B6CB0", "C": "#C05621",
@@ -3179,9 +3244,7 @@ def page_cpc():
                "cost":"広告費","sales":"売上","orders":"購入数",
                "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
                "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
-        cat_t = pd.CategoricalDtype(categories=_RANK_ORDER, ordered=True)
-        df_c["_r"] = df_c["cpc_rank"].astype(cat_t)
-        df_c = df_c.sort_values(["_r","ROAS"], ascending=[True, False]).drop(columns=["_r"]).reset_index(drop=True)
+        df_c = _cpc_apply_display_order(df_c, _RANK_ORDER)
         df_c.index = df_c.index + 1
         df_disp = df_c[df_c["cpc_delta"] != 0].copy()
         df_disp.index = range(1, len(df_disp) + 1)
