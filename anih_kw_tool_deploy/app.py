@@ -3086,8 +3086,83 @@ def _cpc_apply_display_order(df_c: pd.DataFrame, rank_order: list) -> pd.DataFra
     return df_c
 
 
+def _render_cpc_operation_view():
+    """CPC調整ページの「操作ビュー」（事実ベースUI）。
+    ①キャンペーン選択 ②ランクサマリー（表示のみ・カード） ③KW操作テーブル
+    (keyword/CPC/操作ボタン/ランク列) の3要素で構成する。ランクサマリーとKW行内の
+    「ランク」列は、いずれも既存の cpc_rank をそのまま参照表示するのみで、判定ロジック・
+    集計方法・色・再計算は一切変更しない（tab1(CPC調整)/_render_pt_cpc_page と同一定義）。
+    表示対象は既存の推奨値(cpc_delta)≠0のKWのみ。該当0件のキャンペーン（初回未操作
+    キャンペーン）は空画面防止のため例外的に全KWを表示する。
+    状態分類（🟢⚪🟠🔴）・調整金額(Δ)表示は行わない。
+    CPC列は基準値(avg_cpc)を固定表示するのみで、操作ボタンによる変更は内部状態
+    （st.session_state）としてのみ保持し、基データ・ランク・推奨値は変更しない。
+    """
+    _RC = {
+        "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
+        "A":   "#2C7A7B", "B": "#2B6CB0", "C": "#C05621",
+        "D":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
+    }
+    st.session_state.setdefault("cpc_op_delta", {})
+    if dc_cpc.empty:
+        st.info("分析を実行してください。")
+        return
+    _op_camps = [c for c in CAMPAIGNS if not dc_cpc[dc_cpc["campaign_theme"] == c].empty]
+    if not _op_camps:
+        st.info("表示対象のキャンペーンがありません。")
+        return
+    # ① キャンペーン選択
+    _op_camp = st.selectbox("キャンペーン選択", _op_camps, key="cpc_op_camp_sel")
+    _op_df = dc_cpc[dc_cpc["campaign_theme"] == _op_camp].copy()
+    # ② ランクサマリー（表示のみ・既存の集計方法をそのまま参照。変更禁止）
+    _cnt = {r: int((_op_df["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
+    _kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
+    _bg_map = {
+        "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
+        "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
+    }
+    st.markdown("---")
+    _kc = st.columns(len(_kpi_rks))
+    for _col, rk in zip(_kc, _kpi_rks):
+        _col.markdown(f'''<div class="kpi-card" style="background:{_bg_map.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
+            <div class="kpi-label">{rk}</div>
+            <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{_cnt[rk]}</div>
+            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+    st.markdown("---")
+    # ③ KW操作テーブル（対象：既存推奨値 cpc_delta ≠ 0 のKWのみ。0件時は空画面防止のため全KW表示）
+    if "cpc_delta" in _op_df.columns:
+        _op_target = _op_df[_op_df["cpc_delta"] != 0].copy()
+    else:
+        _op_target = _op_df.iloc[0:0]
+    if _op_target.empty:
+        _op_target = _op_df.copy()
+    if _op_target.empty:
+        st.info("表示対象のキーワードがありません。")
+        return
+    _hc = st.columns([3, 1.5, 0.7, 0.7, 0.7, 0.7, 1])
+    for _h, _label in zip(_hc, ["keyword", "CPC", "+10", "+5", "-5", "-10", "ランク"]):
+        _h.markdown(f"**{_label}**")
+    for _ri, r in _op_target.iterrows():
+        _kw = str(r.get("keyword", ""))
+        _cur_cpc = r.get("avg_cpc", 0) or 0
+        _dk = f"{_op_camp}||{_kw}"
+        _delta = st.session_state["cpc_op_delta"].get(_dk, 0)
+        _rc = st.columns([3, 1.5, 0.7, 0.7, 0.7, 0.7, 1])
+        _rc[0].markdown(_kw)
+        _rc[1].markdown(f"{_cur_cpc:,.0f}円")
+        if _rc[2].button("+10", key=f"cpc_op_p10_{_dk}", use_container_width=True):
+            st.session_state["cpc_op_delta"][_dk] = _delta + 10
+        if _rc[3].button("+5", key=f"cpc_op_p5_{_dk}", use_container_width=True):
+            st.session_state["cpc_op_delta"][_dk] = _delta + 5
+        if _rc[4].button("-5", key=f"cpc_op_m5_{_dk}", use_container_width=True):
+            st.session_state["cpc_op_delta"][_dk] = _delta - 5
+        if _rc[5].button("-10", key=f"cpc_op_m10_{_dk}", use_container_width=True):
+            st.session_state["cpc_op_delta"][_dk] = _delta - 10
+        _rc[6].markdown(str(r.get("cpc_rank", "")))
+
+
 def page_cpc():
-    _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
+    _t_tab1, _t_tab2, _t_tab3 = st.tabs(["CPC調整", "分析", "🔧 操作ビュー"])
     with _t_tab1:
         _RC = {
             "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
@@ -3345,6 +3420,8 @@ def page_cpc():
                           "キーワードCPC分析（30日窓）", "cpc_kw", "keyword", "cpc_change_history.json")
         st.markdown("---")
         _anls_render_tab(dc_cpc, 7, "anls_cpc_kw.json", "anls_cpc_kw", "キーワードCPC分析", "cpc_kw", "keyword", "cpc_change_history.json")
+    with _t_tab3:
+        _render_cpc_operation_view()
 
 def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = ""):
     """商品ターゲ CPC調整ページ共通レンダラー（page_cpc()と同一ロジック・UI）"""
