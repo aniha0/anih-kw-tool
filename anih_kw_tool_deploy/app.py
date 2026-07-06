@@ -1177,10 +1177,17 @@ def page_add_kw():
             _dd["CVR"] = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
         st.dataframe(_dd, use_container_width=True)
     with _t2:
-        _anls_render_tab(
-            st.session_state.get("df_win", pd.DataFrame()),
-            7, "anls_kw_add.json", "anls_kw_add",
-            "KW追加分析", "kw_add", "keyword", "kw_add_history.json")
+        _anls_entry_point_kw_add(st.session_state.get("df_win", pd.DataFrame()))
+
+def _anls_entry_point_kw_add(df_win):
+    """page_add_kw の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
+    中身は元々あった _anls_render_tab 呼び出し（引数そのまま）を移設しただけで、
+    ロジック自体・引数は一切変更していない（page_cpcの_anls_entry_pointと同一パターン）。
+    """
+    _anls_render_tab(
+        df_win,
+        7, "anls_kw_add.json", "anls_kw_add",
+        "KW追加分析", "kw_add", "keyword", "kw_add_history.json")
 
 def page_del_kw():
     _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "< 0.8"), ("勝ちKW", "除外")])
@@ -3302,16 +3309,25 @@ def page_cpc():
             st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
                 file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
     with _t_tab2:
-        st.markdown("#### ⏱️ 期間別クイック分析")
-        st.markdown("**📅 7日分析**")
-        _anls_render_tab(dc_cpc, 7, "anls_cpc_kw_top7.json", "anls_cpc_kw_top7",
-                          "キーワードCPC分析（7日窓）", "cpc_kw", "keyword", "cpc_change_history.json")
-        st.markdown("---")
-        st.markdown("**📅 30日分析**")
-        _anls_render_tab(dc_cpc, 30, "anls_cpc_kw_top30.json", "anls_cpc_kw_top30",
-                          "キーワードCPC分析（30日窓）", "cpc_kw", "keyword", "cpc_change_history.json")
-        st.markdown("---")
-        _anls_render_tab(dc_cpc, 7, "anls_cpc_kw.json", "anls_cpc_kw", "キーワードCPC分析", "cpc_kw", "keyword", "cpc_change_history.json")
+        _anls_entry_point(dc_cpc)
+
+def _anls_entry_point(dc_cpc):
+    """page_cpc の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
+    中身は page_cpc の tab2 に元々あった _anls_render_tab 呼び出し3件（引数・順序・
+    間の st.markdown 見出し/区切り線を含め）をそのまま移設したのみで、ロジック自体・
+    呼び出し先の共通関数（_anls_render_tab等）の挙動は一切変更していない。
+    将来的に他ページ（page_cpc_product等）にも同型で流用可能な構造とするための分離。
+    """
+    st.markdown("#### ⏱️ 期間別クイック分析")
+    st.markdown("**📅 7日分析**")
+    _anls_render_tab(dc_cpc, 7, "anls_cpc_kw_top7.json", "anls_cpc_kw_top7",
+                      "キーワードCPC分析（7日窓）", "cpc_kw", "keyword", "cpc_change_history.json")
+    st.markdown("---")
+    st.markdown("**📅 30日分析**")
+    _anls_render_tab(dc_cpc, 30, "anls_cpc_kw_top30.json", "anls_cpc_kw_top30",
+                      "キーワードCPC分析（30日窓）", "cpc_kw", "keyword", "cpc_change_history.json")
+    st.markdown("---")
+    _anls_render_tab(dc_cpc, 7, "anls_cpc_kw.json", "anls_cpc_kw", "キーワードCPC分析", "cpc_kw", "keyword", "cpc_change_history.json")
 
 def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = ""):
     """商品ターゲ CPC調整ページ共通レンダラー（page_cpc()と同一ロジック・UI）"""
@@ -3515,46 +3531,60 @@ def page_cpc_product():
     with _t1:
         _render_pt_cpc_page(dc_cpc_product, "商品CPC調整", "cpc_product_sel", "cpc_pt_m_history.json")
     with _t2:
-        st.markdown("#### ⏱️ 期間別クイック分析")
-        st.markdown("**📅 7日分析**")
-        _anls_render_tab(
-            st.session_state.get("df_cpc_product", pd.DataFrame()),
-            7, "anls_cpc_pt_m_top7.json", "anls_cpc_pt_m_top7",
-            "商品CPC分析（7日窓）", "cpc_asin", "asin", "cpc_pt_m_history.json")
-        st.markdown("---")
-        st.markdown("**📅 30日分析**")
-        _anls_render_tab(
-            st.session_state.get("df_cpc_product", pd.DataFrame()),
-            30, "anls_cpc_pt_m_top30.json", "anls_cpc_pt_m_top30",
-            "商品CPC分析（30日窓）", "cpc_asin", "asin", "cpc_pt_m_history.json")
-        st.markdown("---")
-        _anls_render_tab(
-            st.session_state.get("df_cpc_product", pd.DataFrame()),
-            7, "anls_cpc_pt_m.json", "anls_cpc_pt_m",
-            "商品CPC分析", "cpc_asin", "asin", "cpc_pt_m_history.json")
+        _anls_entry_point_cpc_product(st.session_state.get("df_cpc_product", pd.DataFrame()))
+
+def _anls_entry_point_cpc_product(df_cpc_product):
+    """page_cpc_product の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
+    中身は元々あった _anls_render_tab 呼び出し3件（引数・順序・見出しを含め）をそのまま
+    移設しただけで、ロジック自体は一切変更していない（page_cpc/page_add_kwと同一パターン）。
+    """
+    st.markdown("#### ⏱️ 期間別クイック分析")
+    st.markdown("**📅 7日分析**")
+    _anls_render_tab(
+        df_cpc_product,
+        7, "anls_cpc_pt_m_top7.json", "anls_cpc_pt_m_top7",
+        "商品CPC分析（7日窓）", "cpc_asin", "asin", "cpc_pt_m_history.json")
+    st.markdown("---")
+    st.markdown("**📅 30日分析**")
+    _anls_render_tab(
+        df_cpc_product,
+        30, "anls_cpc_pt_m_top30.json", "anls_cpc_pt_m_top30",
+        "商品CPC分析（30日窓）", "cpc_asin", "asin", "cpc_pt_m_history.json")
+    st.markdown("---")
+    _anls_render_tab(
+        df_cpc_product,
+        7, "anls_cpc_pt_m.json", "anls_cpc_pt_m",
+        "商品CPC分析", "cpc_asin", "asin", "cpc_pt_m_history.json")
 
 def page_cpc_video():
     _t1, _t2 = st.tabs(["CPC調整", "分析"])
     with _t1:
         _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel", "cpc_pt_v_history.json")
     with _t2:
-        st.markdown("#### ⏱️ 期間別クイック分析")
-        st.markdown("**📅 7日分析**")
-        _anls_render_tab(
-            st.session_state.get("df_cpc_video", pd.DataFrame()),
-            7, "anls_cpc_pt_v_top7.json", "anls_cpc_pt_v_top7",
-            "動画CPC分析（7日窓）", "cpc_asin", "asin", "cpc_pt_v_history.json")
-        st.markdown("---")
-        st.markdown("**📅 30日分析**")
-        _anls_render_tab(
-            st.session_state.get("df_cpc_video", pd.DataFrame()),
-            30, "anls_cpc_pt_v_top30.json", "anls_cpc_pt_v_top30",
-            "動画CPC分析（30日窓）", "cpc_asin", "asin", "cpc_pt_v_history.json")
-        st.markdown("---")
-        _anls_render_tab(
-            st.session_state.get("df_cpc_video", pd.DataFrame()),
-            7, "anls_cpc_pt_v.json", "anls_cpc_pt_v",
-            "動画CPC分析", "cpc_asin", "asin", "cpc_pt_v_history.json")
+        _anls_entry_point_cpc_video(st.session_state.get("df_cpc_video", pd.DataFrame()))
+
+def _anls_entry_point_cpc_video(df_cpc_video):
+    """page_cpc_video の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
+    中身は元々あった _anls_render_tab 呼び出し3件（引数・順序・見出しを含め）をそのまま
+    移設しただけで、ロジック自体は一切変更していない（他ページと同一パターン）。
+    """
+    st.markdown("#### ⏱️ 期間別クイック分析")
+    st.markdown("**📅 7日分析**")
+    _anls_render_tab(
+        df_cpc_video,
+        7, "anls_cpc_pt_v_top7.json", "anls_cpc_pt_v_top7",
+        "動画CPC分析（7日窓）", "cpc_asin", "asin", "cpc_pt_v_history.json")
+    st.markdown("---")
+    st.markdown("**📅 30日分析**")
+    _anls_render_tab(
+        df_cpc_video,
+        30, "anls_cpc_pt_v_top30.json", "anls_cpc_pt_v_top30",
+        "動画CPC分析（30日窓）", "cpc_asin", "asin", "cpc_pt_v_history.json")
+    st.markdown("---")
+    _anls_render_tab(
+        df_cpc_video,
+        7, "anls_cpc_pt_v.json", "anls_cpc_pt_v",
+        "動画CPC分析", "cpc_asin", "asin", "cpc_pt_v_history.json")
 
 
 # ===================================================
@@ -4279,10 +4309,17 @@ def page_pt_add_manual():
     with _t1:
         _render_pt_page("df_pt_add_m", True,  "商品", "pt_add_m_sel", "product_add_history.json")
     with _t2:
-        _anls_render_tab(
-            st.session_state.get("df_pt_add_m", pd.DataFrame()),
-            7, "anls_pt_add_m.json", "anls_pt_add_m",
-            "商品追加分析", "asin_add", "asin", "product_add_history.json")
+        _anls_entry_point_pt_add_manual(st.session_state.get("df_pt_add_m", pd.DataFrame()))
+
+def _anls_entry_point_pt_add_manual(df_pt_add_m):
+    """page_pt_add_manual の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
+    中身は元々あった _anls_render_tab 呼び出し（引数そのまま）を移設しただけで、
+    ロジック自体は一切変更していない（他ページと同一パターン）。
+    """
+    _anls_render_tab(
+        df_pt_add_m,
+        7, "anls_pt_add_m.json", "anls_pt_add_m",
+        "商品追加分析", "asin_add", "asin", "product_add_history.json")
 
 def page_pt_del_manual():
     _render_pt_page("df_pt_del_m", False, "商品", "pt_del_m_sel")
@@ -4292,10 +4329,17 @@ def page_pt_add_video():
     with _t1:
         _render_pt_page("df_pt_add_v", True,  "動画", "pt_add_v_sel", "video_add_history.json")
     with _t2:
-        _anls_render_tab(
-            st.session_state.get("df_pt_add_v", pd.DataFrame()),
-            7, "anls_pt_add_v.json", "anls_pt_add_v",
-            "動画追加分析", "asin_add", "asin", "video_add_history.json")
+        _anls_entry_point_pt_add_video(st.session_state.get("df_pt_add_v", pd.DataFrame()))
+
+def _anls_entry_point_pt_add_video(df_pt_add_v):
+    """page_pt_add_video の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
+    中身は元々あった _anls_render_tab 呼び出し（引数そのまま）を移設しただけで、
+    ロジック自体は一切変更していない（他ページと同一パターン）。
+    """
+    _anls_render_tab(
+        df_pt_add_v,
+        7, "anls_pt_add_v.json", "anls_pt_add_v",
+        "動画追加分析", "asin_add", "asin", "video_add_history.json")
 
 def page_pt_del_video():
     _render_pt_page("df_pt_del_v", False, "動画", "pt_del_v_sel")
