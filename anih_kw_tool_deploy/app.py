@@ -3764,7 +3764,10 @@ def page_cpc_product():
     with _t1:
         _render_pt_cpc_page(dc_cpc_product, "商品CPC調整", "cpc_product_sel", "cpc_pt_m_history.json")
     with _t2:
-        _anls_entry_point_cpc_product(st.session_state.get("df_cpc_product", pd.DataFrame()))
+        # ⏱️ 期間別クイック分析（旧・7日/30日分析、比較CSVバケット表示、分析実行ボタン等）は
+        # ユーザー指示により表示を廃止。_anls_entry_point_cpc_product自体は削除せず、
+        # 呼び出しのみ停止する（既存関数の削除禁止のため）。
+        pass
 
 def _anls_entry_point_cpc_product(df_cpc_product):
     """page_cpc_product の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
@@ -3794,7 +3797,10 @@ def page_cpc_video():
     with _t1:
         _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel", "cpc_pt_v_history.json")
     with _t2:
-        _anls_entry_point_cpc_video(st.session_state.get("df_cpc_video", pd.DataFrame()))
+        # ⏱️ 期間別クイック分析（旧・7日/30日分析、比較CSVバケット表示、分析実行ボタン等）は
+        # ユーザー指示により表示を廃止。_anls_entry_point_cpc_video自体は削除せず、
+        # 呼び出しのみ停止する（既存関数の削除禁止のため）。
+        pass
 
 def _anls_entry_point_cpc_video(df_cpc_video):
     """page_cpc_video の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
