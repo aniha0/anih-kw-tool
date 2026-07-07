@@ -3469,6 +3469,16 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     閉じる）を提供しないため、複数キーワードを同時に開くこと自体は技術的に
     可能。ここでは追加の状態管理を持ち込まず最小実装とした。"""
     st.markdown("#### 📋 KW一覧")
+
+    with st.expander("🔍 診断: cpc_change_history.json 実パス確認", expanded=True):
+        _hist_path = _get_analysis_dir() / anls_hist_fname
+        st.write(f"絶対パス: {_hist_path}")
+        st.write(f"存在するか: {_hist_path.exists()}")
+        if _hist_path.exists():
+            _stat = _hist_path.stat()
+            st.write(f"ファイルサイズ: {_stat.st_size} bytes")
+            st.write(f"最終更新日時: {_anls_dt.datetime.fromtimestamp(_stat.st_mtime)}")
+
     if _kwl_target is None or _kwl_target.empty:
         st.info("表示対象のキーワードがありません。")
         return
