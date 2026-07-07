@@ -3105,6 +3105,10 @@ def _cpc_apply_display_order(df_c: pd.DataFrame, rank_order: list) -> pd.DataFra
 
 def page_cpc():
     _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
+    # 【安全確保のためのみの初期化】tab1内で確定する_kwl_target(KW一覧の実行対象)を
+    # tab2側でも参照するための既定値。tab1のCPC調整ロジック・表示は一切変更しない。
+    # dc_cpcが空でtab1内でreturnする場合、tab2自体も実行されないため実害はない。
+    _kwl_target = pd.DataFrame()
     with _t_tab1:
         _RC = {
             "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
@@ -3314,12 +3318,59 @@ def page_cpc():
             st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
                 file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
     with _t_tab2:
-        # ── 分析タブ表示の一時停止（新規UI設計待ち） ──────────────────
-        # 【重要】ここは表示の呼び出しを止めているだけで、_anls_entry_point・
-        # _anls_render_tab等の分析ロジック本体は一切削除・変更していない。
-        # 分析ページの新UIは別途設計予定のため、今回はKW一覧（実行対象）より
-        # 下に何も表示しない状態にする。
-        pass
+        # ── 分析ページ（新規・表示専用） ──────────────────────────
+        # 【重要】tab1で既に確定済みの_kwl_target（KW一覧・実行対象。並び順・
+        # 件数・内容ともtab1と同一）をそのまま利用するだけで、分析ページ側で
+        # 新規のKW生成・判定・順位付けは一切行わない。_anls_entry_point・
+        # _anls_render_tab等の既存分析ロジック本体も無改変のまま保持している。
+        _anls_render_analysis_page(_kwl_target)
+
+
+def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str = "cpc_change_history.json") -> None:
+    """分析ページ（page_cpcのtab2）用の新規追加関数（表示専用）。
+    CPC調整ページ(tab1)のKW一覧（実行対象）で既に確定済みの_kwl_targetを
+    そのまま利用する。並び順・件数・内容はtab1と完全に同一で、分析ページ側
+    での独自ソート・独自フィルタ・新規KW生成は一切行わない。
+
+    各キーワードは st.expander(expanded=False) で折りたたみ表示し、開いた
+    場合のみ既存の _cpc_hier_lookup_trend()（無改変・既存の保存済み履歴
+    cpc_change_history.jsonを読むだけ）が返す直近4期間のトレンドを表示する。
+    表示項目はROAS/CPC/クリック/売上のみで、新しい判定・新しい集計は行わない。
+
+    【既知の制約】st.expanderはStreamlit標準機能では相互排他（1つ開くと他が
+    閉じる）を提供しないため、複数キーワードを同時に開くこと自体は技術的に
+    可能。ここでは追加の状態管理を持ち込まず最小実装とした。"""
+    st.markdown("#### 📋 KW一覧")
+    if _kwl_target is None or _kwl_target.empty:
+        st.info("表示対象のキーワードがありません。")
+        return
+    _labels = ["今週", "1週前", "2週前", "3週前"]
+    for _, _row in _kwl_target.iterrows():
+        _kw = _row.get("keyword", "")
+        _theme = _row.get("campaign_theme", "")
+        with st.expander(f"▶ {_kw}", expanded=False):
+            _trend = _cpc_hier_lookup_trend(_theme, _kw, anls_hist_fname)
+            if not _trend:
+                st.caption("分析履歴データがありません。")
+                continue
+            _recent_first = list(reversed(_trend))[:4]
+            _padded = _recent_first + [None] * (4 - len(_recent_first))
+            _tbl_df = pd.DataFrame(
+                [
+                    ["ROAS"]    + [(_t or {}).get("roas_str", "―") for _t in _padded],
+                    ["CPC"]     + [(_t or {}).get("avg_cpc_str", "―") for _t in _padded],
+                    ["クリック"] + [(_t or {}).get("clicks_str", "―") for _t in _padded],
+                    ["売上"]    + [(_t or {}).get("sales_str", "―") for _t in _padded],
+                ],
+                columns=["指標"] + _labels,
+            )
+            st.table(_tbl_df)
+            st.markdown("**分析履歴**")
+            for _h in _trend:
+                st.caption(
+                    f"・ROAS {_h.get('roas_str', '―')}｜CPC {_h.get('avg_cpc_str', '―')}｜"
+                    f"クリック {_h.get('clicks_str', '―')}｜売上 {_h.get('sales_str', '―')}"
+                )
 
 
 def _anls_entry_point(dc_cpc):
