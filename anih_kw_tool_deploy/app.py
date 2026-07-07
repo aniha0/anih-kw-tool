@@ -3314,7 +3314,12 @@ def page_cpc():
             st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
                 file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
     with _t_tab2:
-        _anls_entry_point(dc_cpc)
+        # ── 分析タブ表示の一時停止（新規UI設計待ち） ──────────────────
+        # 【重要】ここは表示の呼び出しを止めているだけで、_anls_entry_point・
+        # _anls_render_tab等の分析ロジック本体は一切削除・変更していない。
+        # 分析ページの新UIは別途設計予定のため、今回はKW一覧（実行対象）より
+        # 下に何も表示しない状態にする。
+        pass
 
 
 def _anls_entry_point(dc_cpc):
