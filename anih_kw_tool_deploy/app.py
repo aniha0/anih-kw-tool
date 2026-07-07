@@ -3102,6 +3102,131 @@ def _cpc_apply_display_order(df_c: pd.DataFrame, rank_order: list) -> pd.DataFra
     return df_c
 
 
+# ── 分析ページ「CPC調整ページの深掘り画面」用（新規・表示専用） ────────────────────────
+# 【重要】以下3関数は、既存の _cpc_apply_display_order（並び順の確定）と
+# 既存の _cpc_hier_lookup_trend（保存済み履歴からの4期間トレンド取得）を
+# そのまま呼び出して結果を読むだけの新規追加関数。新しい判定・新しい集計・
+# 新しいソート・新しい履歴取得ロジックは一切追加しない。
+#
+# 【標準アーキテクチャ】entry_point層(_anls_entry_point)は本関数
+# (_anls_render_analysis_page)だけを呼ぶ。分析UIを今後拡張する場合も、
+# entry_pointから新しい分析関数を直接呼ぶことはせず、必ず本関数の中へ
+# 追加すること。
+def _anls_build_hierarchy_rows(dc_cpc: pd.DataFrame, anls_hist_fname: str) -> list:
+    """_cpc_apply_display_order() が確定させた並び順を先頭から順番に読むだけの
+    新規追加関数。独自ソート・groupby・再集計・再判定は一切行わない。
+    各行について _cpc_hier_lookup_trend()（既存・無改変）を呼び、trendを
+    取得するだけ。表示対象ランクはSS+/SS/A/Dの4つのみ（フィルタのみ・
+    再判定ではない）。
+
+    【商品単位でまとめる】dc_cpcを全商品まとめて _cpc_apply_display_order に
+    渡すと、ソートキーがrank/ROASのみのため商品(campaign_theme)がまたがって
+    交互に並んでしまう。これを避けるため、既存のCAMPAIGNS（商品順の既存定数）
+    でループし、商品ごとにdc_cpcを絞り込んだ上で既存の _cpc_apply_display_order
+    をそのまま呼び、各商品の結果を順番に連結するだけ。商品内の並び（ランク→
+    ROAS）は既存ロジックそのままで、新しいソート・判定は一切追加しない。"""
+    _SHOW_RANKS = {"SS+", "SS", "A", "D"}
+    if dc_cpc is None or dc_cpc.empty or "cpc_rank" not in dc_cpc.columns:
+        return []
+    _rows = []
+    for _theme in CAMPAIGNS:
+        _df_theme = dc_cpc[dc_cpc["campaign_theme"] == _theme]
+        if _df_theme.empty:
+            continue
+        _ordered = _cpc_apply_display_order(_df_theme, _RANK_ORDER)
+        for _, _row in _ordered.iterrows():
+            _rank = _row.get("cpc_rank")
+            if _rank not in _SHOW_RANKS:
+                continue
+            _cname = _row.get("campaign_name", "")
+            _kw = _row.get("keyword", "")
+            _trend = _cpc_hier_lookup_trend(_theme, _kw, anls_hist_fname)
+            _rows.append({
+                "campaign_theme": _theme,
+                "campaign_name": _cname,
+                "cpc_rank": _rank,
+                "keyword": _kw,
+                "trend": _trend,
+            })
+    return _rows
+
+
+def _anls_render_hierarchy_view(_rows: list) -> None:
+    """表示専用の新規追加関数。_anls_build_hierarchy_rows() が返した順序を
+    そのまま先頭から描画するだけで、独自のソート・groupbyは一切行わない。
+    直前行との比較のみで 商品→ランク の見出しを切り替える（キャンペーン見出し
+    は廃止し、代わりにexpander内先頭にキャンペーン名を表示する）。
+    ランクは色を使わず記号のみ。expander内はCV・ランク履歴・矢印推移を
+    含めず、今週/1週前/2週前/3週前 × ROAS/CPC/クリック/売上のみを表示する。
+
+    ランク見出しの件数表示・キーワード番号のランク単位リセットのため、
+    _rows内で(campaign_theme, cpc_rank)が連続する「かたまり」ごとの件数を
+    隣接要素比較のみで事前集計する（pandas groupby・独自ソートは使用しない。
+    既にこの順で並んでいる_rowsをそのまま1回走査するだけ）。"""
+    if not _rows:
+        return
+    _SYM = {"SS+": "■", "SS": "↑", "A": "→", "D": "↓"}
+    st.markdown("---")
+    st.markdown("#### 🔎 CPC調整ページの深掘り画面")
+
+    _n = len(_rows)
+    _block_size = [0] * _n
+    _i = 0
+    while _i < _n:
+        _key = (_rows[_i].get("campaign_theme", ""), _rows[_i].get("cpc_rank", ""))
+        _j = _i
+        while _j < _n and (_rows[_j].get("campaign_theme", ""), _rows[_j].get("cpc_rank", "")) == _key:
+            _j += 1
+        for _k in range(_i, _j):
+            _block_size[_k] = _j - _i
+        _i = _j
+
+    _prev_theme = _prev_rank = None
+    _kw_no = 0
+    for _idx, _row in enumerate(_rows):
+        _theme = _row.get("campaign_theme", "")
+        _cname = _row.get("campaign_name", "")
+        _rank = _row.get("cpc_rank", "")
+        _kw = _row.get("keyword", "")
+        _trend = _row.get("trend") or []
+        if _theme != _prev_theme:
+            st.markdown("---")
+            st.markdown(f"**商品：{_theme}**")
+            _prev_theme = _theme
+            _prev_rank = None
+        if _rank != _prev_rank:
+            st.markdown("---")
+            st.markdown(f"**{_SYM.get(_rank, '')} {_rank}（{_block_size[_idx]}件）**")
+            _prev_rank = _rank
+            _kw_no = 0
+        _kw_no += 1
+        with st.expander(f"▶ {_kw_no}. {_kw}", expanded=False):
+            st.markdown(f"キャンペーン｜{_cname}")
+            _labels = ["今週", "1週前", "2週前", "3週前"]
+            _recent_first = list(reversed(_trend))[:4]
+            _padded = _recent_first + [None] * (4 - len(_recent_first))
+            _tbl_df = pd.DataFrame(
+                [
+                    ["ROAS"]    + [(_t or {}).get("roas_str", "―") for _t in _padded],
+                    ["CPC"]     + [(_t or {}).get("avg_cpc_str", "―") for _t in _padded],
+                    ["クリック"] + [(_t or {}).get("clicks_str", "―") for _t in _padded],
+                    ["売上"]    + [(_t or {}).get("sales_str", "―") for _t in _padded],
+                ],
+                columns=["指標"] + _labels,
+            )
+            st.table(_tbl_df)
+
+
+def _anls_render_analysis_page(dc_cpc: pd.DataFrame) -> None:
+    """分析ページ全体の司令塔（新規追加・表示専用）。entry_point層
+    (_anls_entry_point) はこの関数だけを呼び、_anls_build_hierarchy_rows /
+    _anls_render_hierarchy_view はこの関数だけが呼ぶ。今後、分析UI
+    （グラフ・キャンペーン分析・キーワード分析等）を追加する場合も、
+    必ずこの関数の中へ追加すること。entry_pointから新しい分析関数を
+    直接呼ぶことはしない。新しい判定・新しい集計は一切行わない。"""
+    _rows = _anls_build_hierarchy_rows(dc_cpc, "cpc_change_history.json")
+    _anls_render_hierarchy_view(_rows)
+
 
 def page_cpc():
     _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
@@ -3334,6 +3459,7 @@ def _anls_entry_point(dc_cpc):
                       "キーワードCPC分析（30日窓）", "cpc_kw", "keyword", "cpc_change_history.json")
     st.markdown("---")
     _anls_render_tab(dc_cpc, 7, "anls_cpc_kw.json", "anls_cpc_kw", "キーワードCPC分析", "cpc_kw", "keyword", "cpc_change_history.json")
+    _anls_render_analysis_page(dc_cpc)
 
 def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = ""):
     """商品ターゲ CPC調整ページ共通レンダラー（page_cpc()と同一ロジック・UI）"""
