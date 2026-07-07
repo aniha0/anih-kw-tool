@@ -3411,34 +3411,41 @@ def _anls_run_cpc_kw_period_comparison(dc_cpc: pd.DataFrame, _debug: dict = None
 def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str = "cpc_change_history.json") -> None:
     """分析ページ（page_cpcのtab2）用の関数（表示専用）。
 
-    【設計変更】cpc_change_history.json（履歴）に依存した表示を廃止し、
-    アップロード済みCSV（既存の「📅 7日比較CSV」バケット、
-    st.session_state["csv_bucket_7d"]）だけで完結する「4週間比較ページ」に
-    変更した。KW別詳細・履歴比較・アコーディオン表示は行わない。
+    【設計変更】全対象合計の4週間比較（1枚のテーブル）を廃止し、
+    CPC調整ページのKW一覧（実行対象。_kwl_target＝tab1で既に確定済み、
+    build_cpc_df/assign_cpc_rank＝既存・無改変ロジックの出力から絞り込まれた
+    ものをそのまま利用。新しい抽出・判定ロジックは追加しない）に含まれる
+    キーワード単位で、st.tabs()による個別4週間比較タブを表示する。
+    KW別詳細・履歴比較のアコーディオン表示（旧バージョン）は行わない。
 
-    【集計対象の絞り込み】CSV全行の単純合計ではなく、CPC調整ページの対象
-    判定結果（dc_cpc。build_cpc_df/assign_cpc_rank＝既存・無改変ロジックの
-    出力そのもの）に含まれる campaign_name/ad_group/keyword の組み合わせに
-    一致するCSV行だけを対象に集計する。新しい判定・新しいランク付け・新しい
-    抽出ロジックは一切追加せず、既存のdc_cpcという「判定結果」をそのまま
-    フィルタ集合として再利用するのみ（キー生成は_anls_run_cpc_kw_period_
-    comparison内の_cpc_key_fnと同一パターン）。
+    タブ名は「キーワード名 + 状態アイコン」。状態アイコンは分析表示専用の
+    トレンド判定であり、既存のCPCランク判定（assign_cpc_rank）とは完全に
+    別の指標。判定基準：直近週ROAS と 前週ROAS を比較し、
+      +10%以上上昇 → ↑（改善傾向）
+      -10%以上下降 → ↓（悪化傾向）
+      その他       → →（横ばい）
+      比較に必要な直近2週分のデータが揃わない場合 → ■（要確認）
 
+    データ取得はCSV全件集計ではなく、アップロード済みCSV（既存の
+    「📅 7日比較CSV」バケット、st.session_state["csv_bucket_7d"]）を
+    campaign_name/ad_group/keywordの組み合わせ（_kwl_target側の値との
+    norm一致）で絞り込んだ行だけを対象に、週（＝CSV1件）単位で
+    広告費・売上・注文数を合計し、ROAS=売上/広告費を算出する。
     CSVはすでに1週間単位で集計されている前提のため、日付から週を分割する
-    処理は行わない（既存の期間文字列抽出ロジックをそのまま流用するのみ）。
-    アップロードされた各CSV（＝1週間分）ごとに、上記フィルタ後の行を対象に
-    広告費・売上・注文数を合計し、ROAS=売上/広告費を算出、期間終了日の
-    古い順に並べて直近4件（週）だけを列として表示する。
-    列見出しはCSV内「期間」列から抽出した実際の日付範囲をそのまま使い、
-    コード側で将来期間や独自の週区切りを生成することはしない。
+    処理は行わない。列見出しはCSV内「期間」列から抽出した実際の日付範囲を
+    そのまま使い、コード側で将来期間や独自の週区切りを生成することはしない。
+    期間終了日の古い順に並べ、直近4件（週）だけを列として使う（全キーワード
+    共通の期間グリッド。各タブでは、そのキーワードにその週のデータが
+    無ければ「―」を表示する）。
 
-    表示項目は 広告費・売上・注文数・ROAS の4行のみ（CTR/CPC/CVR/ACOS/
-    インプレッション/KW別詳細/履歴比較は表示しない）。
+    表示項目は 広告費・売上・注文数・ROAS の4行のみ。
 
-    _kwl_target / anls_hist_fname は呼び出し元(page_cpc)との互換のために
-    引数として残しているが、本設計では使用しない（未参照）。
+    anls_hist_fname は呼び出し元(page_cpc)との互換のために引数として
+    残しているが、本設計では使用しない（未参照）。
     """
-    st.markdown("#### 📊 4週間比較（アップロードCSVベース・CPC調整対象のみ）")
+    if _kwl_target is None or _kwl_target.empty:
+        st.info("表示対象のキーワードがありません。")
+        return
 
     _bucket_held = st.session_state.get("csv_bucket_7d", {})
     if not _bucket_held:
@@ -3448,14 +3455,17 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     def _target_key_fn(cn, ag, kw):
         return f"{norm(str(cn or ''))}|{norm(str(ag or ''))}|{norm(str(kw or ''))}"
 
-    _target_keys = set()
-    if dc_cpc is not None and not dc_cpc.empty:
-        for _, _r in dc_cpc.iterrows():
-            _target_keys.add(_target_key_fn(
-                _r.get("campaign_name", ""), _r.get("ad_group", ""), _r.get("keyword", "")
-            ))
+    def _fmt_yen(v):
+        return f"¥{v:,.0f}" if v is not None else "―"
+    def _fmt_orders(v):
+        return f"{int(v):,}" if v is not None else "―"
+    def _fmt_roas(v):
+        return f"{v:.2f}" if v is not None else "―"
 
-    _periods = []
+    # CSVは対象キーワードによらず共通なので、1度だけパース・期間抽出し、
+    # 各CSVの「行 → _target_key」対応表として保持する（対象単位ループでの
+    # CSV再パースを避けるための単純なキャッシュであり、新しい判定ロジックではない）。
+    _csv_infos = []
     for _af_file in _bucket_held.values():
         try:
             df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(_af_file)
@@ -3484,56 +3494,409 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
             continue
 
         _agn_col = agn if agn else fcol(df_raw, ["広告グループ名", "Ad Group Name", "広告グループ"])
+        _od_col = od if od else fcol(
+            df_raw,
+            ["注文数", "Orders", "購入数", "商品購入数", "7日間の総注文数",
+             "14日間の総注文数", "合計注文数", "注文された商品点数"],
+        )
         _df_t = df_raw.copy()
         _df_t["_target_key"] = _df_t.apply(
             lambda r: _target_key_fn(
                 r.get(cc, ""), r.get(_agn_col, "") if _agn_col else "", r.get(kw_col_cpc, "")
             ), axis=1,
         )
-        _df_t = _df_t[_df_t["_target_key"].isin(_target_keys)]
-        if _df_t.empty:
-            continue
-
-        _cost = float(tonum(_df_t[oc_]).sum())
-        _sales = float(tonum(_df_t[sc]).sum())
-        _od_col = od if od else fcol(
-            _df_t,
-            ["注文数", "Orders", "購入数", "商品購入数", "7日間の総注文数",
-             "14日間の総注文数", "合計注文数", "注文された商品点数"],
-        )
-        _orders = float(tonum(_df_t[_od_col]).sum()) if _od_col else None
-        _roas = round(_sales / _cost, 2) if _cost > 0 else 0.0
-        _periods.append({
+        _csv_infos.append({
+            "df": _df_t, "sc": sc, "oc": oc_, "od_col": _od_col,
             "period_label": _period_str, "period_end": _period_end,
-            "cost": _cost, "sales": _sales, "orders": _orders, "roas": _roas,
         })
 
-    if not _periods:
-        st.caption("アップロードされたCSVから、CPC調整対象データを抽出できませんでした。")
+    if not _csv_infos:
+        st.caption("アップロードされたCSVから期間情報を取得できませんでした。")
         return
 
-    _periods.sort(key=lambda r: r["period_end"])
-    _periods = _periods[-4:]
-    _labels = [p["period_label"] for p in _periods]
+    _csv_infos.sort(key=lambda r: r["period_end"])
+    _csv_infos = _csv_infos[-4:]
+
+    def _weekly_for_key(_key):
+        _weekly = []
+        for _info in _csv_infos:
+            _sub = _info["df"][_info["df"]["_target_key"] == _key]
+            if _sub.empty:
+                _weekly.append(None)
+                continue
+            _cost = float(tonum(_sub[_info["oc"]]).sum())
+            _sales = float(tonum(_sub[_info["sc"]]).sum())
+            _orders = float(tonum(_sub[_info["od_col"]]).sum()) if _info["od_col"] else None
+            _roas = round(_sales / _cost, 2) if _cost > 0 else 0.0
+            _weekly.append({
+                "period_label": _info["period_label"], "cost": _cost,
+                "sales": _sales, "orders": _orders, "roas": _roas,
+            })
+        return _weekly
+
+    def _icon_for_weekly(_weekly):
+        if len(_weekly) < 2:
+            return "■"
+        _latest, _prev = _weekly[-1], _weekly[-2]
+        if not _latest or not _prev or _prev["roas"] <= 0:
+            return "■"
+        _chg = (_latest["roas"] - _prev["roas"]) / _prev["roas"] * 100
+        if _chg >= 10:
+            return "↑"
+        elif _chg <= -10:
+            return "↓"
+        return "→"
+
+    _tab_labels = []
+    _tab_weeklies = []
+    for _, _row in _kwl_target.iterrows():
+        _kw = _row.get("keyword", "")
+        _cname = _row.get("campaign_name", "")
+        _agname = _row.get("ad_group", "")
+        _key = _target_key_fn(_cname, _agname, _kw)
+        _weekly = _weekly_for_key(_key)
+        _icon = _icon_for_weekly(_weekly)
+        _tab_labels.append(f"{_kw} {_icon}")
+        _tab_weeklies.append(_weekly)
+
+    if not _tab_labels:
+        st.caption("表示対象のキーワードがありません。")
+        return
+
+    _tabs = st.tabs(_tab_labels)
+    for _tab, _weekly in zip(_tabs, _tab_weeklies):
+        with _tab:
+            _col_labels = [w["period_label"] if w else "―" for w in _weekly]
+            _tbl_df = pd.DataFrame(
+                [
+                    ["広告費"] + [_fmt_yen(w["cost"]) if w else "―" for w in _weekly],
+                    ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
+                    ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
+                    ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
+                ],
+                columns=["期間"] + _col_labels,
+            )
+            st.table(_tbl_df)
+
+
+def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
+    """商品CPC調整ページ(page_cpc_productのtab2)用の関数（表示専用）。
+    KW版(_anls_render_analysis_page)と完全同一仕様の「対象ごとの個別4週間
+    比較タブ＋状態アイコン」を、商品(ASIN)単位に展開したもの。新しい判定・
+    新しいランク付けは一切追加しない。
+
+    対象抽出：dc_cpc_product（build_cpc_df/assign_cpc_rank＝既存・無改変
+    ロジックの出力そのもの）に対し、_render_pt_cpc_page（既存・無改変）が
+    実行対象一覧の表示に使っているのと同一の条件（cpc_delta != 0）を適用
+    するのみで、新しい抽出ロジックは追加しない。商品選択の絞り込みも、
+    _render_pt_cpc_page内のselectboxと同一のsession_stateキー
+    ("cpc_product_sel")を参照し、tab1で選択中の商品と同じ絞り込みを反映する。
+
+    データ取得：CSV全件集計ではなく、アップロード済みCSV（既存の
+    「📅 7日比較CSV」バケット）の各行から、既存_anls_build_asin_afterと
+    同一のASIN抽出パターン（"ターゲティング"列から正規表現 B0[A-Z0-9]{8}
+    を抽出）でASINを取り出し、campaign_name/ad_group/asinの組み合わせが
+    対象と一致する行だけを週（＝CSV1件）単位で集計する。
+
+    状態アイコン判定はKW版と完全同一（直近週ROAS vs 前週ROAS ±10%。
+    分析表示専用で、CPC上げ下げ判定には使用しない）。
+    """
+    if dc_pt is None or dc_pt.empty:
+        st.info("表示対象の商品がありません。")
+        return
+    _sel = st.session_state.get("cpc_product_sel", "全商品")
+    if _sel != "全商品" and "campaign_theme" in dc_pt.columns:
+        df_c = dc_pt[dc_pt["campaign_theme"] == _sel].copy()
+    else:
+        df_c = dc_pt.copy()
+    if "cpc_delta" not in df_c.columns or "asin" not in df_c.columns:
+        st.info("表示対象の商品がありません。")
+        return
+    _pt_target = df_c[df_c["cpc_delta"] != 0].copy()
+    if _pt_target.empty:
+        st.info("表示対象の商品がありません。")
+        return
+
+    _bucket_held = st.session_state.get("csv_bucket_7d", {})
+    if not _bucket_held:
+        st.caption("📅 7日比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると4週間比較が表示されます。")
+        return
+
+    def _target_key_fn(cn, ag, asin):
+        return f"{norm(str(cn or ''))}|{norm(str(ag or ''))}|{norm(str(asin or ''))}"
+
+    def _extract_asin(v):
+        m = re.search(r'B0[A-Z0-9]{8}', str(v), re.IGNORECASE)
+        return m.group(0).upper() if m else ""
 
     def _fmt_yen(v):
-        return f"¥{v:,.0f}"
+        return f"¥{v:,.0f}" if v is not None else "―"
     def _fmt_orders(v):
         return f"{int(v):,}" if v is not None else "―"
     def _fmt_roas(v):
-        return f"{v:.2f}"
+        return f"{v:.2f}" if v is not None else "―"
 
-    _tbl_df = pd.DataFrame(
-        [
-            ["広告費"] + [_fmt_yen(p["cost"]) for p in _periods],
-            ["売上"]   + [_fmt_yen(p["sales"]) for p in _periods],
-            ["注文数"] + [_fmt_orders(p["orders"]) for p in _periods],
-            ["ROAS"]   + [_fmt_roas(p["roas"]) for p in _periods],
-        ],
-        columns=["項目"] + _labels,
-    )
-    st.table(_tbl_df)
+    _csv_infos = []
+    for _af_file in _bucket_held.values():
+        try:
+            df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(_af_file)
+        except Exception:
+            continue
+        if not sc or not oc_ or not cc or not tkc:
+            continue
+        _pc = fcol(df_raw, ["期間"])
+        _period_str = None
+        _period_end = None
+        if _pc:
+            try:
+                _parts = df_raw[_pc].astype(str).str.split(" - ", expand=True)
+                _starts = pd.to_datetime(_parts[0], format="%Y/%m/%d", errors="coerce")
+                _ends = pd.to_datetime(_parts[1], format="%Y/%m/%d", errors="coerce") if _parts.shape[1] > 1 else _starts
+                if _starts.notna().any() and _ends.notna().any():
+                    _s_min, _e_max = _starts.min(), _ends.max()
+                    _period_str = f"{_s_min.month}/{_s_min.day}〜{_e_max.month}/{_e_max.day}"
+                    _period_end = _e_max
+            except Exception:
+                _period_str = None
+        if _period_str is None or _period_end is None:
+            continue
+        _agn_col = agn if agn else fcol(df_raw, ["広告グループ名", "Ad Group Name", "広告グループ"])
+        _od_col = od if od else fcol(
+            df_raw,
+            ["注文数", "Orders", "購入数", "商品購入数", "7日間の総注文数",
+             "14日間の総注文数", "合計注文数", "注文された商品点数"],
+        )
+        _df_t = df_raw.copy()
+        _df_t["_asin_ext"] = _df_t[tkc].apply(_extract_asin)
+        _df_t["_target_key"] = _df_t.apply(
+            lambda r: _target_key_fn(
+                r.get(cc, ""), r.get(_agn_col, "") if _agn_col else "", r.get("_asin_ext", "")
+            ), axis=1,
+        )
+        _csv_infos.append({
+            "df": _df_t, "sc": sc, "oc": oc_, "od_col": _od_col,
+            "period_label": _period_str, "period_end": _period_end,
+        })
 
+    if not _csv_infos:
+        st.caption("アップロードされたCSVから期間情報を取得できませんでした。")
+        return
+
+    _csv_infos.sort(key=lambda r: r["period_end"])
+    _csv_infos = _csv_infos[-4:]
+
+    def _weekly_for_key(_key):
+        _weekly = []
+        for _info in _csv_infos:
+            _sub = _info["df"][_info["df"]["_target_key"] == _key]
+            if _sub.empty:
+                _weekly.append(None)
+                continue
+            _cost = float(tonum(_sub[_info["oc"]]).sum())
+            _sales = float(tonum(_sub[_info["sc"]]).sum())
+            _orders = float(tonum(_sub[_info["od_col"]]).sum()) if _info["od_col"] else None
+            _roas = round(_sales / _cost, 2) if _cost > 0 else 0.0
+            _weekly.append({
+                "period_label": _info["period_label"], "cost": _cost,
+                "sales": _sales, "orders": _orders, "roas": _roas,
+            })
+        return _weekly
+
+    def _icon_for_weekly(_weekly):
+        if len(_weekly) < 2:
+            return "■"
+        _latest, _prev = _weekly[-1], _weekly[-2]
+        if not _latest or not _prev or _prev["roas"] <= 0:
+            return "■"
+        _chg = (_latest["roas"] - _prev["roas"]) / _prev["roas"] * 100
+        if _chg >= 10:
+            return "↑"
+        elif _chg <= -10:
+            return "↓"
+        return "→"
+
+    _tab_labels = []
+    _tab_weeklies = []
+    for _, _row in _pt_target.iterrows():
+        _asin = _row.get("asin", "")
+        _cname = _row.get("campaign_name", "")
+        _agname = _row.get("ad_group", "")
+        _key = _target_key_fn(_cname, _agname, _asin)
+        _weekly = _weekly_for_key(_key)
+        _icon = _icon_for_weekly(_weekly)
+        _tab_labels.append(f"{_asin} {_icon}")
+        _tab_weeklies.append(_weekly)
+
+    if not _tab_labels:
+        st.caption("表示対象の商品がありません。")
+        return
+
+    _tabs = st.tabs(_tab_labels)
+    for _tab, _weekly in zip(_tabs, _tab_weeklies):
+        with _tab:
+            _col_labels = [w["period_label"] if w else "―" for w in _weekly]
+            _tbl_df = pd.DataFrame(
+                [
+                    ["広告費"] + [_fmt_yen(w["cost"]) if w else "―" for w in _weekly],
+                    ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
+                    ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
+                    ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
+                ],
+                columns=["期間"] + _col_labels,
+            )
+            st.table(_tbl_df)
+
+def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
+    """動画CPC調整ページ(page_cpc_videoのtab2)用の関数（表示専用）。
+    _anls_render_analysis_page_productと完全同一仕様（対象＝ASIN、
+    session_stateキーのみ"cpc_video_sel"に対応）。新しい判定・新しい
+    ランク付けは一切追加しない。詳細は_anls_render_analysis_page_product
+    のdocstringを参照。
+    """
+    if dc_pt is None or dc_pt.empty:
+        st.info("表示対象の動画がありません。")
+        return
+    _sel = st.session_state.get("cpc_video_sel", "全商品")
+    if _sel != "全商品" and "campaign_theme" in dc_pt.columns:
+        df_c = dc_pt[dc_pt["campaign_theme"] == _sel].copy()
+    else:
+        df_c = dc_pt.copy()
+    if "cpc_delta" not in df_c.columns or "asin" not in df_c.columns:
+        st.info("表示対象の動画がありません。")
+        return
+    _pt_target = df_c[df_c["cpc_delta"] != 0].copy()
+    if _pt_target.empty:
+        st.info("表示対象の動画がありません。")
+        return
+
+    _bucket_held = st.session_state.get("csv_bucket_7d", {})
+    if not _bucket_held:
+        st.caption("📅 7日比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると4週間比較が表示されます。")
+        return
+
+    def _target_key_fn(cn, ag, asin):
+        return f"{norm(str(cn or ''))}|{norm(str(ag or ''))}|{norm(str(asin or ''))}"
+
+    def _extract_asin(v):
+        m = re.search(r'B0[A-Z0-9]{8}', str(v), re.IGNORECASE)
+        return m.group(0).upper() if m else ""
+
+    def _fmt_yen(v):
+        return f"¥{v:,.0f}" if v is not None else "―"
+    def _fmt_orders(v):
+        return f"{int(v):,}" if v is not None else "―"
+    def _fmt_roas(v):
+        return f"{v:.2f}" if v is not None else "―"
+
+    _csv_infos = []
+    for _af_file in _bucket_held.values():
+        try:
+            df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(_af_file)
+        except Exception:
+            continue
+        if not sc or not oc_ or not cc or not tkc:
+            continue
+        _pc = fcol(df_raw, ["期間"])
+        _period_str = None
+        _period_end = None
+        if _pc:
+            try:
+                _parts = df_raw[_pc].astype(str).str.split(" - ", expand=True)
+                _starts = pd.to_datetime(_parts[0], format="%Y/%m/%d", errors="coerce")
+                _ends = pd.to_datetime(_parts[1], format="%Y/%m/%d", errors="coerce") if _parts.shape[1] > 1 else _starts
+                if _starts.notna().any() and _ends.notna().any():
+                    _s_min, _e_max = _starts.min(), _ends.max()
+                    _period_str = f"{_s_min.month}/{_s_min.day}〜{_e_max.month}/{_e_max.day}"
+                    _period_end = _e_max
+            except Exception:
+                _period_str = None
+        if _period_str is None or _period_end is None:
+            continue
+        _agn_col = agn if agn else fcol(df_raw, ["広告グループ名", "Ad Group Name", "広告グループ"])
+        _od_col = od if od else fcol(
+            df_raw,
+            ["注文数", "Orders", "購入数", "商品購入数", "7日間の総注文数",
+             "14日間の総注文数", "合計注文数", "注文された商品点数"],
+        )
+        _df_t = df_raw.copy()
+        _df_t["_asin_ext"] = _df_t[tkc].apply(_extract_asin)
+        _df_t["_target_key"] = _df_t.apply(
+            lambda r: _target_key_fn(
+                r.get(cc, ""), r.get(_agn_col, "") if _agn_col else "", r.get("_asin_ext", "")
+            ), axis=1,
+        )
+        _csv_infos.append({
+            "df": _df_t, "sc": sc, "oc": oc_, "od_col": _od_col,
+            "period_label": _period_str, "period_end": _period_end,
+        })
+
+    if not _csv_infos:
+        st.caption("アップロードされたCSVから期間情報を取得できませんでした。")
+        return
+
+    _csv_infos.sort(key=lambda r: r["period_end"])
+    _csv_infos = _csv_infos[-4:]
+
+    def _weekly_for_key(_key):
+        _weekly = []
+        for _info in _csv_infos:
+            _sub = _info["df"][_info["df"]["_target_key"] == _key]
+            if _sub.empty:
+                _weekly.append(None)
+                continue
+            _cost = float(tonum(_sub[_info["oc"]]).sum())
+            _sales = float(tonum(_sub[_info["sc"]]).sum())
+            _orders = float(tonum(_sub[_info["od_col"]]).sum()) if _info["od_col"] else None
+            _roas = round(_sales / _cost, 2) if _cost > 0 else 0.0
+            _weekly.append({
+                "period_label": _info["period_label"], "cost": _cost,
+                "sales": _sales, "orders": _orders, "roas": _roas,
+            })
+        return _weekly
+
+    def _icon_for_weekly(_weekly):
+        if len(_weekly) < 2:
+            return "■"
+        _latest, _prev = _weekly[-1], _weekly[-2]
+        if not _latest or not _prev or _prev["roas"] <= 0:
+            return "■"
+        _chg = (_latest["roas"] - _prev["roas"]) / _prev["roas"] * 100
+        if _chg >= 10:
+            return "↑"
+        elif _chg <= -10:
+            return "↓"
+        return "→"
+
+    _tab_labels = []
+    _tab_weeklies = []
+    for _, _row in _pt_target.iterrows():
+        _asin = _row.get("asin", "")
+        _cname = _row.get("campaign_name", "")
+        _agname = _row.get("ad_group", "")
+        _key = _target_key_fn(_cname, _agname, _asin)
+        _weekly = _weekly_for_key(_key)
+        _icon = _icon_for_weekly(_weekly)
+        _tab_labels.append(f"{_asin} {_icon}")
+        _tab_weeklies.append(_weekly)
+
+    if not _tab_labels:
+        st.caption("表示対象の動画がありません。")
+        return
+
+    _tabs = st.tabs(_tab_labels)
+    for _tab, _weekly in zip(_tabs, _tab_weeklies):
+        with _tab:
+            _col_labels = [w["period_label"] if w else "―" for w in _weekly]
+            _tbl_df = pd.DataFrame(
+                [
+                    ["広告費"] + [_fmt_yen(w["cost"]) if w else "―" for w in _weekly],
+                    ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
+                    ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
+                    ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
+                ],
+                columns=["期間"] + _col_labels,
+            )
+            st.table(_tbl_df)
 
 def _anls_entry_point(dc_cpc):
     """page_cpc の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
@@ -3755,10 +4118,10 @@ def page_cpc_product():
     with _t1:
         _render_pt_cpc_page(dc_cpc_product, "商品CPC調整", "cpc_product_sel", "cpc_pt_m_history.json")
     with _t2:
-        # ⏱️ 期間別クイック分析（旧・7日/30日分析、比較CSVバケット表示、分析実行ボタン等）は
-        # ユーザー指示により表示を廃止。_anls_entry_point_cpc_product自体は削除せず、
-        # 呼び出しのみ停止する（既存関数の削除禁止のため）。
-        pass
+        # KW版と同一仕様の「対象ごとの個別4週間比較タブ＋状態アイコン」。
+        # _render_pt_cpc_page（tab1・既存無改変）の判定結果(dc_cpc_product)を
+        # そのまま渡すのみで、判定ロジック自体には一切影響しない。
+        _anls_render_analysis_page_product(dc_cpc_product)
 
 def _anls_entry_point_cpc_product(df_cpc_product):
     """page_cpc_product の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
@@ -3788,10 +4151,10 @@ def page_cpc_video():
     with _t1:
         _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel", "cpc_pt_v_history.json")
     with _t2:
-        # ⏱️ 期間別クイック分析（旧・7日/30日分析、比較CSVバケット表示、分析実行ボタン等）は
-        # ユーザー指示により表示を廃止。_anls_entry_point_cpc_video自体は削除せず、
-        # 呼び出しのみ停止する（既存関数の削除禁止のため）。
-        pass
+        # KW版と同一仕様の「対象ごとの個別4週間比較タブ＋状態アイコン」。
+        # _render_pt_cpc_page（tab1・既存無改変）の判定結果(dc_cpc_video)を
+        # そのまま渡すのみで、判定ロジック自体には一切影響しない。
+        _anls_render_analysis_page_video(dc_cpc_video)
 
 def _anls_entry_point_cpc_video(df_cpc_video):
     """page_cpc_video の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
