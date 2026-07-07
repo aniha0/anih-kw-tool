@@ -3452,123 +3452,96 @@ def _anls_run_cpc_kw_period_comparison(dc_cpc: pd.DataFrame, _debug: dict = None
 
 def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str = "cpc_change_history.json") -> None:
     """分析ページ（page_cpcのtab2）用の関数（表示専用）。
-    CPC調整ページ(tab1)のKW一覧（実行対象）で既に確定済みの_kwl_targetを
-    そのまま利用する。並び順・件数・内容はtab1と完全に同一で、分析ページ側
-    での独自ソート・独自フィルタ・新規KW生成は一切行わない。
 
-    各キーワードの4期間推移は、_anls_run_cpc_kw_period_comparison()
-    （新規追加・既存関数の呼び出しのみで構成）が返す、実際のCSV「期間」
-    列に基づく値をそのまま使う。コード側で7日区切りや将来期間を独自生成
-    することはしない。列（期間）はCSVの期間文字列をそのまま使用し、
-    _anls_build_multi_period_table（既存・無改変）がすでに古い期間→新しい
-    期間の順に並べた結果をそのまま表示するだけ。
+    【設計変更】cpc_change_history.json（履歴）に依存した表示を廃止し、
+    アップロード済みCSV（既存の「📅 7日比較CSV」バケット、
+    st.session_state["csv_bucket_7d"]）だけで完結する「4週間比較ページ」に
+    変更した。KW別詳細・履歴比較・アコーディオン表示は行わない。
 
-    各キーワードは st.expander(expanded=False) で折りたたみ表示する。
+    CSVはすでに1週間単位で集計されている前提のため、日付から週を分割する
+    処理は行わない（既存の期間文字列抽出ロジックをそのまま流用するのみ）。
+    アップロードされた各CSV（＝1週間分）ごとに、CSV全行を対象に
+    広告費・売上・注文数を合計し、ROAS=売上/広告費を算出、期間終了日の
+    古い順に並べて直近4件（週）だけを列として表示する。
+    列見出しはCSV内「期間」列から抽出した実際の日付範囲をそのまま使い、
+    コード側で将来期間や独自の週区切りを生成することはしない。
 
-    【既知の制約】st.expanderはStreamlit標準機能では相互排他（1つ開くと他が
-    閉じる）を提供しないため、複数キーワードを同時に開くこと自体は技術的に
-    可能。ここでは追加の状態管理を持ち込まず最小実装とした。"""
-    st.markdown("#### 📋 KW一覧")
+    表示項目は 広告費・売上・注文数・ROAS の4行のみ（CTR/CPC/CVR/ACOS/
+    インプレッション/KW別詳細/履歴比較は表示しない）。
 
-    with st.expander("🔍 診断: 対象KWの_hist_keys存在確認", expanded=True):
-        _target_kw_diag = "犬 口臭ケア 水に混ぜる"
-        _hist_all_diag = _anls_load(anls_hist_fname)
-        _entries_diag = _hist_all_diag[-1]["entries"] if _hist_all_diag else []
-        _hist_keys_diag = set()
-        for _e in _entries_diag:
-            _cn_d = norm(str(_e.get("campaign_name", "") or ""))
-            _ag_d = norm(str(_e.get("ad_group", "") or ""))
-            _kw_d = norm(str(_e.get("keyword", "") or ""))
-            _hist_keys_diag.add(f"{_cn_d}|{_ag_d}|{_kw_d}")
-        _target_n_diag = norm(_target_kw_diag)
-        _exists_diag = any(_k.endswith("|" + _target_n_diag) for _k in _hist_keys_diag)
-        st.write(f"対象KW：{_target_kw_diag}")
-        st.write(f"_hist_keys に存在する：{'YES' if _exists_diag else 'NO'}")
-        st.write(f"entries件数：{len(_entries_diag)}件")
-        st.write(f"_hist_keys件数：{len(_hist_keys_diag)}件")
+    _kwl_target / anls_hist_fname は呼び出し元(page_cpc)との互換のために
+    引数として残しているが、本設計では使用しない（未参照）。
+    """
+    st.markdown("#### 📊 4週間比較（アップロードCSVベース）")
 
-    if _kwl_target is None or _kwl_target.empty:
-        st.info("表示対象のキーワードがありません。")
+    _bucket_held = st.session_state.get("csv_bucket_7d", {})
+    if not _bucket_held:
+        st.caption("📅 7日比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると4週間比較が表示されます。")
         return
 
-    _dbg = {}
-    _cmp_rows = _anls_run_cpc_kw_period_comparison(dc_cpc, _dbg)
-    _lookup = {}
-    for _row in _cmp_rows:
-        _key = (norm(_row.get("campaign_name", "")), norm(_row.get("keyword", "")))
-        _lookup[_key] = _row.get("cells", [])
-
-    if not _cmp_rows:
-        st.caption("📅 7日比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると期間別の推移が表示されます。")
-
-    with st.expander(
-        f"🔍 診断ログ（一時的・調査用） "
-        f"CSV保持数:{_dbg.get('bucket_count', 0)} / "
-        f"解析成功:{sum(1 for f in _dbg.get('files', []) if f.get('parsed'))}件 / "
-        f"比較表生成:{_dbg.get('cmp_rows_count', 0)}件",
-        expanded=False,
-    ):
-        st.write(f"① CSV保持数: {_dbg.get('bucket_count', 0)}")
-        st.write("② CSV解析結果:")
-        for _f in _dbg.get("files", []):
-            _ok = "YES" if _f.get("parsed") else "NO"
-            _reason = f"（{_f['reason']}）" if _f.get("reason") else ""
-            st.write(f"　・{_f.get('name')}: 解析成功={_ok} {_reason}")
-        st.write("③ 期間取得:")
-        for _f in _dbg.get("files", []):
-            st.write(f"　・{_f.get('name')}: {_f.get('period') or '(取得できず)'}")
-        st.write(
-            f"⑤ _anls_build_multi_period_table: "
-            f"入力件数={_dbg.get('results_count', 0)} / "
-            f"2件以上ゲート通過={_dbg.get('gate_passed')} / "
-            f"返却データ数={_dbg.get('cmp_rows_count', 0)}"
+    _periods = []
+    for _af_file in _bucket_held.values():
+        try:
+            df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(_af_file)
+        except Exception:
+            continue
+        if not sc or not oc_:
+            continue
+        _pc = fcol(df_raw, ["期間"])
+        _period_str = None
+        _period_end = None
+        if _pc:
+            try:
+                _parts = df_raw[_pc].astype(str).str.split(" - ", expand=True)
+                _starts = pd.to_datetime(_parts[0], format="%Y/%m/%d", errors="coerce")
+                _ends = pd.to_datetime(_parts[1], format="%Y/%m/%d", errors="coerce") if _parts.shape[1] > 1 else _starts
+                if _starts.notna().any() and _ends.notna().any():
+                    _s_min, _e_max = _starts.min(), _ends.max()
+                    _period_str = f"{_s_min.month}/{_s_min.day}〜{_e_max.month}/{_e_max.day}"
+                    _period_end = _e_max
+            except Exception:
+                _period_str = None
+        if _period_str is None or _period_end is None:
+            continue
+        _cost = float(tonum(df_raw[oc_]).sum())
+        _sales = float(tonum(df_raw[sc]).sum())
+        _od_col = od if od else fcol(
+            df_raw,
+            ["注文数", "Orders", "購入数", "商品購入数", "7日間の総注文数",
+             "14日間の総注文数", "合計注文数", "注文された商品点数"],
         )
+        _orders = float(tonum(df_raw[_od_col]).sum()) if _od_col else None
+        _roas = round(_sales / _cost, 2) if _cost > 0 else 0.0
+        _periods.append({
+            "period_label": _period_str, "period_end": _period_end,
+            "cost": _cost, "sales": _sales, "orders": _orders, "roas": _roas,
+        })
 
-    for _, _row in _kwl_target.iterrows():
-        _kw = _row.get("keyword", "")
-        _cname = _row.get("campaign_name", "")
-        with st.expander(f"▶ {_kw}", expanded=False):
-            _cells = _lookup.get((norm(_cname), norm(_kw)))
-            if not _cells:
-                st.caption("データなし")
-                with st.expander("🔍 このKWの診断（④KW件数）", expanded=False):
-                    for _f in _dbg.get("files", []):
-                        _name = _f.get("name")
-                        if not _f.get("parsed"):
-                            st.write(f"・{_name}: 解析失敗 - {_f.get('reason')}")
-                            continue
-                        _period = _f.get("period") or "(期間取得失敗)"
-                        _mdf = _f.get("merged_df")
-                        if _mdf is None:
-                            st.write(f"・{_name} [{_period}]: 比較データ0件 - {_f.get('reason')}")
-                            continue
-                        _hit = _mdf[
-                            (_mdf["keyword"].apply(norm) == norm(_kw))
-                            & (_mdf["campaign_name"].apply(norm) == norm(_cname))
-                        ]
-                        st.write(f"・{_name} [{_period}]: ヒット {len(_hit)}件")
-                continue
-            _period_labels = [c.get("period_label") or "（期間不明）" for c in _cells]
+    if not _periods:
+        st.caption("アップロードされたCSVから期間・集計値を取得できませんでした。")
+        return
 
-            def _fmt_roas(v):
-                return f"{v:.2f}" if isinstance(v, (int, float)) else "―"
-            def _fmt_cpc(v):
-                return f"{v:,.0f}円" if isinstance(v, (int, float)) else "―"
-            def _fmt_clicks(v):
-                return f"{int(v):,}" if isinstance(v, (int, float)) else "―"
-            def _fmt_sales(v):
-                return f"{v/10000:.1f}万" if isinstance(v, (int, float)) else "―"
+    _periods.sort(key=lambda r: r["period_end"])
+    _periods = _periods[-4:]
+    _labels = [p["period_label"] for p in _periods]
 
-            _tbl_df = pd.DataFrame(
-                [
-                    ["ROAS"]    + [_fmt_roas(c.get("roas")) for c in _cells],
-                    ["CPC"]     + [_fmt_cpc(c.get("avg_cpc")) for c in _cells],
-                    ["クリック"] + [_fmt_clicks(c.get("clicks")) for c in _cells],
-                    ["売上"]    + [_fmt_sales(c.get("sales")) for c in _cells],
-                ],
-                columns=["指標"] + _period_labels,
-            )
-            st.table(_tbl_df)
+    def _fmt_yen(v):
+        return f"¥{v:,.0f}"
+    def _fmt_orders(v):
+        return f"{int(v):,}" if v is not None else "―"
+    def _fmt_roas(v):
+        return f"{v:.2f}"
+
+    _tbl_df = pd.DataFrame(
+        [
+            ["広告費"] + [_fmt_yen(p["cost"]) for p in _periods],
+            ["売上"]   + [_fmt_yen(p["sales"]) for p in _periods],
+            ["注文数"] + [_fmt_orders(p["orders"]) for p in _periods],
+            ["ROAS"]   + [_fmt_roas(p["roas"]) for p in _periods],
+        ],
+        columns=["項目"] + _labels,
+    )
+    st.table(_tbl_df)
 
 
 def _anls_entry_point(dc_cpc):
