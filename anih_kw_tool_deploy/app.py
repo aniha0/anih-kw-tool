@@ -3458,9 +3458,17 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     st.session_state["csv_bucket_7d"]）だけで完結する「4週間比較ページ」に
     変更した。KW別詳細・履歴比較・アコーディオン表示は行わない。
 
+    【集計対象の絞り込み】CSV全行の単純合計ではなく、CPC調整ページの対象
+    判定結果（dc_cpc。build_cpc_df/assign_cpc_rank＝既存・無改変ロジックの
+    出力そのもの）に含まれる campaign_name/ad_group/keyword の組み合わせに
+    一致するCSV行だけを対象に集計する。新しい判定・新しいランク付け・新しい
+    抽出ロジックは一切追加せず、既存のdc_cpcという「判定結果」をそのまま
+    フィルタ集合として再利用するのみ（キー生成は_anls_run_cpc_kw_period_
+    comparison内の_cpc_key_fnと同一パターン）。
+
     CSVはすでに1週間単位で集計されている前提のため、日付から週を分割する
     処理は行わない（既存の期間文字列抽出ロジックをそのまま流用するのみ）。
-    アップロードされた各CSV（＝1週間分）ごとに、CSV全行を対象に
+    アップロードされた各CSV（＝1週間分）ごとに、上記フィルタ後の行を対象に
     広告費・売上・注文数を合計し、ROAS=売上/広告費を算出、期間終了日の
     古い順に並べて直近4件（週）だけを列として表示する。
     列見出しはCSV内「期間」列から抽出した実際の日付範囲をそのまま使い、
@@ -3472,12 +3480,22 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     _kwl_target / anls_hist_fname は呼び出し元(page_cpc)との互換のために
     引数として残しているが、本設計では使用しない（未参照）。
     """
-    st.markdown("#### 📊 4週間比較（アップロードCSVベース）")
+    st.markdown("#### 📊 4週間比較（アップロードCSVベース・CPC調整対象のみ）")
 
     _bucket_held = st.session_state.get("csv_bucket_7d", {})
     if not _bucket_held:
         st.caption("📅 7日比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると4週間比較が表示されます。")
         return
+
+    def _target_key_fn(cn, ag, kw):
+        return f"{norm(str(cn or ''))}|{norm(str(ag or ''))}|{norm(str(kw or ''))}"
+
+    _target_keys = set()
+    if dc_cpc is not None and not dc_cpc.empty:
+        for _, _r in dc_cpc.iterrows():
+            _target_keys.add(_target_key_fn(
+                _r.get("campaign_name", ""), _r.get("ad_group", ""), _r.get("keyword", "")
+            ))
 
     _periods = []
     for _af_file in _bucket_held.values():
@@ -3485,7 +3503,10 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
             df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(_af_file)
         except Exception:
             continue
-        if not sc or not oc_:
+        if not sc or not oc_ or not cc:
+            continue
+        kw_col_cpc = kwt if kwt else fcol(df_raw, ["ターゲティング", "Targeting", "targeting"])
+        if not kw_col_cpc:
             continue
         _pc = fcol(df_raw, ["期間"])
         _period_str = None
@@ -3503,14 +3524,26 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
                 _period_str = None
         if _period_str is None or _period_end is None:
             continue
-        _cost = float(tonum(df_raw[oc_]).sum())
-        _sales = float(tonum(df_raw[sc]).sum())
+
+        _agn_col = agn if agn else fcol(df_raw, ["広告グループ名", "Ad Group Name", "広告グループ"])
+        _df_t = df_raw.copy()
+        _df_t["_target_key"] = _df_t.apply(
+            lambda r: _target_key_fn(
+                r.get(cc, ""), r.get(_agn_col, "") if _agn_col else "", r.get(kw_col_cpc, "")
+            ), axis=1,
+        )
+        _df_t = _df_t[_df_t["_target_key"].isin(_target_keys)]
+        if _df_t.empty:
+            continue
+
+        _cost = float(tonum(_df_t[oc_]).sum())
+        _sales = float(tonum(_df_t[sc]).sum())
         _od_col = od if od else fcol(
-            df_raw,
+            _df_t,
             ["注文数", "Orders", "購入数", "商品購入数", "7日間の総注文数",
              "14日間の総注文数", "合計注文数", "注文された商品点数"],
         )
-        _orders = float(tonum(df_raw[_od_col]).sum()) if _od_col else None
+        _orders = float(tonum(_df_t[_od_col]).sum()) if _od_col else None
         _roas = round(_sales / _cost, 2) if _cost > 0 else 0.0
         _periods.append({
             "period_label": _period_str, "period_end": _period_end,
@@ -3518,7 +3551,7 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
         })
 
     if not _periods:
-        st.caption("アップロードされたCSVから期間・集計値を取得できませんでした。")
+        st.caption("アップロードされたCSVから、CPC調整対象データを抽出できませんでした。")
         return
 
     _periods.sort(key=lambda r: r["period_end"])
