@@ -3104,213 +3104,217 @@ def _cpc_apply_display_order(df_c: pd.DataFrame, rank_order: list) -> pd.DataFra
 
 
 def page_cpc():
-    _RC = {
-        "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
-        "A":   "#2C7A7B", "B": "#2B6CB0", "C": "#C05621",
-        "D":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
-    }
-    _cond_bar([("CPC調整ルール", "適用"), ("最小クリック数", f"{sv['mc']}回")])
-    render_logic_section(
-        "📈 CPC調整ロジック",
-        '''
-<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
-<thead>
-  <tr style="background:#DBEAFE;">
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:15%;">ランク</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:45%;">判定条件</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">アクション</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">CPC変更幅</th>
-  </tr>
-</thead>
-<tbody>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 1】 データ不足判定（最優先）
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#4A5568;">判断保留</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>かつ</b> 購入数 &lt; 4件</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">変更なし</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 2】 高実績ランク（購入数 ≥ 20件）
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#D69E2E;">SS+</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> ROAS ≥ 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
-  </tr>
-  <tr style="background:#FFFBEB;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#B7791F;">SS</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> 2.0 ≤ ROAS &lt; 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 3】 ROASベースランク
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#553C9A;">S</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS ≥ 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
-  </tr>
-  <tr style="background:#F0FFF4;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2C7A7B;">A</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">3.0 ≤ ROAS &lt; 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2B6CB0;">B</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.8 ≤ ROAS &lt; 3.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">C</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 1.8</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">D</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS &lt; 1.5</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 4】 即削除判定（広告費過多 × 低ROAS）
-    </td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#742A2A;">即削除</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      ROAS &lt; 0.8 <b>かつ</b> 広告費が閾値以上<br>
-      <span style="font-size:.8rem;color:#718096;">
-        売価 ≤¥1,500 → 広告費 ≥¥3,000 ／
-        売価 ≤¥2,000 → 広告費 ≥¥4,000 ／
-        売価 &gt;¥2,000 → 広告費 ≥¥5,000
-      </span>
-    </td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#742A2A;font-weight:700;">即削除</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">—</td>
-  </tr>
-</tbody>
-</table>
-<p style="font-size:.78rem;color:#718096;margin-top:10px;">
-  ▶ 判定順序: STEP1（データ不足）→ STEP2（購入数優先） → STEP3（ROASベース） → STEP4（即削除）<br>
-  ▶ 基本思想: ROASだけでなく、広告費と購入数を重視した複合判定
-</p>''',
-    )
-    if dc_cpc.empty:
-        st.info("分析を実行してください。")
-        return
-    sel_options = ["全商品"] + [c for c in CAMPAIGNS if not dc_cpc[dc_cpc["campaign_theme"] == c].empty]
-    _sc, _ = st.columns([3, 2])
-    with _sc:
-        cpc_camp = st.selectbox("商品選択（キーワードCPC調整）", sel_options, label_visibility="visible", key="cpc_camp_sel")
-    if cpc_camp == "全商品":
-        df_c = dc_cpc.copy()
-    else:
-        df_c = dc_cpc[dc_cpc["campaign_theme"] == cpc_camp].copy()
-    kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
-    _bg_map_rank = {
-        "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
-        "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
-    }
-    def _render_rank_cards(_df_for_cnt):
-        _c = {r: int((_df_for_cnt["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
-        _kc = st.columns(len(kpi_rks))
-        for _col, rk in zip(_kc, kpi_rks):
-            _col.markdown(f'''<div class="kpi-card" style="background:{_bg_map_rank.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
-                <div class="kpi-label">{rk}</div>
-                <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{_c[rk]}</div>
-                <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-        return _c
-    # ランクサマリー（選択商品に連動。全商品選択時はdf_c=dc_cpc.copy()となるため
-    # 従来の全体集計と完全に同じ件数になる。集計方法・色はランク判定ロジックの
-    # 変更を伴わない表示専用の再利用のみで、assign_cpc_rank等の判定条件には
-    # 一切触れない）
-    cnt = _render_rank_cards(df_c)
-    if cnt["判断保留"] > 0:
-        st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
-    st.markdown("---")
-    disp_cols = [c for c in ["campaign_name","ad_group","keyword","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
-    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","keyword":"KWテキスト",
-           "cost":"広告費","sales":"売上","orders":"購入数",
-           "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
-           "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
-    df_c = _cpc_apply_display_order(df_c, _RANK_ORDER)
-    df_c.index = df_c.index + 1
-    df_disp = df_c[df_c["cpc_delta"] != 0].copy()
-    df_disp.index = range(1, len(df_disp) + 1)
-    _d = df_disp[disp_cols].rename(columns=_rn).copy()
-    if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
-    if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
-    if "変更幅" in _d.columns: _d["変更幅"] = _d["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
-    if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-    if "推奨CPC" in _d.columns: _d["推奨CPC"] = _d["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-    # ③ KW一覧（実行対象抽出のみ）。表示条件は以下2つを厳密AND評価する：
-    # ①cpc_delta が数値としてnon-zero（NaN/文字列は数値0として扱い除外）
-    # ②cpc_rank が判定保留・未確定・空ではない（確定済み状態のみ許可）
-    # 文字列比較は行わず、フィルタは描画前に完結させる（描画後の除外は行わない）。
-    # フィルタ結果が0件の場合も、ノイズ(±0・判定保留)を再度含める形での
-    # 「完全開示」は行わない（安全な部分開示。対象なしの場合はその旨を表示する）。
-    st.markdown("#### 📋 KW一覧（実行対象）")
-    if df_c.empty:
-        st.info("表示対象のキーワードがありません。")
-    else:
-        if "cpc_delta" in df_c.columns:
-            _cd_num = pd.to_numeric(df_c["cpc_delta"], errors="coerce").fillna(0.0)
+    _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
+    with _t_tab1:
+        _RC = {
+            "SS+": "#D69E2E", "SS": "#B7791F", "S": "#553C9A",
+            "A":   "#2C7A7B", "B": "#2B6CB0", "C": "#C05621",
+            "D":   "#C53030", "即削除": "#742A2A", "判断保留": "#4A5568",
+        }
+        _cond_bar([("CPC調整ルール", "適用"), ("最小クリック数", f"{sv['mc']}回")])
+        render_logic_section(
+            "📈 CPC調整ロジック",
+            '''
+    <table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
+    <thead>
+      <tr style="background:#DBEAFE;">
+        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:15%;">ランク</th>
+        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:45%;">判定条件</th>
+        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">アクション</th>
+        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">CPC変更幅</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background:#F1F5F9;">
+        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+          【STEP 1】 データ不足判定（最優先）
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#4A5568;">判断保留</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>かつ</b> 購入数 &lt; 4件</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">変更なし</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+      </tr>
+      <tr style="background:#F1F5F9;">
+        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+          【STEP 2】 高実績ランク（購入数 ≥ 20件）
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#D69E2E;">SS+</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> ROAS ≥ 4.0</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
+      </tr>
+      <tr style="background:#FFFBEB;">
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#B7791F;">SS</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> 2.0 ≤ ROAS &lt; 4.0</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+      </tr>
+      <tr style="background:#F1F5F9;">
+        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+          【STEP 3】 ROASベースランク
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#553C9A;">S</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS ≥ 4.0</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
+      </tr>
+      <tr style="background:#F0FFF4;">
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2C7A7B;">A</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">3.0 ≤ ROAS &lt; 4.0</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2B6CB0;">B</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.8 ≤ ROAS &lt; 3.0</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
+      </tr>
+      <tr style="background:#FFF5F5;">
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">C</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 1.8</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
+      </tr>
+      <tr style="background:#FFF5F5;">
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">D</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS &lt; 1.5</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
+      </tr>
+      <tr style="background:#F1F5F9;">
+        <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
+          【STEP 4】 即削除判定（広告費過多 × 低ROAS）
+        </td>
+      </tr>
+      <tr style="background:#FFF5F5;">
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#742A2A;">即削除</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">
+          ROAS &lt; 0.8 <b>かつ</b> 広告費が閾値以上<br>
+          <span style="font-size:.8rem;color:#718096;">
+            売価 ≤¥1,500 → 広告費 ≥¥3,000 ／
+            売価 ≤¥2,000 → 広告費 ≥¥4,000 ／
+            売価 &gt;¥2,000 → 広告費 ≥¥5,000
+          </span>
+        </td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#742A2A;font-weight:700;">即削除</td>
+        <td style="padding:6px 10px;border:1px solid #BFDBFE;">—</td>
+      </tr>
+    </tbody>
+    </table>
+    <p style="font-size:.78rem;color:#718096;margin-top:10px;">
+      ▶ 判定順序: STEP1（データ不足）→ STEP2（購入数優先） → STEP3（ROASベース） → STEP4（即削除）<br>
+      ▶ 基本思想: ROASだけでなく、広告費と購入数を重視した複合判定
+    </p>''',
+        )
+        if dc_cpc.empty:
+            st.info("分析を実行してください。")
+            return
+        sel_options = ["全商品"] + [c for c in CAMPAIGNS if not dc_cpc[dc_cpc["campaign_theme"] == c].empty]
+        _sc, _ = st.columns([3, 2])
+        with _sc:
+            cpc_camp = st.selectbox("商品選択（キーワードCPC調整）", sel_options, label_visibility="visible", key="cpc_camp_sel")
+        if cpc_camp == "全商品":
+            df_c = dc_cpc.copy()
         else:
-            _cd_num = pd.Series(0.0, index=df_c.index)
-        _pending_vals = {"", "none", "nan", "n/a", "na", "pending", "保留", "判断保留"}
-        def _cpc_is_pending(_v):
-            if pd.isna(_v):
-                return True
-            return str(_v).strip().lower() in _pending_vals
-        if "cpc_rank" in df_c.columns:
-            _rank_pending = df_c["cpc_rank"].apply(_cpc_is_pending)
+            df_c = dc_cpc[dc_cpc["campaign_theme"] == cpc_camp].copy()
+        kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
+        _bg_map_rank = {
+            "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
+            "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
+        }
+        def _render_rank_cards(_df_for_cnt):
+            _c = {r: int((_df_for_cnt["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
+            _kc = st.columns(len(kpi_rks))
+            for _col, rk in zip(_kc, kpi_rks):
+                _col.markdown(f'''<div class="kpi-card" style="background:{_bg_map_rank.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
+                    <div class="kpi-label">{rk}</div>
+                    <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{_c[rk]}</div>
+                    <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+            return _c
+        # ランクサマリー（選択商品に連動。全商品選択時はdf_c=dc_cpc.copy()となるため
+        # 従来の全体集計と完全に同じ件数になる。集計方法・色はランク判定ロジックの
+        # 変更を伴わない表示専用の再利用のみで、assign_cpc_rank等の判定条件には
+        # 一切触れない）
+        cnt = _render_rank_cards(df_c)
+        if cnt["判断保留"] > 0:
+            st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
+        st.markdown("---")
+        disp_cols = [c for c in ["campaign_name","ad_group","keyword","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
+        _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","keyword":"KWテキスト",
+               "cost":"広告費","sales":"売上","orders":"購入数",
+               "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
+               "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
+        df_c = _cpc_apply_display_order(df_c, _RANK_ORDER)
+        df_c.index = df_c.index + 1
+        df_disp = df_c[df_c["cpc_delta"] != 0].copy()
+        df_disp.index = range(1, len(df_disp) + 1)
+        _d = df_disp[disp_cols].rename(columns=_rn).copy()
+        if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
+        if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
+        if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
+        if "変更幅" in _d.columns: _d["変更幅"] = _d["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
+        if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
+        if "推奨CPC" in _d.columns: _d["推奨CPC"] = _d["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
+        # ③ KW一覧（実行対象抽出のみ）。表示条件は以下2つを厳密AND評価する：
+        # ①cpc_delta が数値としてnon-zero（NaN/文字列は数値0として扱い除外）
+        # ②cpc_rank が判定保留・未確定・空ではない（確定済み状態のみ許可）
+        # 文字列比較は行わず、フィルタは描画前に完結させる（描画後の除外は行わない）。
+        # フィルタ結果が0件の場合も、ノイズ(±0・判定保留)を再度含める形での
+        # 「完全開示」は行わない（安全な部分開示。対象なしの場合はその旨を表示する）。
+        st.markdown("#### 📋 KW一覧（実行対象）")
+        if df_c.empty:
+            st.info("表示対象のキーワードがありません。")
         else:
-            _rank_pending = pd.Series(False, index=df_c.index)
-        _valid_mask = (_cd_num != 0) & (~_rank_pending)
-        _kwl_target = df_c[_valid_mask].copy()
-        if _kwl_target.empty:
-            st.info("調整対象のキーワードはありません（すべて変更不要または判定保留）。")
-        else:
-            _kwl_cols = [c for c in ["keyword", "avg_cpc", "cpc_delta", "cpc_rank"] if c in _kwl_target.columns]
-            _kwl = _kwl_target[_kwl_cols].rename(columns={
-                "keyword": "keyword", "avg_cpc": "CPC", "cpc_delta": "推奨調整額", "cpc_rank": "ランク",
-            }).copy()
-            if "CPC" in _kwl.columns:
-                _kwl["CPC"] = _kwl["CPC"].apply(lambda x: f"{x:,.0f}円" if x else "—")
-            if "推奨調整額" in _kwl.columns:
-                _kwl["推奨調整額"] = pd.to_numeric(_kwl["推奨調整額"], errors="coerce").fillna(0.0).apply(
-                    lambda x: f"+{int(x)}円" if x > 0 else f"{int(x)}円" if x < 0 else "±0円"
-                )
-            _kwl.index = range(1, len(_kwl) + 1)
-            st.dataframe(_kwl, use_container_width=True, height=460)
-    st.markdown("---")
-    _c1, _c2 = st.columns(2)
-    with _c1:
-        _dl_csv_adj = df_disp[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-        _anls_save_cpc_change_history(df_disp[disp_cols].copy())
-        st.download_button(f"📥 {cpc_camp}_CPC調整_実行用.csv", data=_dl_csv_adj,
-            file_name=f"{cpc_camp}_CPC調整_実行用.csv", mime="text/csv", use_container_width=True)
-    with _c2:
-        _dl_csv_all = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-        st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
-            file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
+            if "cpc_delta" in df_c.columns:
+                _cd_num = pd.to_numeric(df_c["cpc_delta"], errors="coerce").fillna(0.0)
+            else:
+                _cd_num = pd.Series(0.0, index=df_c.index)
+            _pending_vals = {"", "none", "nan", "n/a", "na", "pending", "保留", "判断保留"}
+            def _cpc_is_pending(_v):
+                if pd.isna(_v):
+                    return True
+                return str(_v).strip().lower() in _pending_vals
+            if "cpc_rank" in df_c.columns:
+                _rank_pending = df_c["cpc_rank"].apply(_cpc_is_pending)
+            else:
+                _rank_pending = pd.Series(False, index=df_c.index)
+            _valid_mask = (_cd_num != 0) & (~_rank_pending)
+            _kwl_target = df_c[_valid_mask].copy()
+            if _kwl_target.empty:
+                st.info("調整対象のキーワードはありません（すべて変更不要または判定保留）。")
+            else:
+                _kwl_cols = [c for c in ["keyword", "avg_cpc", "cpc_delta", "cpc_rank"] if c in _kwl_target.columns]
+                _kwl = _kwl_target[_kwl_cols].rename(columns={
+                    "keyword": "keyword", "avg_cpc": "CPC", "cpc_delta": "推奨調整額", "cpc_rank": "ランク",
+                }).copy()
+                if "CPC" in _kwl.columns:
+                    _kwl["CPC"] = _kwl["CPC"].apply(lambda x: f"{x:,.0f}円" if x else "—")
+                if "推奨調整額" in _kwl.columns:
+                    _kwl["推奨調整額"] = pd.to_numeric(_kwl["推奨調整額"], errors="coerce").fillna(0.0).apply(
+                        lambda x: f"+{int(x)}円" if x > 0 else f"{int(x)}円" if x < 0 else "±0円"
+                    )
+                _kwl.index = range(1, len(_kwl) + 1)
+                st.dataframe(_kwl, use_container_width=True, height=460)
+        st.markdown("---")
+        _c1, _c2 = st.columns(2)
+        with _c1:
+            _dl_csv_adj = df_disp[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            _anls_save_cpc_change_history(df_disp[disp_cols].copy())
+            st.download_button(f"📥 {cpc_camp}_CPC調整_実行用.csv", data=_dl_csv_adj,
+                file_name=f"{cpc_camp}_CPC調整_実行用.csv", mime="text/csv", use_container_width=True)
+        with _c2:
+            _dl_csv_all = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
+                file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
+    with _t_tab2:
+        _anls_entry_point(dc_cpc)
 
 
 def _anls_entry_point(dc_cpc):
