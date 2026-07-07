@@ -3326,6 +3326,63 @@ def page_cpc():
         _anls_render_analysis_page(_kwl_target)
 
 
+def _anls_lookup_kw_cpc_trend(campaign_name: str, keyword: str, anls_hist_fname: str) -> list:
+    """分析ページ専用の新規追加ヘルパー（表示専用・参照専用）。
+
+    _anls_save_cpc_change_history() が実際に保存している構造
+    （各レコード = {"exported_at": ..., "entries": [{"campaign_name": ...,
+    "keyword": ..., "avg_cpc": ..., "cost": ..., "sales": ..., "ROAS": ...,
+    "orders": ..., ...}, ...]}）を _anls_load()（既存・無改変）でそのまま
+    読み、campaign_name・keywordが一致するentryだけを保存順（＝時系列順）
+    に抽出するだけ。新しい判定・新しい集計・新しい保存形式は一切追加しない。
+
+    （旧 _cpc_hier_lookup_trend は "detail" キーを前提としており、
+    cpc_change_history.json の実際の保存構造（"entries"キー）とは一致しない
+    ため、常に空リストを返してしまっていた。_cpc_hier_lookup_trend 自体は
+    無改変のまま残し、分析ページはこちらの新規ヘルパーを利用する。）
+
+    キーワード照合は全角半角・空白・改行・大文字小文字の表記揺れを吸収する
+    ため、既存の正規化関数 norm()（無改変）をそのまま利用する。表示する
+    キーワード文字列自体（呼び出し側で使う値）は一切加工しない。
+    """
+    _recs = _anls_load(anls_hist_fname)
+    if not _recs:
+        return []
+    _key_cn = norm(campaign_name)
+    _key_kw = norm(keyword)
+    _out = []
+    for _r in _recs:
+        if not isinstance(_r, dict):
+            continue
+        _entries = _r.get("entries")
+        if not isinstance(_entries, list):
+            continue
+        _match = None
+        for _e in _entries:
+            if not isinstance(_e, dict):
+                continue
+            if norm(_e.get("campaign_name", "")) == _key_cn and norm(_e.get("keyword", "")) == _key_kw:
+                _match = _e
+                break
+        if _match is None:
+            continue
+        _roas_v = _match.get("ROAS")
+        _cpc_v = _match.get("avg_cpc")
+        _sales_v = _match.get("sales")
+        _out.append({
+            "sort_key": _r.get("exported_at", ""),
+            "roas_str": f"{_roas_v:.2f}" if isinstance(_roas_v, (int, float)) else "―",
+            "avg_cpc_str": f"{_cpc_v:,.0f}円" if isinstance(_cpc_v, (int, float)) else "―",
+            # 【既知の制約】cpc_change_history.jsonにはクリック数が保存されて
+            # いない（_anls_save_cpc_change_historyのsave_colsに含まれない
+            # 既存仕様のため）。新規に集計・逆算はしないため常に"―"。
+            "clicks_str": "―",
+            "sales_str": f"{_sales_v/10000:.1f}万" if isinstance(_sales_v, (int, float)) else "―",
+        })
+    _out.sort(key=lambda x: x["sort_key"])
+    return _out[-4:]
+
+
 def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str = "cpc_change_history.json") -> None:
     """分析ページ（page_cpcのtab2）用の新規追加関数（表示専用）。
     CPC調整ページ(tab1)のKW一覧（実行対象）で既に確定済みの_kwl_targetを
@@ -3333,8 +3390,8 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     での独自ソート・独自フィルタ・新規KW生成は一切行わない。
 
     各キーワードは st.expander(expanded=False) で折りたたみ表示し、開いた
-    場合のみ既存の _cpc_hier_lookup_trend()（無改変・既存の保存済み履歴
-    cpc_change_history.jsonを読むだけ）が返す直近4期間のトレンドを表示する。
+    場合のみ _anls_lookup_kw_cpc_trend()（新規追加・cpc_change_history.json
+    の実際の保存構造をそのまま読むだけ）が返す直近4期間のトレンドを表示する。
     表示項目はROAS/CPC/クリック/売上のみで、新しい判定・新しい集計は行わない。
 
     【既知の制約】st.expanderはStreamlit標準機能では相互排他（1つ開くと他が
@@ -3347,9 +3404,9 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     _labels = ["今週", "1週前", "2週前", "3週前"]
     for _, _row in _kwl_target.iterrows():
         _kw = _row.get("keyword", "")
-        _theme = _row.get("campaign_theme", "")
+        _cname = _row.get("campaign_name", "")
         with st.expander(f"▶ {_kw}", expanded=False):
-            _trend = _cpc_hier_lookup_trend(_theme, _kw, anls_hist_fname)
+            _trend = _anls_lookup_kw_cpc_trend(_cname, _kw, anls_hist_fname)
             if not _trend:
                 st.caption("分析履歴データがありません。")
                 continue
