@@ -548,6 +548,27 @@ if run:
         st.error("検索用語レポートをアップロードしてください"); st.stop()
     with st.spinner("分析中..."):
         dfs = rcsv(sf)
+
+        # -- 親KW分析用: 検索用語CSVのデータ期間(日数)を算出 --
+        # (既存のオート除外KWロジックには一切影響しない、追加の読み取りのみ)
+        _pkw_period_days = None
+        _pkw_period_label = None
+        _pkw_pc = fcol(dfs, ["期間"])
+        if _pkw_pc:
+            try:
+                _pkw_parts = dfs[_pkw_pc].astype(str).str.split(" - ", expand=True)
+                _pkw_starts = pd.to_datetime(_pkw_parts[0], format="%Y/%m/%d", errors="coerce")
+                _pkw_ends = (
+                    pd.to_datetime(_pkw_parts[1], format="%Y/%m/%d", errors="coerce")
+                    if _pkw_parts.shape[1] > 1 else _pkw_starts
+                )
+                if _pkw_starts.notna().any() and _pkw_ends.notna().any():
+                    _pkw_s_min, _pkw_e_max = _pkw_starts.min(), _pkw_ends.max()
+                    _pkw_period_days = (_pkw_e_max - _pkw_s_min).days + 1
+                    _pkw_period_label = f"{_pkw_s_min.month}/{_pkw_s_min.day}〜{_pkw_e_max.month}/{_pkw_e_max.day}"
+            except Exception:
+                _pkw_period_days = None
+                _pkw_period_label = None
         kc  = fcol(dfs, ["検索用語", "カスタマーの検索用語", "Customer Search Term", "search term"])
         cc  = fcol(dfs, ["キャンペーン名", "Campaign Name", "campaign name"])
         sc  = fcol(dfs, ["売上", "売上額", "合計売上", "広告費売上高", "7日間の総売上高", "Attributed Sales", "Sales"])
@@ -900,6 +921,34 @@ if run:
 
             df_auto_del_kw_keyword_ = _apply_del_filter(_agg_kw)
 
+            # -- 親KW分析用: 検索用語CSV全体(AUTO/マニュアル問わず、マニュアル重複
+            # 除外も適用しない)を正規化キーワード単位で集計する。
+            # 目的:「オート広告がどのような検索意図に配信されているか」を親KW単位で
+            # 評価する際、良い検索語まで巻き込むリスクを見落とさないため、除外候補
+            # (df_auto_del_kw_keyword_、悪い検索語の判定)だけでなく、CSV全体に含まれる
+            # 良い検索語も集計対象に含める。
+            # 既存のオート除外KW抽出ロジック(_auto_kw_base/_agg_kw/_apply_del_filter/
+            # df_auto_del_kw_keyword_自体)には一切手を加えず、以下は別建てで
+            # 独立に集計するのみ。ASIN/category:コード化された行のみ、自然言語の
+            # 検索語ではないため対象から除外する(既存のis_asin_kn/is_category_kn
+            # 関数を呼び出すのみで、判定ロジック自体は変更しない)。
+            if kc and sc and oc_:
+                _pkw_full = dfs.copy()
+                _pkw_full["kn"] = _pkw_full[kc].apply(norm)
+                _pkw_full = _pkw_full[~_pkw_full["kn"].apply(
+                    lambda k: is_asin_kn(k) or is_category_kn(k)
+                )].copy()
+                _parent_kw_all_priced = (
+                    _pkw_full.groupby("kn", as_index=False)
+                    .agg(sales=(sc, "sum"), cost=(oc_, "sum"))
+                )
+                _parent_kw_all_priced.insert(0, "keyword", _parent_kw_all_priced["kn"])
+                _parent_kw_all_priced["ROAS"] = _parent_kw_all_priced.apply(
+                    lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1
+                )
+            else:
+                _parent_kw_all_priced = pd.DataFrame()
+
             # ── 商品専用DataFrame: ASINのみ残す ──
             _base_pt = _auto_kw_base[_auto_kw_base["kn"].apply(
                 lambda k: is_asin_kn(k)
@@ -923,6 +972,7 @@ if run:
             df_auto_del_kw_product_ = pd.DataFrame()
             df_auto_del_kw_video_   = pd.DataFrame()
             _dbg_auto_kw_ = {"n1":0,"n2":0,"n3":0,"n4":0,"n5":0,"n6":0,"n7":0}
+            _parent_kw_all_priced = pd.DataFrame()
 
         # 商品/動画: オートASIN中、マニュアルASINと重複しない出血ASIN
         def _build_auto_asin_del(camp_mask, manual_mask):
@@ -1000,6 +1050,9 @@ if run:
             "df_auto_del_product": df_auto_del_product_,
             "df_auto_del_video":   df_auto_del_video_,
             "dbg_auto_kw": _dbg_auto_kw_,
+            "parent_kw_all_priced": _parent_kw_all_priced,
+            "parent_kw_period_days": _pkw_period_days,
+            "parent_kw_period_label": _pkw_period_label,
             "dbg_auto_pt": _dbg_auto_pt_,
             "dbg_auto_vid": _dbg_auto_vid_,
             "stats": {
@@ -1371,31 +1424,197 @@ def _render_del_kw_block(df, badge_label, list_label, table_label,
     else:
         st.info(empty_msg or "削除対象キーワードはありません。")
 
-def page_auto_del_kw():
-    # ── session_stateからキーワードDataFrameを取得（商品/動画は別ページへ合流済み）──
-    df_auto_del_kw_keyword = st.session_state.get("df_auto_del_kw_keyword", pd.DataFrame())
+def _anls_render_parent_kw_page() -> None:
+    """親KW分析ページ(page_auto_del_kwのtab2)用の関数（表示専用・実験機能）。
 
-    if df_auto_del_kw_keyword.empty:
-        st.info("除外候補のキーワードはありません。（オートKWで出血中かつマニュアル未登録のものなし）")
+    既存の「オート除外KW」判定ロジック(広告費 >= 売価×2 かつ ROAS <= 0.8、
+    df_auto_del_kw_keyword_の抽出結果)には一切手を加えない。本関数は、
+    その除外対象キーワードについて「親KW」(隣接2語以上の複合語候補)単位で
+    見た場合に、実売のある兄弟検索語を巻き込むリスクがないかを追加で
+    可視化するだけの、分析表示専用の実験機能。
+
+    【対象期間についての注意】
+    親KW分析は検索語数が十分でないと判定精度が下がるため、60日以上
+    (推奨90日)の検索用語データでの分析を推奨する。アップロードされた
+    検索用語CSVの「期間」列から算出したデータ期間が60日未満の場合、
+    もしくは期間が判定できない場合は、本分析の上部に注意メッセージを
+    表示する。このチェックは本関数内の表示のみに影響し、既存のオート
+    除外KWロジック自体(抽出条件・抽出件数)には一切影響を与えない。
+
+    親KW候補は「隣接する2語以上」のみを対象とし、単語1つの候補は
+    生成しない(ご指示に基づく仕様)。
+    """
+    _bad = st.session_state.get("df_auto_del_kw_keyword", pd.DataFrame())
+    _all_priced = st.session_state.get("parent_kw_all_priced", pd.DataFrame())
+    _period_days = st.session_state.get("parent_kw_period_days")
+    _period_label = st.session_state.get("parent_kw_period_label")
+
+    _warn_base = (
+        "⚠️ 親KW分析は60日以上（推奨90日）の検索用語データで分析することを推奨します。"
+        "データ期間が短い場合、判定精度が低下する可能性があります。"
+    )
+    if _period_days is None:
+        st.warning(_warn_base + "（アップロードされたCSVから期間を判定できませんでした）")
+    elif _period_days < 60:
+        _extra = f" 現在のデータ期間: 約{_period_days}日"
+        if _period_label:
+            _extra += f"（{_period_label}）"
+        st.warning(_warn_base + _extra)
+
+    if _bad is None or _bad.empty:
+        st.info("除外候補のキーワードがないため、親KW分析の対象がありません。")
+        return
+    if _all_priced is None or _all_priced.empty or "keyword" not in _all_priced.columns:
+        st.info("親KW分析に必要なデータが取得できませんでした。")
         return
 
-    # ── 件数検証（必須）─────────────────────────────────────────────────
-    n_kw = len(df_auto_del_kw_keyword)
-    st.metric("📄 キーワード件数", f"{n_kw}件")
+    _bad_set = set(_bad["keyword"].astype(str))
+    _agg_idx = _all_priced.set_index("keyword")
 
-    # ── キーワードセクション ─────────────────────────────────────────────
-    st.markdown("### 📄 キーワード")
-    _render_del_kw_block(
-        df_auto_del_kw_keyword,
-        badge_label="キーワード除外候補",
-        list_label="除外対象KW一覧",
-        table_label="除外KW詳細テーブル",
-        camp_label="キャンペーン（キーワード）",
-        camp_key="auto_kw_camp_kw",
-        empty_msg="除外候補のキーワードはありません。",
-        csv_fname="auto_negative_keyword.csv",
-        dl_key="dl_akw_kw",
+    _vocab = {}
+    for _kw in _all_priced["keyword"]:
+        for _tok in str(_kw).split():
+            if _tok:
+                _vocab[_tok] = _vocab.get(_tok, 0) + 1
+    _VOCAB = set(_t for _t, _c in _vocab.items() if (len(_t) >= 2 or _c >= 5))
+
+    def _pkw_tokenize(_term):
+        _term = str(_term).strip()
+        if " " in _term:
+            return [_t for _t in _term.split() if _t]
+        _toks, _i, _n = [], 0, len(_term)
+        while _i < _n:
+            _matched = None
+            for _L in range(min(8, _n - _i), 0, -1):
+                _cand = _term[_i:_i + _L]
+                if _cand in _VOCAB:
+                    _matched = _cand
+                    break
+            if _matched:
+                _toks.append(_matched)
+                _i += len(_matched)
+            else:
+                _toks.append(_term[_i])
+                _i += 1
+        _merged = []
+        for _t in _toks:
+            if _merged and len(_merged[-1]) == 1 and len(_t) == 1:
+                _merged[-1] += _t
+            else:
+                _merged.append(_t)
+        return _merged
+
+    _parent_map = {}
+    for _kw in _all_priced["keyword"]:
+        _toks = _pkw_tokenize(_kw)
+        _cands = set()
+        for _n in range(2, len(_toks) + 1):
+            for _i in range(len(_toks) - _n + 1):
+                _cands.add(" ".join(_toks[_i:_i + _n]))
+        for _c in _cands:
+            _parent_map.setdefault(_c, []).append(_kw)
+
+    _rows = []
+    for _parent, _kws in _parent_map.items():
+        _kws = sorted(set(_kws))
+        if len(_kws) < 2:
+            continue
+        _n_bad = sum(1 for _k in _kws if _k in _bad_set)
+        if _n_bad < 1:
+            continue
+        _sub = _agg_idx.loc[_kws]
+        _total_cost = float(_sub["cost"].sum())
+        _total_sales = float(_sub["sales"].sum())
+        _roas = round(_total_sales / _total_cost, 2) if _total_cost > 0 else 0.0
+        _good_kws = [_k for _k in _kws if _k not in _bad_set and _agg_idx.loc[_k, "sales"] > 0]
+        _unproven_kws = [_k for _k in _kws if _k not in _bad_set and _agg_idx.loc[_k, "sales"] == 0]
+        _n_realgood = len(_good_kws)
+        _n_unproven = len(_unproven_kws)
+        _realgood_sales = float(_sub.loc[_good_kws, "sales"].sum()) if _n_realgood else 0.0
+        _realgood_ratio = (_realgood_sales / _total_sales) if _total_sales > 0 else 0.0
+        if _n_realgood == 0:
+            _verdict = "🟩 安全"
+        elif _realgood_ratio >= 0.2 or _n_realgood >= 2:
+            _verdict = "🟥 危険"
+        else:
+            _verdict = "🟨 要確認"
+        _rows.append({
+            "親KW候補": _parent, "関連検索語数": len(_kws),
+            "広告費": _total_cost, "売上": _total_sales, "ROAS": _roas,
+            "悪い検索語数": _n_bad, "実売あり良い検索語数": _n_realgood,
+            "未実売検索語数": _n_unproven, "実売良い語の売上構成比": round(_realgood_ratio, 2),
+            "判定": _verdict,
+        })
+
+    st.markdown("### 🔍 親KW分析（実験機能）")
+    st.caption(
+        "現在の除外対象キーワード（下記「① 現在の除外対象キーワード一覧」）を「2語以上」の"
+        "親KW単位でグルーピングし、実売のある兄弟検索語を巻き込むリスクがないかを確認します。"
+        "本分析は表示専用の実験機能であり、除外判定ロジック自体"
+        "（広告費 ≥ 売価×2 かつ ROAS ≤ 0.8）には一切影響しません。"
     )
+
+    with st.expander(f"① 現在の除外対象キーワード一覧（{len(_bad)}件）", expanded=False):
+        _bcols = [c for c in ["keyword", "campaign_theme", "cost", "sales", "ROAS"] if c in _bad.columns]
+        _brn = {"keyword": "検索語", "campaign_theme": "テーマ", "cost": "広告費", "sales": "売上", "ROAS": "ROAS"}
+        st.dataframe(_bad[_bcols].rename(columns=_brn), use_container_width=True)
+
+    if not _rows:
+        st.info("除外対象キーワードを含む「2語以上」の親KW候補は見つかりませんでした。")
+        return
+
+    _pdf = pd.DataFrame(_rows).sort_values(["判定", "広告費"], ascending=[True, False])
+    st.markdown(f"**② 親KW候補一覧（除外対象語を含むもの: {len(_pdf)}件）**")
+    _disp = _pdf.copy()
+    _disp["広告費"] = _disp["広告費"].apply(lambda x: f"¥{x:,.0f}")
+    _disp["売上"] = _disp["売上"].apply(lambda x: f"¥{x:,.0f}")
+    st.dataframe(_disp, use_container_width=True)
+
+    _n_danger = int((_pdf["判定"] == "🟥 危険").sum())
+    _n_check = int((_pdf["判定"] == "🟨 要確認").sum())
+    _n_safe = int((_pdf["判定"] == "🟩 安全").sum())
+    st.caption(f"判定内訳： 🟥危険 {_n_danger}件 / 🟨要確認 {_n_check}件 / 🟩安全 {_n_safe}件")
+
+    with st.expander("判定基準・限界について", expanded=False):
+        st.text(
+            "安全：親KWの兄弟検索語に実売(売上>0)のある語が1件もない\n"
+            "要確認：実売のある兄弟語はあるが件数・売上比率とも小さい\n"
+            "危険：実売のある兄弟語が複数、または売上構成比20%以上"
+            "（親KW単位の除外で巻き添えが大きい）\n\n"
+            "限界：形態素解析器（MeCab/Janome等）が利用できない環境のため、"
+            "独自の簡易分かち書き（語彙辞書＋最長一致）で代替しており、"
+            "分割精度は本格的な形態素解析に劣ります。"
+        )
+
+
+def page_auto_del_kw():
+    _t1, _t2 = st.tabs(["除外候補", "🔍 親KW分析"])
+    with _t1:
+        # ── session_stateからキーワードDataFrameを取得（商品/動画は別ページへ合流済み）──
+        df_auto_del_kw_keyword = st.session_state.get("df_auto_del_kw_keyword", pd.DataFrame())
+
+        if df_auto_del_kw_keyword.empty:
+            st.info("除外候補のキーワードはありません。（オートKWで出血中かつマニュアル未登録のものなし）")
+        else:
+            # ── 件数検証（必須）─────────────────────────────────────────
+            n_kw = len(df_auto_del_kw_keyword)
+            st.metric("📄 キーワード件数", f"{n_kw}件")
+
+            # ── キーワードセクション ─────────────────────────────────────
+            st.markdown("### 📄 キーワード")
+            _render_del_kw_block(
+                df_auto_del_kw_keyword,
+                badge_label="キーワード除外候補",
+                list_label="除外対象KW一覧",
+                table_label="除外KW詳細テーブル",
+                camp_label="キャンペーン（キーワード）",
+                camp_key="auto_kw_camp_kw",
+                empty_msg="除外候補のキーワードはありません。",
+                csv_fname="auto_negative_keyword.csv",
+                dl_key="dl_akw_kw",
+            )
+    with _t2:
+        _anls_render_parent_kw_page()
 
 def page_auto_del_product():
     df = st.session_state.get("df_auto_del_product", pd.DataFrame())
@@ -3564,7 +3783,7 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
         return
 
     _sel_label = st.radio(
-        "対象を選択", _tab_labels, key="_anls_radio_kw", label_visibility="collapsed",
+        "対象を選択", _tab_labels, key="anls_kw_radio", label_visibility="collapsed",
     )
     _sel_idx = _tab_labels.index(_sel_label)
     _weekly = _tab_weeklies[_sel_idx]
@@ -3734,7 +3953,7 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
         return
 
     _sel_label = st.radio(
-        "対象を選択", _tab_labels, key="_anls_radio_product", label_visibility="collapsed",
+        "対象を選択", _tab_labels, key="anls_product_radio", label_visibility="collapsed",
     )
     _sel_idx = _tab_labels.index(_sel_label)
     _weekly = _tab_weeklies[_sel_idx]
@@ -3888,7 +4107,7 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
         return
 
     _sel_label = st.radio(
-        "対象を選択", _tab_labels, key="_anls_radio_video", label_visibility="collapsed",
+        "対象を選択", _tab_labels, key="anls_video_radio", label_visibility="collapsed",
     )
     _sel_idx = _tab_labels.index(_sel_label)
     _weekly = _tab_weeklies[_sel_idx]
