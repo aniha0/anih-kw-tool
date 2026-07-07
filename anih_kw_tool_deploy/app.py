@@ -3326,170 +3326,99 @@ def page_cpc():
         _anls_render_analysis_page(_kwl_target)
 
 
-def _anls_week_bounds(basis_date=None):
-    """分析ページ専用の新規追加関数（週判定処理・表示専用・参照専用）。
-    保存順（最新N件）ではなく、実際の日付から「今週/1週前/2週前/3週前」の
-    区間（開始日, 終了日, ラベル）を計算するだけの純粋関数。既存のCPC調整・
-    判定・保存ロジックには一切依存せず、新しい判定ロジックの追加でもない
-    （単なる日付範囲の算出）。
+def _anls_run_cpc_kw_period_comparison(dc_cpc: pd.DataFrame) -> list:
+    """分析ページ専用の新規追加関数（表示専用・データ取得のロジックは
+    既存関数の呼び出しのみで構成）。
 
-    区間定義（ユーザー指定例・テストケースに基づく）:
-      今週  : [basis-1日,  basis]        （例: 基準日2026/07/07 → 7/6〜7/7）
-      1週前 : [basis-8日,  basis-2日]     （例: 6/29〜7/5）
-      2週前 : [basis-15日, basis-9日]     （例: 6/22〜6/28）
-      3週前 : [basis-22日, basis-16日]    （例: 6/15〜6/21）
+    【経緯】以前の分析ページ設計では、cpc_change_history.json（保存ボタンの
+    クリック日時のみを持つ）を根拠に「今週/1週前/2週前/3週前」を独自生成
+    していたが、これは実際のCSV「期間」列を無視した誤った表示だった。
+    正しい仕様は「各CSVに記録されている実際の期間（例:2026/6/10〜6/16）を
+    そのまま使う」ことであり、それを保持しているのは、以前tab2から切り
+    離した「🔍 分析実行」機能（_anls_render_tab内）が使っていたロジック
+    のみである。ここではそのロジック（CSVパース→期間文字列抽出→
+    _anls_build_cpc_after→cpc_change_history.jsonとの照合→マージ→
+    _anls_row_judge→_anls_build_multi_period_table）を、既存関数を一切
+    改変せずそのまま呼び出す形で再現するだけの新規追加関数。新しい判定・
+    新しい集計・新しい保存処理は一切追加しない。
+
+    CSVの取得元は、既存の（アプリ起動時から共通で表示されている）
+    「📅 7日比較CSV」バケット（st.session_state["csv_bucket_7d"]）を
+    そのまま参照する。分析ページ内に新しいアップロードUIは追加しない。
     """
-    if basis_date is None:
-        basis_date = _anls_dt.date.today()
-    _bounds = []
-    _labels = ["今週", "1週前", "2週前", "3週前"]
-    for _n, _label in enumerate(_labels):
-        if _n == 0:
-            _start = basis_date - _anls_dt.timedelta(days=1)
-            _end = basis_date
-        else:
-            _end = basis_date - _anls_dt.timedelta(days=7 * _n - 5)
-            _start = basis_date - _anls_dt.timedelta(days=7 * _n + 1)
-        _bounds.append((_start, _end, _label))
-    return _bounds
-
-
-def _anls_build_kw_week_trend(campaign_name: str, keyword: str, anls_hist_fname: str, basis_date=None) -> dict:
-    """分析ページ専用の新規追加関数（表示専用・参照専用）。
-    _anls_load()（既存・無改変）でcpc_change_history.jsonの既存entriesを
-    そのまま読み、campaign_name・keywordが一致するentryを、保存日時
-    (exported_at)を基準に _anls_week_bounds() の各区間へ配置するだけ。
-    「最新4件 = 4週間」という保存順依存の扱いは行わず、必ず日付で判定する。
-    同一週内に複数件マッチした場合は、その週内で最も新しい日時のものを採用
-    する（新しい判定・新しい集計の追加ではなく、単純な日時比較のみ）。
-    新規保存処理・新規履歴形式は一切追加しない。
-    """
-    _recs = _anls_load(anls_hist_fname)
-    _bounds = _anls_week_bounds(basis_date)
-    _result = {_label: None for _, _, _label in _bounds}
-    if not _recs:
-        return _result
-    _key_cn = norm(campaign_name)
-    _key_kw = norm(keyword)
-    for _r in _recs:
-        if not isinstance(_r, dict):
-            continue
-        _entries = _r.get("entries")
-        if not isinstance(_entries, list):
-            continue
-        _match = None
-        for _e in _entries:
-            if not isinstance(_e, dict):
-                continue
-            if norm(_e.get("campaign_name", "")) == _key_cn and norm(_e.get("keyword", "")) == _key_kw:
-                _match = _e
-                break
-        if _match is None:
-            continue
-        _exported_at = _r.get("exported_at", "")
+    _bucket_held = st.session_state.get("csv_bucket_7d", {})
+    if not _bucket_held:
+        return []
+    af_files = list(_bucket_held.values())
+    _results = []
+    for af_file in af_files:
         try:
-            _rec_dt = _anls_dt.datetime.fromisoformat(str(_exported_at))
-            _rec_date = _rec_dt.date()
+            df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
+            _period_str = None
+            _pc = fcol(df_raw, ["期間"])
+            if _pc:
+                try:
+                    _parts = df_raw[_pc].astype(str).str.split(" - ", expand=True)
+                    _starts = pd.to_datetime(_parts[0], format="%Y/%m/%d", errors="coerce")
+                    _ends = pd.to_datetime(_parts[1], format="%Y/%m/%d", errors="coerce") if _parts.shape[1] > 1 else _starts
+                    if _starts.notna().any() and _ends.notna().any():
+                        _period_str = f"{_starts.min().strftime('%Y/%m/%d')} - {_ends.max().strftime('%Y/%m/%d')}"
+                except Exception:
+                    _period_str = None
+            if not all([cc, sc, oc_]):
+                continue
+            kw_col_cpc = kwt if kwt else fcol(df_raw, ["ターゲティング", "Targeting", "targeting"])
+            after_df = _anls_build_cpc_after(df_raw, cc, sc, oc_, od, clk, kw_col_cpc)
+            if after_df.empty:
+                continue
+            bf = dc_cpc.copy()
+            _cpc_hist = _anls_load("cpc_change_history.json")
+            if not _cpc_hist:
+                continue
+            _last_entries = _cpc_hist[-1]["entries"]
+            _hist_df = pd.DataFrame(_last_entries)
+            def _cpc_key_fn(r):
+                cn_  = norm(str(r.get("campaign_name", "") or ""))
+                agn_ = norm(str(r.get("ad_group", "") or ""))
+                kw_  = norm(str(r.get("keyword", "") or ""))
+                return f"{cn_}|{agn_}|{kw_}"
+            _hist_df["_kn_key"] = _hist_df.apply(_cpc_key_fn, axis=1)
+            _hist_keys = set(_hist_df["_kn_key"])
+            bf["_kn_key"] = bf.apply(_cpc_key_fn, axis=1)
+            bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
+            sfx = [c for c in ["sales", "cost", "ROAS", "orders", "clicks", "CVR", "avg_cpc"] if c in after_df.columns]
+            merged = bf.merge(after_df[["_kn_key"] + sfx], on="_kn_key", how="inner", suffixes=("_b", "_a"))
+            if merged.empty:
+                continue
+            merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
+            _results.append({"merged": merged, "period": _period_str})
         except Exception:
             continue
-        for _start, _end, _label in _bounds:
-            if _start <= _rec_date <= _end:
-                _prev = _result.get(_label)
-                if _prev is None or _exported_at >= _prev.get("_exported_at", ""):
-                    _roas_v = _match.get("ROAS")
-                    _cpc_v = _match.get("avg_cpc")
-                    _sales_v = _match.get("sales")
-                    _result[_label] = {
-                        "_exported_at": _exported_at,
-                        "roas_str": f"{_roas_v:.2f}" if isinstance(_roas_v, (int, float)) else "―",
-                        "avg_cpc_str": f"{_cpc_v:,.0f}円" if isinstance(_cpc_v, (int, float)) else "―",
-                        # 【既知の制約】cpc_change_history.jsonにはクリック数が
-                        # 保存されていないため常に"―"（既存の保存処理は無変更）。
-                        "clicks_str": "―",
-                        "sales_str": f"{_sales_v/10000:.1f}万" if isinstance(_sales_v, (int, float)) else "―",
-                    }
-                break
-    return _result
-
-
-def _anls_bucket_history_by_period(campaign_name: str, keyword: str, anls_hist_fname: str, basis_date=None) -> list:
-    """分析ページ専用の新規追加関数（表示専用・参照専用）。
-
-    保存順（最新N件）には一切依存せず、対象KWの実際の保存日時
-    (exported_at) だけを根拠に日付範囲へ分類する。該当KWの最も古い
-    マッチ日から基準日（既定=本日）まで、7日単位で連続する日付範囲
-    （バケット）を機械的に生成し、各バケットに該当する保存データが
-    あればそれを、なければNone（＝表示側で「―」）を割り当てるだけ。
-    新しい判定・新しい集計・新しい保存形式は一切追加しない。既存の
-    _anls_load()（無改変）でcpc_change_history.jsonのentriesをそのまま
-    読み、キーワード照合は既存の norm()（無改変）をそのまま利用する。
-
-    戻り値: [(start_date, end_date, entry_dict_or_None), ...] を
-    古い期間→新しい期間の順（昇順）で返す。該当データが1件も
-    見つからない場合は空リスト[]を返す（＝「データなし」表示用）。
-    """
-    if basis_date is None:
-        basis_date = _anls_dt.date.today()
-    _recs = _anls_load(anls_hist_fname)
-    if not _recs:
+    # 【旧分析ページとの仕様一致】旧分析ページ(_anls_render_tab)は
+    # `if len(_results_now) >= 2:` の場合のみ複数期間比較表
+    # (_anls_build_multi_period_table/_anls_render_multi_period_table)を
+    # 表示し、2件未満（0件・1件）の場合は比較表自体を表示しない仕様
+    # だった。列数もハードコードされた4ではなく、実際に解析できた
+    # CSV件数と完全に一致する（旧仕様のこの2点をそのまま踏襲する）。
+    if len(_results) < 2:
         return []
-    _key_cn = norm(campaign_name)
-    _key_kw = norm(keyword)
-    _matches = []
-    for _r in _recs:
-        if not isinstance(_r, dict):
-            continue
-        _entries = _r.get("entries")
-        if not isinstance(_entries, list):
-            continue
-        _match = None
-        for _e in _entries:
-            if not isinstance(_e, dict):
-                continue
-            if norm(_e.get("campaign_name", "")) == _key_cn and norm(_e.get("keyword", "")) == _key_kw:
-                _match = _e
-                break
-        if _match is None:
-            continue
-        _exported_at = _r.get("exported_at", "")
-        try:
-            _rec_date = _anls_dt.datetime.fromisoformat(str(_exported_at)).date()
-        except Exception:
-            continue
-        _matches.append((_rec_date, _match, _exported_at))
-    if not _matches:
-        return []
-    _earliest = min(_m[0] for _m in _matches)
-    _buckets = []
-    _i = 0
-    while True:
-        _start = _earliest + _anls_dt.timedelta(days=7 * _i)
-        _end = _start + _anls_dt.timedelta(days=6)
-        _buckets.append([_start, _end, None])
-        if _end >= basis_date or _i > 520:  # 520=安全弁(約10年分)。無限ループ防止のみ
-            break
-        _i += 1
-    for _rec_date, _match, _exported_at in _matches:
-        for _b in _buckets:
-            if _b[0] <= _rec_date <= _b[1]:
-                _prev = _b[2]
-                if _prev is None or _exported_at >= _prev[1]:
-                    _b[2] = (_match, _exported_at)
-                break
-    return [(_b[0], _b[1], (_b[2][0] if _b[2] else None)) for _b in _buckets]
+    return _anls_build_multi_period_table(_results, "keyword", "cpc_kw")
 
 
 def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str = "cpc_change_history.json") -> None:
-    """分析ページ（page_cpcのtab2）用の新規追加関数（表示専用）。
+    """分析ページ（page_cpcのtab2）用の関数（表示専用）。
     CPC調整ページ(tab1)のKW一覧（実行対象）で既に確定済みの_kwl_targetを
     そのまま利用する。並び順・件数・内容はtab1と完全に同一で、分析ページ側
     での独自ソート・独自フィルタ・新規KW生成は一切行わない。
 
-    各キーワードは st.expander(expanded=False) で折りたたみ表示し、開いた
-    場合のみ _anls_bucket_history_by_period()（新規追加・保存日付ベースの
-    期間分類。保存順依存は廃止）が返す期間ごとの値を、古い期間→新しい期間
-    の順で表示する。表示項目はROAS/CPC/クリック/売上のみで、新しい判定・
-    新しい集計は行わない。
+    各キーワードの4期間推移は、_anls_run_cpc_kw_period_comparison()
+    （新規追加・既存関数の呼び出しのみで構成）が返す、実際のCSV「期間」
+    列に基づく値をそのまま使う。コード側で7日区切りや将来期間を独自生成
+    することはしない。列（期間）はCSVの期間文字列をそのまま使用し、
+    _anls_build_multi_period_table（既存・無改変）がすでに古い期間→新しい
+    期間の順に並べた結果をそのまま表示するだけ。
+
+    各キーワードは st.expander(expanded=False) で折りたたみ表示する。
 
     【既知の制約】st.expanderはStreamlit標準機能では相互排他（1つ開くと他が
     閉じる）を提供しないため、複数キーワードを同時に開くこと自体は技術的に
@@ -3498,50 +3427,50 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     if _kwl_target is None or _kwl_target.empty:
         st.info("表示対象のキーワードがありません。")
         return
+
+    _cmp_rows = _anls_run_cpc_kw_period_comparison(dc_cpc)
+    _lookup = {}
+    for _row in _cmp_rows:
+        _key = (norm(_row.get("campaign_name", "")), norm(_row.get("keyword", "")))
+        _lookup[_key] = _row.get("cells", [])
+
+    if not _cmp_rows:
+        _bucket_held = st.session_state.get("csv_bucket_7d", {})
+        if len(_bucket_held) < 2:
+            # 旧分析ページと同じ仕様：比較表はCSVが2件以上そろって初めて表示される。
+            st.caption("📅 7日比較CSVバケットに2件以上のCSVをアップロードすると、期間別の推移が表示されます（旧分析ページと同じ仕様）。")
+        else:
+            st.caption("📅 7日比較CSVバケットのCSVを解析できませんでした。CSV内容をご確認ください。")
+
     for _, _row in _kwl_target.iterrows():
         _kw = _row.get("keyword", "")
         _cname = _row.get("campaign_name", "")
         with st.expander(f"▶ {_kw}", expanded=False):
-            _buckets = _anls_bucket_history_by_period(_cname, _kw, anls_hist_fname)
-            if not _buckets:
+            _cells = _lookup.get((norm(_cname), norm(_kw)))
+            if not _cells:
                 st.caption("データなし")
                 continue
-            _period_labels = [f"{_s.month}/{_s.day}〜{_e.month}/{_e.day}" for _s, _e, _ in _buckets]
+            _period_labels = [c.get("period_label") or "（期間不明）" for c in _cells]
 
-            def _fmt(_entry, _key):
-                if _entry is None:
-                    return "―"
-                if _key == "roas":
-                    _v = _entry.get("ROAS")
-                    return f"{_v:.2f}" if isinstance(_v, (int, float)) else "―"
-                if _key == "cpc":
-                    _v = _entry.get("avg_cpc")
-                    return f"{_v:,.0f}円" if isinstance(_v, (int, float)) else "―"
-                if _key == "sales":
-                    _v = _entry.get("sales")
-                    return f"{_v/10000:.1f}万" if isinstance(_v, (int, float)) else "―"
-                return "―"
+            def _fmt_roas(v):
+                return f"{v:.2f}" if isinstance(v, (int, float)) else "―"
+            def _fmt_cpc(v):
+                return f"{v:,.0f}円" if isinstance(v, (int, float)) else "―"
+            def _fmt_clicks(v):
+                return f"{int(v):,}" if isinstance(v, (int, float)) else "―"
+            def _fmt_sales(v):
+                return f"{v/10000:.1f}万" if isinstance(v, (int, float)) else "―"
 
             _tbl_df = pd.DataFrame(
                 [
-                    ["ROAS"]    + [_fmt(_e, "roas") for _, _, _e in _buckets],
-                    ["CPC"]     + [_fmt(_e, "cpc") for _, _, _e in _buckets],
-                    # 【既知の制約】cpc_change_history.jsonにはクリック数が
-                    # 保存されていないため常に"―"（既存の保存処理は無変更）。
-                    ["クリック"] + ["―" for _ in _buckets],
-                    ["売上"]    + [_fmt(_e, "sales") for _, _, _e in _buckets],
+                    ["ROAS"]    + [_fmt_roas(c.get("roas")) for c in _cells],
+                    ["CPC"]     + [_fmt_cpc(c.get("avg_cpc")) for c in _cells],
+                    ["クリック"] + [_fmt_clicks(c.get("clicks")) for c in _cells],
+                    ["売上"]    + [_fmt_sales(c.get("sales")) for c in _cells],
                 ],
                 columns=["指標"] + _period_labels,
             )
             st.table(_tbl_df)
-            st.markdown("**分析履歴**")
-            for (_s, _e, _entry), _label in zip(_buckets, _period_labels):
-                if _entry is None:
-                    continue
-                st.caption(
-                    f"・{_label}｜ROAS {_fmt(_entry, 'roas')}｜CPC {_fmt(_entry, 'cpc')}｜"
-                    f"クリック ―｜売上 {_fmt(_entry, 'sales')}"
-                )
 
 
 def _anls_entry_point(dc_cpc):
