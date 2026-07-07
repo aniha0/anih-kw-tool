@@ -3470,14 +3470,22 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     可能。ここでは追加の状態管理を持ち込まず最小実装とした。"""
     st.markdown("#### 📋 KW一覧")
 
-    with st.expander("🔍 診断: cpc_change_history.json 実パス確認", expanded=True):
-        _hist_path = _get_analysis_dir() / anls_hist_fname
-        st.write(f"絶対パス: {_hist_path}")
-        st.write(f"存在するか: {_hist_path.exists()}")
-        if _hist_path.exists():
-            _stat = _hist_path.stat()
-            st.write(f"ファイルサイズ: {_stat.st_size} bytes")
-            st.write(f"最終更新日時: {_anls_dt.datetime.fromtimestamp(_stat.st_mtime)}")
+    with st.expander("🔍 診断: 対象KWの_hist_keys存在確認", expanded=True):
+        _target_kw_diag = "犬 口臭ケア 水に混ぜる"
+        _hist_all_diag = _anls_load(anls_hist_fname)
+        _entries_diag = _hist_all_diag[-1]["entries"] if _hist_all_diag else []
+        _hist_keys_diag = set()
+        for _e in _entries_diag:
+            _cn_d = norm(str(_e.get("campaign_name", "") or ""))
+            _ag_d = norm(str(_e.get("ad_group", "") or ""))
+            _kw_d = norm(str(_e.get("keyword", "") or ""))
+            _hist_keys_diag.add(f"{_cn_d}|{_ag_d}|{_kw_d}")
+        _target_n_diag = norm(_target_kw_diag)
+        _exists_diag = any(_k.endswith("|" + _target_n_diag) for _k in _hist_keys_diag)
+        st.write(f"対象KW：{_target_kw_diag}")
+        st.write(f"_hist_keys に存在する：{'YES' if _exists_diag else 'NO'}")
+        st.write(f"entries件数：{len(_entries_diag)}件")
+        st.write(f"_hist_keys件数：{len(_hist_keys_diag)}件")
 
     if _kwl_target is None or _kwl_target.empty:
         st.info("表示対象のキーワードがありません。")
