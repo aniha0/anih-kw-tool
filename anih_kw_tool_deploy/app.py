@@ -3563,20 +3563,22 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
         st.caption("表示対象のキーワードがありません。")
         return
 
-    _tabs = st.tabs(_tab_labels)
-    for _tab, _weekly in zip(_tabs, _tab_weeklies):
-        with _tab:
-            _col_labels = [w["period_label"] if w else "―" for w in _weekly]
-            _tbl_df = pd.DataFrame(
-                [
-                    ["広告費"] + [_fmt_yen(w["cost"]) if w else "―" for w in _weekly],
-                    ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
-                    ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
-                    ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
-                ],
-                columns=["期間"] + _col_labels,
-            )
-            st.table(_tbl_df)
+    _sel_label = st.radio(
+        "対象を選択", _tab_labels, key="_anls_radio_kw", label_visibility="collapsed",
+    )
+    _sel_idx = _tab_labels.index(_sel_label)
+    _weekly = _tab_weeklies[_sel_idx]
+    _col_labels = [w["period_label"] if w else "―" for w in _weekly]
+    _tbl_df = pd.DataFrame(
+        [
+            ["広告費"] + [_fmt_yen(w["cost"]) if w else "―" for w in _weekly],
+            ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
+            ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
+            ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
+        ],
+        columns=["期間"] + _col_labels,
+    )
+    st.table(_tbl_df)
 
 
 def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
@@ -3731,20 +3733,22 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
         st.caption("表示対象の商品がありません。")
         return
 
-    _tabs = st.tabs(_tab_labels)
-    for _tab, _weekly in zip(_tabs, _tab_weeklies):
-        with _tab:
-            _col_labels = [w["period_label"] if w else "―" for w in _weekly]
-            _tbl_df = pd.DataFrame(
-                [
-                    ["広告費"] + [_fmt_yen(w["cost"]) if w else "―" for w in _weekly],
-                    ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
-                    ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
-                    ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
-                ],
-                columns=["期間"] + _col_labels,
-            )
-            st.table(_tbl_df)
+    _sel_label = st.radio(
+        "対象を選択", _tab_labels, key="_anls_radio_product", label_visibility="collapsed",
+    )
+    _sel_idx = _tab_labels.index(_sel_label)
+    _weekly = _tab_weeklies[_sel_idx]
+    _col_labels = [w["period_label"] if w else "―" for w in _weekly]
+    _tbl_df = pd.DataFrame(
+        [
+            ["広告費"] + [_fmt_yen(w["cost"]) if w else "―" for w in _weekly],
+            ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
+            ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
+            ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
+        ],
+        columns=["期間"] + _col_labels,
+    )
+    st.table(_tbl_df)
 
 def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
     """動画CPC調整ページ(page_cpc_videoのtab2)用の関数（表示専用）。
@@ -3883,20 +3887,22 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
         st.caption("表示対象の動画がありません。")
         return
 
-    _tabs = st.tabs(_tab_labels)
-    for _tab, _weekly in zip(_tabs, _tab_weeklies):
-        with _tab:
-            _col_labels = [w["period_label"] if w else "―" for w in _weekly]
-            _tbl_df = pd.DataFrame(
-                [
-                    ["広告費"] + [_fmt_yen(w["cost"]) if w else "―" for w in _weekly],
-                    ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
-                    ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
-                    ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
-                ],
-                columns=["期間"] + _col_labels,
-            )
-            st.table(_tbl_df)
+    _sel_label = st.radio(
+        "対象を選択", _tab_labels, key="_anls_radio_video", label_visibility="collapsed",
+    )
+    _sel_idx = _tab_labels.index(_sel_label)
+    _weekly = _tab_weeklies[_sel_idx]
+    _col_labels = [w["period_label"] if w else "―" for w in _weekly]
+    _tbl_df = pd.DataFrame(
+        [
+            ["広告費"] + [_fmt_yen(w["cost"]) if w else "―" for w in _weekly],
+            ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
+            ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
+            ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
+        ],
+        columns=["期間"] + _col_labels,
+    )
+    st.table(_tbl_df)
 
 def _anls_entry_point(dc_cpc):
     """page_cpc の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
