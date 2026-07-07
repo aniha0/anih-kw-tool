@@ -496,6 +496,11 @@ with _b2:
 with _b3:
     _csv_bucket_uploader("📊 その他CSV", "csv_bucket_other", f"csv_bucket_other_uploader_{_rid}")
 
+st.caption(
+    "🗑 比較CSVをクリアします。※アップロード済みの比較CSV（7日/30日/その他バケット）のみ削除されます。"
+    "現在表示中の分析結果・Amazon登録KW・オート除外KW・親KW分析・ダウンロードデータは保持されます。"
+    "新しいCSVで再度「🚀 分析開始」を押すと更新されます。"
+)
 if st.button("🗑 比較CSVをクリア", use_container_width=True):
     for _bk in ("csv_bucket_7d", "csv_bucket_30d", "csv_bucket_other"):
         st.session_state[_bk] = {}
@@ -3011,6 +3016,11 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                 _anls_save(anls_hist_fname, _recs)
                 st.success("✅ 分析結果を保存しました。")
     with st.expander("📂 保存済み分析履歴", expanded=False):
+        st.caption(
+            "📌 保存済み分析履歴は、過去に保存した分析結果です。分析履歴はJSONとして保存され、"
+            "比較CSVとは別管理です。比較CSVをクリアしても、この分析履歴は削除されません。\n\n"
+            "現在、分析履歴の削除機能はありません。保存された履歴は保持され続けます。"
+        )
         _recs = _anls_load(anls_hist_fname)
         _anls_render_saved_report(_recs, label, anls_hist_fname)
 
