@@ -3326,7 +3326,7 @@ def page_cpc():
         _anls_render_analysis_page(_kwl_target)
 
 
-def _anls_run_cpc_kw_period_comparison(dc_cpc: pd.DataFrame) -> list:
+def _anls_run_cpc_kw_period_comparison(dc_cpc: pd.DataFrame, _debug: dict = None) -> list:
     """分析ページ専用の新規追加関数（表示専用・データ取得のロジックは
     既存関数の呼び出しのみで構成）。
 
@@ -3345,15 +3345,34 @@ def _anls_run_cpc_kw_period_comparison(dc_cpc: pd.DataFrame) -> list:
     CSVの取得元は、既存の（アプリ起動時から共通で表示されている）
     「📅 7日比較CSV」バケット（st.session_state["csv_bucket_7d"]）を
     そのまま参照する。分析ページ内に新しいアップロードUIは追加しない。
+
+    【診断用追加】_debug（dict、任意）を渡すと、各段階の実測値
+    （CSV保持数／解析成功可否と理由／取得期間／マージ後件数など）を
+    そのまま記録する。判定ロジック・継続条件（continue）はすべて元の
+    実装と完全に同一で、変更は「値の記録」のみ。
     """
+    if _debug is None:
+        _debug = {}
+    _debug["files"] = []
     _bucket_held = st.session_state.get("csv_bucket_7d", {})
+    _debug["bucket_count"] = len(_bucket_held)
     if not _bucket_held:
+        _debug["results_count"] = 0
+        _debug["gate_passed"] = False
+        _debug["cmp_rows_count"] = 0
         return []
     af_files = list(_bucket_held.values())
     _results = []
     for af_file in af_files:
+        _finfo = {
+            "name": getattr(af_file, "name", "?"),
+            "parsed": False, "reason": None, "period": None,
+            "after_rows": None, "hist_entries": None,
+            "bf_after_hist_filter": None, "merged_rows": None, "merged_df": None,
+        }
         try:
             df_raw, kc, cc, sc, oc_, od, clk, imp, tkc, kwt, agn = _anls_parse_csv(af_file)
+            _finfo["parsed"] = True
             _period_str = None
             _pc = fcol(df_raw, ["期間"])
             if _pc:
@@ -3365,44 +3384,70 @@ def _anls_run_cpc_kw_period_comparison(dc_cpc: pd.DataFrame) -> list:
                         _period_str = f"{_starts.min().strftime('%Y/%m/%d')} - {_ends.max().strftime('%Y/%m/%d')}"
                 except Exception:
                     _period_str = None
+            _finfo["period"] = _period_str
+            if not _pc:
+                _finfo["reason"] = "「期間」列が見つからない"
+            elif _period_str is None:
+                _finfo["reason"] = "「期間」列はあるが日付として解析できなかった"
             if not all([cc, sc, oc_]):
+                _finfo["reason"] = ((_finfo["reason"] + " / ") if _finfo["reason"] else "") + "必須列(コスト/売上/注文数)が見つからない"
+                _debug["files"].append(_finfo)
                 continue
             kw_col_cpc = kwt if kwt else fcol(df_raw, ["ターゲティング", "Targeting", "targeting"])
             after_df = _anls_build_cpc_after(df_raw, cc, sc, oc_, od, clk, kw_col_cpc)
+            _finfo["after_rows"] = len(after_df)
             if after_df.empty:
+                _finfo["reason"] = ((_finfo["reason"] + " / ") if _finfo["reason"] else "") + "after_dfが空（CSVから有効行を抽出できなかった）"
+                _debug["files"].append(_finfo)
                 continue
             bf = dc_cpc.copy()
             _cpc_hist = _anls_load("cpc_change_history.json")
             if not _cpc_hist:
+                _finfo["reason"] = "cpc_change_history.jsonが空（保存履歴なし）"
+                _debug["files"].append(_finfo)
                 continue
             _last_entries = _cpc_hist[-1]["entries"]
+            _finfo["hist_entries"] = len(_last_entries)
             _hist_df = pd.DataFrame(_last_entries)
             def _cpc_key_fn(r):
                 cn_  = norm(str(r.get("campaign_name", "") or ""))
                 agn_ = norm(str(r.get("ad_group", "") or ""))
                 kw_  = norm(str(r.get("keyword", "") or ""))
                 return f"{cn_}|{agn_}|{kw_}"
-            _hist_df["_kn_key"] = _hist_df.apply(_cpc_key_fn, axis=1)
-            _hist_keys = set(_hist_df["_kn_key"])
+            _hist_df["_kn_key"] = _hist_df.apply(_cpc_key_fn, axis=1) if not _hist_df.empty else pd.Series(dtype=str)
+            _hist_keys = set(_hist_df["_kn_key"]) if not _hist_df.empty else set()
             bf["_kn_key"] = bf.apply(_cpc_key_fn, axis=1)
             bf = bf[bf["_kn_key"].isin(_hist_keys)].copy()
+            _finfo["bf_after_hist_filter"] = len(bf)
             sfx = [c for c in ["sales", "cost", "ROAS", "orders", "clicks", "CVR", "avg_cpc"] if c in after_df.columns]
             merged = bf.merge(after_df[["_kn_key"] + sfx], on="_kn_key", how="inner", suffixes=("_b", "_a"))
+            _finfo["merged_rows"] = len(merged)
             if merged.empty:
+                if _finfo["hist_entries"] == 0:
+                    _finfo["reason"] = "cpc_change_history.jsonの直近保存(entries)が0件のため、比較対象KWが1件も残らなかった"
+                elif _finfo["bf_after_hist_filter"] == 0:
+                    _finfo["reason"] = f"直近保存entries({_finfo['hist_entries']}件)とdc_cpcのキーが1件も一致しなかった"
+                else:
+                    _finfo["reason"] = "hist-filter後のCPC調整データとCSV解析結果(after_df)のキーワードが1件も一致しなかった"
+                _debug["files"].append(_finfo)
                 continue
             merged["_判定"] = merged.apply(_anls_row_judge, axis=1)
+            _finfo["merged_df"] = merged
+            _debug["files"].append(_finfo)
             _results.append({"merged": merged, "period": _period_str})
-        except Exception:
+        except Exception as e:
+            _finfo["reason"] = f"例外: {e}"
+            _debug["files"].append(_finfo)
             continue
-    # 【旧分析ページとの仕様一致】旧分析ページ(_anls_render_tab)は
-    # `if len(_results_now) >= 2:` の場合のみ複数期間比較表
-    # (_anls_build_multi_period_table/_anls_render_multi_period_table)を
-    # 表示し、2件未満（0件・1件）の場合は比較表自体を表示しない仕様
-    # だった。列数もハードコードされた4ではなく、実際に解析できた
-    # CSV件数と完全に一致する（旧仕様のこの2点をそのまま踏襲する）。
+    _debug["results_count"] = len(_results)
     if len(_results) < 2:
+        _debug["gate_passed"] = False
+        _debug["cmp_rows_count"] = 0
         return []
-    return _anls_build_multi_period_table(_results, "keyword", "cpc_kw")
+    _debug["gate_passed"] = True
+    _cmp_rows = _anls_build_multi_period_table(_results, "keyword", "cpc_kw")
+    _debug["cmp_rows_count"] = len(_cmp_rows)
+    return _cmp_rows
 
 
 def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str = "cpc_change_history.json") -> None:
@@ -3428,19 +3473,38 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
         st.info("表示対象のキーワードがありません。")
         return
 
-    _cmp_rows = _anls_run_cpc_kw_period_comparison(dc_cpc)
+    _dbg = {}
+    _cmp_rows = _anls_run_cpc_kw_period_comparison(dc_cpc, _dbg)
     _lookup = {}
     for _row in _cmp_rows:
         _key = (norm(_row.get("campaign_name", "")), norm(_row.get("keyword", "")))
         _lookup[_key] = _row.get("cells", [])
 
     if not _cmp_rows:
-        _bucket_held = st.session_state.get("csv_bucket_7d", {})
-        if len(_bucket_held) < 2:
-            # 旧分析ページと同じ仕様：比較表はCSVが2件以上そろって初めて表示される。
-            st.caption("📅 7日比較CSVバケットに2件以上のCSVをアップロードすると、期間別の推移が表示されます（旧分析ページと同じ仕様）。")
-        else:
-            st.caption("📅 7日比較CSVバケットのCSVを解析できませんでした。CSV内容をご確認ください。")
+        st.caption("📅 7日比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると期間別の推移が表示されます。")
+
+    with st.expander(
+        f"🔍 診断ログ（一時的・調査用） "
+        f"CSV保持数:{_dbg.get('bucket_count', 0)} / "
+        f"解析成功:{sum(1 for f in _dbg.get('files', []) if f.get('parsed'))}件 / "
+        f"比較表生成:{_dbg.get('cmp_rows_count', 0)}件",
+        expanded=False,
+    ):
+        st.write(f"① CSV保持数: {_dbg.get('bucket_count', 0)}")
+        st.write("② CSV解析結果:")
+        for _f in _dbg.get("files", []):
+            _ok = "YES" if _f.get("parsed") else "NO"
+            _reason = f"（{_f['reason']}）" if _f.get("reason") else ""
+            st.write(f"　・{_f.get('name')}: 解析成功={_ok} {_reason}")
+        st.write("③ 期間取得:")
+        for _f in _dbg.get("files", []):
+            st.write(f"　・{_f.get('name')}: {_f.get('period') or '(取得できず)'}")
+        st.write(
+            f"⑤ _anls_build_multi_period_table: "
+            f"入力件数={_dbg.get('results_count', 0)} / "
+            f"2件以上ゲート通過={_dbg.get('gate_passed')} / "
+            f"返却データ数={_dbg.get('cmp_rows_count', 0)}"
+        )
 
     for _, _row in _kwl_target.iterrows():
         _kw = _row.get("keyword", "")
@@ -3449,6 +3513,22 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
             _cells = _lookup.get((norm(_cname), norm(_kw)))
             if not _cells:
                 st.caption("データなし")
+                with st.expander("🔍 このKWの診断（④KW件数）", expanded=False):
+                    for _f in _dbg.get("files", []):
+                        _name = _f.get("name")
+                        if not _f.get("parsed"):
+                            st.write(f"・{_name}: 解析失敗 - {_f.get('reason')}")
+                            continue
+                        _period = _f.get("period") or "(期間取得失敗)"
+                        _mdf = _f.get("merged_df")
+                        if _mdf is None:
+                            st.write(f"・{_name} [{_period}]: 比較データ0件 - {_f.get('reason')}")
+                            continue
+                        _hit = _mdf[
+                            (_mdf["keyword"].apply(norm) == norm(_kw))
+                            & (_mdf["campaign_name"].apply(norm) == norm(_cname))
+                        ]
+                        st.write(f"・{_name} [{_period}]: ヒット {len(_hit)}件")
                 continue
             _period_labels = [c.get("period_label") or "（期間不明）" for c in _cells]
 
