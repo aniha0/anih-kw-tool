@@ -1220,6 +1220,9 @@ def page_add_kw():
         _dd["CVR"] = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
     st.dataframe(_dd, use_container_width=True)
 
+    # ── 分析入口の表示導線を復旧（既存関数の呼び出しのみ。内部は無改変）──
+    _anls_entry_point_kw_add(dw)
+
 def _anls_entry_point_kw_add(df_win):
     """page_add_kw の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
     中身は元々あった _anls_render_tab 呼び出し（引数そのまま）を移設しただけで、
@@ -5106,6 +5109,8 @@ def _anls_entry_point_pt_add_manual(df_pt_add_m):
 
 def page_pt_add_manual():
     _render_pt_page("df_pt_add_m", True,  "商品", "pt_add_m_sel", "product_add_history.json")
+    # ── 分析入口の表示導線を復旧（既存関数の呼び出しのみ。内部は無改変）──
+    _anls_entry_point_pt_add_manual(st.session_state.get("df_pt_add_m", pd.DataFrame()))
 
 def page_pt_del_manual():
     _render_pt_page("df_pt_del_m", False, "商品", "pt_del_m_sel")
@@ -5119,6 +5124,8 @@ def _anls_entry_point_pt_add_video(df_pt_add_v):
 
 def page_pt_add_video():
     _render_pt_page("df_pt_add_v", True,  "動画", "pt_add_v_sel", "video_add_history.json")
+    # ── 分析入口の表示導線を復旧（既存関数の呼び出しのみ。内部は無改変）──
+    _anls_entry_point_pt_add_video(st.session_state.get("df_pt_add_v", pd.DataFrame()))
 
 def page_pt_del_video():
     _render_pt_page("df_pt_del_v", False, "動画", "pt_del_v_sel")
