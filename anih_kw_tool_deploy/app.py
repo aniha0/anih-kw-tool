@@ -3861,6 +3861,7 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
 
     _tab_labels = []
     _tab_weeklies = []
+    _tab_targets = []
     for _, _row in _kwl_target.iterrows():
         _kw = _row.get("keyword", "")
         _cname = _row.get("campaign_name", "")
@@ -3870,6 +3871,7 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
         _icon = _icon_for_weekly(_weekly)
         _tab_labels.append(f"{_kw} {_icon}")
         _tab_weeklies.append(_weekly)
+        _tab_targets.append((_cname, _kw))
 
     if not _tab_labels:
         st.caption("表示対象のキーワードがありません。")
@@ -3891,6 +3893,45 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
         columns=["期間"] + _col_labels,
     )
     st.table(_tbl_df)
+    # ── 4週間比較結果の保存入口（既存保存処理・既存JSON形式を再利用するのみ）──
+    # 新しい保存システムは作らない。既存の_anls_save/_anls_load・既存records
+    # 構造をそのまま使う。detail1件のbefore/afterには、表示中の4週間のうち
+    # 最も古い週と最も新しい週の実数値（既にこの関数内で計算済みの_weekly値）
+    # をそのまま格納するだけで、新しい判定ロジック・新しい集計・新しいAI考察は
+    # 一切追加しない（judgementは固定文字列"変化なし"、reasons/actionsは空）。
+    # 保存先は7日/30日分析とは別の既存ファイル(anls_cpc_kw.json＝これまで
+    # 呼び出し元がなく未使用だった無題ブロック用JSON)を再利用し、新規JSON
+    # ファイルは作成しない。既存の7日窓(anls_cpc_kw_top7.json)・30日窓
+    # (anls_cpc_kw_top30.json)のJSONには一切触れない。
+    _sel_cname, _sel_kw = _tab_targets[_sel_idx]
+    _weekly_valid = [w for w in _weekly if w]
+    if st.button("💾 4週間比較を保存", key="_anls_4wk_kw_save"):
+        if not _weekly_valid:
+            st.warning("保存できる週次データがありません。")
+        else:
+            _kw4wk_fname = "anls_cpc_kw.json"
+            _recs = _anls_load(_kw4wk_fname)
+            _b_w, _a_w = _weekly_valid[0], _weekly_valid[-1]
+            _detail = [{
+                "campaign": _sel_cname, "keyword": _sel_kw, "judgement": "変化なし",
+                "before": {"sales": _b_w["sales"], "cost": _b_w["cost"],
+                           "ROAS": _b_w["roas"], "orders": _b_w["orders"]},
+                "after": {"sales": _a_w["sales"], "cost": _a_w["cost"],
+                          "ROAS": _a_w["roas"], "orders": _a_w["orders"]},
+                "reasons": [], "actions": [], "memo": "",
+                "action_taken": "", "next_eval": "",
+            }]
+            _recs.append({
+                "id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
+                "saved_at": _anls_dt.date.today().isoformat(),
+                "type": "キーワードCPC分析（4週間比較）",
+                "period_days": len(_weekly_valid) * 7,
+                "n_before": 1, "n_matched": 1, "n_kaizen": 0, "n_akka": 0, "n_henko": 1,
+                "rate": 0.0, "camps": [_sel_cname] if _sel_cname else [],
+                "period": None, "detail": _detail,
+            })
+            _anls_save(_kw4wk_fname, _recs)
+            st.success("✅ 4週間比較を保存しました。")
 
 
 def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
@@ -4031,6 +4072,7 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
 
     _tab_labels = []
     _tab_weeklies = []
+    _tab_targets = []
     for _, _row in _pt_target.iterrows():
         _asin = _row.get("asin", "")
         _cname = _row.get("campaign_name", "")
@@ -4040,6 +4082,7 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
         _icon = _icon_for_weekly(_weekly)
         _tab_labels.append(f"{_asin} {_icon}")
         _tab_weeklies.append(_weekly)
+        _tab_targets.append((_cname, _asin))
 
     if not _tab_labels:
         st.caption("表示対象の商品がありません。")
@@ -4061,6 +4104,42 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
         columns=["期間"] + _col_labels,
     )
     st.table(_tbl_df)
+    # ── 4週間比較結果の保存入口（既存保存処理・既存JSON形式を再利用するのみ）──
+    # _anls_render_analysis_page（KW版）と同一パターン。新しい保存システムは
+    # 作らない。既存の_anls_save/_anls_load・既存records構造をそのまま使い、
+    # judgementは固定文字列"変化なし"、reasons/actionsは空とし、新しい判定・
+    # 新しい集計・新しいAI考察は一切追加しない。保存先は7日/30日分析とは別の
+    # 既存ファイル(anls_cpc_pt_m.json＝これまで呼び出し元がなく未使用だった
+    # 無題ブロック用JSON)を再利用し、新規JSONファイルは作成しない。
+    _sel_cname, _sel_asin = _tab_targets[_sel_idx]
+    _weekly_valid = [w for w in _weekly if w]
+    if st.button("💾 4週間比較を保存", key="_anls_4wk_pt_m_save"):
+        if not _weekly_valid:
+            st.warning("保存できる週次データがありません。")
+        else:
+            _pt_m_4wk_fname = "anls_cpc_pt_m.json"
+            _recs = _anls_load(_pt_m_4wk_fname)
+            _b_w, _a_w = _weekly_valid[0], _weekly_valid[-1]
+            _detail = [{
+                "campaign": _sel_cname, "keyword": _sel_asin, "judgement": "変化なし",
+                "before": {"sales": _b_w["sales"], "cost": _b_w["cost"],
+                           "ROAS": _b_w["roas"], "orders": _b_w["orders"]},
+                "after": {"sales": _a_w["sales"], "cost": _a_w["cost"],
+                          "ROAS": _a_w["roas"], "orders": _a_w["orders"]},
+                "reasons": [], "actions": [], "memo": "",
+                "action_taken": "", "next_eval": "",
+            }]
+            _recs.append({
+                "id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
+                "saved_at": _anls_dt.date.today().isoformat(),
+                "type": "商品CPC分析（4週間比較）",
+                "period_days": len(_weekly_valid) * 7,
+                "n_before": 1, "n_matched": 1, "n_kaizen": 0, "n_akka": 0, "n_henko": 1,
+                "rate": 0.0, "camps": [_sel_cname] if _sel_cname else [],
+                "period": None, "detail": _detail,
+            })
+            _anls_save(_pt_m_4wk_fname, _recs)
+            st.success("✅ 4週間比較を保存しました。")
 
 def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
     """動画CPC調整ページ(page_cpc_videoのtab2)用の関数（表示専用）。
@@ -4185,6 +4264,7 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
 
     _tab_labels = []
     _tab_weeklies = []
+    _tab_targets = []
     for _, _row in _pt_target.iterrows():
         _asin = _row.get("asin", "")
         _cname = _row.get("campaign_name", "")
@@ -4194,6 +4274,7 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
         _icon = _icon_for_weekly(_weekly)
         _tab_labels.append(f"{_asin} {_icon}")
         _tab_weeklies.append(_weekly)
+        _tab_targets.append((_cname, _asin))
 
     if not _tab_labels:
         st.caption("表示対象の動画がありません。")
@@ -4215,6 +4296,42 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
         columns=["期間"] + _col_labels,
     )
     st.table(_tbl_df)
+    # ── 4週間比較結果の保存入口（既存保存処理・既存JSON形式を再利用するのみ）──
+    # _anls_render_analysis_page（KW版）と同一パターン。新しい保存システムは
+    # 作らない。既存の_anls_save/_anls_load・既存records構造をそのまま使い、
+    # judgementは固定文字列"変化なし"、reasons/actionsは空とし、新しい判定・
+    # 新しい集計・新しいAI考察は一切追加しない。保存先は7日/30日分析とは別の
+    # 既存ファイル(anls_cpc_pt_v.json＝これまで呼び出し元がなく未使用だった
+    # 無題ブロック用JSON)を再利用し、新規JSONファイルは作成しない。
+    _sel_cname, _sel_asin = _tab_targets[_sel_idx]
+    _weekly_valid = [w for w in _weekly if w]
+    if st.button("💾 4週間比較を保存", key="_anls_4wk_pt_v_save"):
+        if not _weekly_valid:
+            st.warning("保存できる週次データがありません。")
+        else:
+            _pt_v_4wk_fname = "anls_cpc_pt_v.json"
+            _recs = _anls_load(_pt_v_4wk_fname)
+            _b_w, _a_w = _weekly_valid[0], _weekly_valid[-1]
+            _detail = [{
+                "campaign": _sel_cname, "keyword": _sel_asin, "judgement": "変化なし",
+                "before": {"sales": _b_w["sales"], "cost": _b_w["cost"],
+                           "ROAS": _b_w["roas"], "orders": _b_w["orders"]},
+                "after": {"sales": _a_w["sales"], "cost": _a_w["cost"],
+                          "ROAS": _a_w["roas"], "orders": _a_w["orders"]},
+                "reasons": [], "actions": [], "memo": "",
+                "action_taken": "", "next_eval": "",
+            }]
+            _recs.append({
+                "id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
+                "saved_at": _anls_dt.date.today().isoformat(),
+                "type": "動画CPC分析（4週間比較）",
+                "period_days": len(_weekly_valid) * 7,
+                "n_before": 1, "n_matched": 1, "n_kaizen": 0, "n_akka": 0, "n_henko": 1,
+                "rate": 0.0, "camps": [_sel_cname] if _sel_cname else [],
+                "period": None, "detail": _detail,
+            })
+            _anls_save(_pt_v_4wk_fname, _recs)
+            st.success("✅ 4週間比較を保存しました。")
 
 def _anls_entry_point(dc_cpc):
     """page_cpc の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
