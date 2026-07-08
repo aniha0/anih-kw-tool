@@ -5115,11 +5115,7 @@ def _anls_entry_point_pt_add_manual(df_pt_add_m):
 
 
 def page_pt_add_manual():
-    _t1, _t2 = st.tabs(["追加候補", "分析"])
-    with _t1:
-        _render_pt_page("df_pt_add_m", True,  "商品", "pt_add_m_sel", "product_add_history.json")
-    with _t2:
-        _anls_entry_point_pt_add_manual(st.session_state.get("df_pt_add_m", pd.DataFrame()))
+    _render_pt_page("df_pt_add_m", True,  "商品", "pt_add_m_sel", "product_add_history.json")
 
 def page_pt_del_manual():
     _render_pt_page("df_pt_del_m", False, "商品", "pt_del_m_sel")
@@ -5132,11 +5128,7 @@ def _anls_entry_point_pt_add_video(df_pt_add_v):
 
 
 def page_pt_add_video():
-    _t1, _t2 = st.tabs(["追加候補", "分析"])
-    with _t1:
-        _render_pt_page("df_pt_add_v", True,  "動画", "pt_add_v_sel", "video_add_history.json")
-    with _t2:
-        _anls_entry_point_pt_add_video(st.session_state.get("df_pt_add_v", pd.DataFrame()))
+    _render_pt_page("df_pt_add_v", True,  "動画", "pt_add_v_sel", "video_add_history.json")
 
 def page_pt_del_video():
     _render_pt_page("df_pt_del_v", False, "動画", "pt_del_v_sel")
