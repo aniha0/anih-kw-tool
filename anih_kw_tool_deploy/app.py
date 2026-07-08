@@ -1118,17 +1118,15 @@ _LOGIC_BOX_STYLE = (
 )
 def render_logic_section(title: str, content_html: str):
     """📖 判定ロジックを見る — 各ページ共通の折りたたみ式ロジック表示エリア。
+    全ページ共通の統一表示フォーマット（タイトル→区切り線→🎯対象→区切り線→
+    📊判定フロー→✅判定結果→区切り線→💡補足）でプレーンテキスト表示する。
+    判定内容・条件・数値は呼び出し側のcontent_html文字列にそのまま保持されており、
+    本関数は表示の枠組み（タイトル行＋区切り線＋プレーンテキスト表示）のみを担当する。
     title        : 表示タイトル（例: "📋 キーワード追加 判定ロジック"）
-    content_html : ロジック本文（HTML文字列）
+    content_html : ロジック本文（統一テンプレート済みプレーンテキスト。🎯対象から開始）
     """
     with st.expander("📖 判定ロジックを見る", expanded=False):
-        st.markdown(
-            f'''<div style="{_LOGIC_BOX_STYLE}">
-<div style="font-weight:700;font-size:.92rem;color:#1A365D;margin-bottom:12px;">{title}</div>
-{content_html}
-</div>''',
-            unsafe_allow_html=True,
-        )
+        st.text(f"{title}\n━━━━━━━━━━━━━━━━━━━━━━━━\n{content_html}")
 
 # ===================================================
 # ページ関数
@@ -1144,18 +1142,25 @@ def page_add_kw():
     with st.expander("📖 判定ロジックを見る", expanded=False):
         st.text(
             '''📋 キーワード追加 判定ロジック
-
-【目的】
+━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 対象
 オート広告で成果が出た検索語句を、手動広告（部分一致）のマニュアルキーワードへ
 追加する候補を抽出します。
-
-【抽出条件】
-信頼度フィルター： 注文数 ≥ 3件 かつ クリック数 ≥ 5 かつ 広告費 ≥ ¥300
-　　　　　　　　　（サイドバーで変更可能）
-採用条件　　　： 売上 ≥ 売価 × 2 かつ ROAS ≥ 2.0
-
-▶ 同一意図KW統合: 語順・表記ゆれが同じKWは代表1件に集約
-▶ ブランドワード・商品コード・タイトル文字列は自動除外'''
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 判定フロー
+① 信頼度フィルター
+　　注文数 ≥ 3件 かつ クリック数 ≥ 5 かつ 広告費 ≥ ¥300
+　　（サイドバーで変更可能）
+　　↓
+② 採用条件
+　　売上 ≥ 売価 × 2 かつ ROAS ≥ 2.0
+　　↓
+✅ 判定結果
+追加候補
+━━━━━━━━━━━━━━━━━━━━━━━━
+💡 補足
+・同一意図KW統合: 語順・表記ゆれが同じKWは代表1件に集約
+・ブランドワード・商品コード・タイトル文字列は自動除外'''
         )
     st.markdown("")
     # ② キャンペーン選択
@@ -1228,55 +1233,27 @@ def page_del_kw():
     _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "< 0.8"), ("勝ちKW", "除外")])
     render_logic_section(
         "🚫 キーワード停止 判定ロジック",
-        '''
-<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
-<thead>
-  <tr style="background:#DBEAFE;">
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>
-  </tr>
-</thead>
-<tbody>
-  <tr style="background:#F1F5F9;">
-    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【対象】</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">分析対象</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">オート広告の検索語句のみ</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【停止条件】</td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">🚫 停止対象</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      広告費 ≥ 売価 × 2 <b>かつ</b> ROAS &lt; 0.8<br>
-      <span style="font-size:.8rem;color:#718096;">→ 完全一致で除外登録することを推奨</span>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#718096;">⚪ データ不足</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      上記条件を満たさない場合<br>
-      <span style="font-size:.8rem;color:#718096;">→ 変更なし（経過観察）</span>
-    </td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【除外ルール】</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">勝ちKW除外</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      追加用KW（勝ちKW）と重複するものは停止対象から除外<br>
-      <span style="font-size:.8rem;color:#718096;">→ 勝ちKWを誤って停止しないための保護処理</span>
-    </td>
-  </tr>
-</tbody>
-</table>
-<p style="font-size:.78rem;color:#718096;margin-top:10px;">
-  ▶ 基本思想: 売価の2倍以上広告費を使っても売上が立たない検索語句を除外する<br>
-  ▶ ダウンロードページからキャンペーン別ZIPで出力可能
-</p>''',
+        '''🎯 対象
+オート広告の検索語句のみ
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 判定フロー
+① 広告費 ≥ 売価 × 2 かつ ROAS < 0.8 を判定
+　　↓
+② 条件を満たす場合
+　　🚫 停止対象 → 完全一致で除外登録することを推奨
+　　↓
+③ 条件を満たさない場合
+　　⚪ データ不足 → 変更なし（経過観察）
+　　↓
+④ 追加用KW（勝ちKW）と重複するものは停止対象から除外
+　　→ 勝ちKWを誤って停止しないための保護処理
+　　↓
+✅ 判定結果
+停止対象／データ不足／除外（勝ちKW重複）
+━━━━━━━━━━━━━━━━━━━━━━━━
+💡 補足
+・基本思想: 売価の2倍以上広告費を使っても売上が立たない検索語句を除外する
+・ダウンロードページからキャンペーン別ZIPで出力可能''',
     )
     st.markdown("")
     _del_camps = ["全キャンペーン"] + CAMPAIGNS
@@ -1567,7 +1544,22 @@ def _anls_render_parent_kw_page() -> None:
 def page_auto_del_kw():
     _t1, _t2 = st.tabs(["除外候補", "🔍 親KW分析"])
     with _t1:
-        render_logic_section("📄 オートKW削除 判定ロジック", '''<div style="font-size:.88rem;color:#2D3748;line-height:2.2;text-align:center;">\n① オート広告のみ対象<br>\n↓<br>\n② マニュアル登録済み検索語を除外<br>\n↓<br>\n③ ASIN・category検索を除外<br>\n↓<br>\n④ 商品価格取得<br>\n↓<br>\n⑤ 広告費 ≥ 売価×2<br>\n↓<br>\n⑥ ROAS ≤ 0.8<br>\n↓<br>\n<span style="font-weight:700;color:#C53030;">除外候補</span>\n</div>''')
+        render_logic_section("📄 オートKW削除 判定ロジック", '''🎯 対象
+オート広告のみ
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 判定フロー
+① マニュアル登録済み検索語を除外
+　　↓
+② ASIN・category検索を除外
+　　↓
+③ 商品価格取得
+　　↓
+④ 広告費 ≥ 売価×2
+　　↓
+⑤ ROAS ≤ 0.8
+　　↓
+✅ 判定結果
+除外候補''')
         # ── session_stateからキーワードDataFrameを取得（商品/動画は別ページへ合流済み）──
         df_auto_del_kw_keyword = st.session_state.get("df_auto_del_kw_keyword", pd.DataFrame())
 
@@ -1595,7 +1587,22 @@ def page_auto_del_kw():
         _anls_render_parent_kw_page()
 
 def page_auto_del_product():
-    render_logic_section("🎯 オート商品削除 判定ロジック", '''<div style="font-size:.88rem;color:#2D3748;line-height:2.2;text-align:center;">\n① オート商品ターゲティングのみ対象<br>\n↓<br>\n② マニュアル商品ターゲティング重複除外<br>\n↓<br>\n③ ASIN単位で集計<br>\n↓<br>\n④ 商品価格取得<br>\n↓<br>\n⑤ 広告費 ≥ 売価×2<br>\n↓<br>\n⑥ ROAS ≤ 0.8<br>\n↓<br>\n<span style="font-weight:700;color:#C53030;">除外候補</span>\n</div>''')
+    render_logic_section("🎯 オート商品削除 判定ロジック", '''🎯 対象
+オート商品ターゲティングのみ
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 判定フロー
+① マニュアル商品ターゲティング重複除外
+　　↓
+② ASIN単位で集計
+　　↓
+③ 商品価格取得
+　　↓
+④ 広告費 ≥ 売価×2
+　　↓
+⑤ ROAS ≤ 0.8
+　　↓
+✅ 判定結果
+除外候補''')
     df = st.session_state.get("df_auto_del_product", pd.DataFrame())
     if df.empty:
         st.info("除外候補の商品ASINはありません。（オート商品広告で出血中かつマニュアル未登録のものなし）")
@@ -1627,7 +1634,22 @@ def page_auto_del_product():
     st.download_button("📥 除外商品ASIN候補.csv", data=_csv, file_name="除外商品ASIN候補.csv", mime="text/csv")
 
 def page_auto_del_video():
-    render_logic_section("🎥 オート動画削除 判定ロジック", '''<div style="font-size:.88rem;color:#2D3748;line-height:2.2;text-align:center;">\n① オート動画ターゲティングのみ対象<br>\n↓<br>\n② マニュアル動画ターゲティング重複除外<br>\n↓<br>\n③ ASIN／カテゴリー単位で集計<br>\n↓<br>\n④ 商品価格取得<br>\n↓<br>\n⑤ 広告費 ≥ 売価×2<br>\n↓<br>\n⑥ ROAS ≤ 0.8<br>\n↓<br>\n<span style="font-weight:700;color:#C53030;">除外候補</span>\n</div>''')
+    render_logic_section("🎥 オート動画削除 判定ロジック", '''🎯 対象
+オート動画ターゲティングのみ
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 判定フロー
+① マニュアル動画ターゲティング重複除外
+　　↓
+② ASIN／カテゴリー単位で集計
+　　↓
+③ 商品価格取得
+　　↓
+④ 広告費 ≥ 売価×2
+　　↓
+⑤ ROAS ≤ 0.8
+　　↓
+✅ 判定結果
+除外候補''')
     df = st.session_state.get("df_auto_del_video", pd.DataFrame())
     if df.empty:
         st.info("除外候補の動画ASINはありません。（オート動画広告で出血中かつマニュアル未登録のものなし）")
@@ -3329,61 +3351,37 @@ def page_cpc():
         with st.expander("📖 判定ロジックを見る", expanded=False):
             st.text(
                 '''📈 CPC調整ロジック
-
-【STEP 1】データ不足判定（最優先）
-■ 判断保留
-判定条件： 広告費 < ¥3,000 かつ 購入数 < 4件
-アクション： 変更なし
-CPC変更幅： ±0円
-
-【STEP 2】高実績ランク（購入数 ≥ 20件）
-■ SS+
-判定条件： 購入数 ≥ 20件 かつ ROAS ≥ 4.0
-アクション： CPC上げ
-CPC変更幅： +5円
-
-■ SS
-判定条件： 購入数 ≥ 20件 かつ 2.0 ≤ ROAS < 4.0
-アクション： 現状維持
-CPC変更幅： ±0円
-
-【STEP 3】ROASベースランク
-■ S
-判定条件： ROAS ≥ 4.0
-アクション： CPC上げ
-CPC変更幅： +5円
-
-■ A
-判定条件： 3.0 ≤ ROAS < 4.0
-アクション： 現状維持
-CPC変更幅： ±0円
-
-■ B
-判定条件： 1.8 ≤ ROAS < 3.0
-アクション： 現状維持
-CPC変更幅： ±0円
-
-■ C
-判定条件： 1.5 ≤ ROAS < 1.8
-アクション： CPC下げ
-CPC変更幅： −5円
-
-■ D
-判定条件： ROAS < 1.5
-アクション： CPC下げ
-CPC変更幅： −10円
-
-【STEP 4】即削除判定（広告費過多 × 低ROAS）
-■ 即削除
-判定条件： ROAS < 0.8 かつ 広告費が閾値以上
-広告費閾値：
-売価 ≤ ¥1,500 → 広告費 ≥ ¥3,000
-売価 ≤ ¥2,000 → 広告費 ≥ ¥4,000
-売価 > ¥2,000 → 広告費 ≥ ¥5,000
-アクション： 即削除
-
-判定順序： STEP1（データ不足） → STEP2（購入数優先） → STEP3（ROASベース） → STEP4（即削除）
-基本思想： ROASだけでなく、広告費と購入数を重視した複合判定'''
+━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 対象
+キーワードCPC調整（すべてのキーワードをSTEP1〜4の順に判定）
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 判定フロー
+① データ不足判定（最優先）
+　　判断保留： 広告費 < ¥3,000 かつ 購入数 < 4件 → 変更なし（±0円）
+　　↓
+② 高実績ランク判定（購入数 ≥ 20件）
+　　SS+： 購入数 ≥ 20件 かつ ROAS ≥ 4.0 → CPC上げ（+5円）
+　　SS ： 購入数 ≥ 20件 かつ 2.0 ≤ ROAS < 4.0 → 現状維持（±0円）
+　　↓
+③ ROASベースランク判定
+　　S： ROAS ≥ 4.0 → CPC上げ（+5円）
+　　A： 3.0 ≤ ROAS < 4.0 → 現状維持（±0円）
+　　B： 1.8 ≤ ROAS < 3.0 → 現状維持（±0円）
+　　C： 1.5 ≤ ROAS < 1.8 → CPC下げ（−5円）
+　　D： ROAS < 1.5 → CPC下げ（−10円）
+　　↓
+④ 即削除判定（広告費過多 × 低ROAS）
+　　即削除： ROAS < 0.8 かつ 広告費が閾値以上 → 即削除
+　　広告費閾値： 売価 ≤ ¥1,500 → 広告費 ≥ ¥3,000／
+　　　　　　　　売価 ≤ ¥2,000 → 広告費 ≥ ¥4,000／
+　　　　　　　　売価 > ¥2,000 → 広告費 ≥ ¥5,000
+　　↓
+✅ 判定結果
+判断保留／SS+／SS／S／A／B／C／D／即削除（ランクとCPC変更幅）
+━━━━━━━━━━━━━━━━━━━━━━━━
+💡 補足
+・判定順序： STEP1（データ不足） → STEP2（購入数優先） → STEP3（ROASベース） → STEP4（即削除）
+・基本思想： ROASだけでなく、広告費と購入数を重視した複合判定'''
             )
         if dc_cpc.empty:
             st.info("分析を実行してください。")
@@ -4143,104 +4141,36 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
     _cond_bar([("CPC調整ルール", "適用"), ("対象", page_title)])
     render_logic_section(
         "📈 CPC調整ロジック",
-        '''
-<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
-<thead>
-  <tr style="background:#DBEAFE;">
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:15%;">ランク</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:45%;">判定条件</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">アクション</th>
-    <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:20%;">CPC変更幅</th>
-  </tr>
-</thead>
-<tbody>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 1】 データ不足判定（最優先）
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#4A5568;">判断保留</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 &lt; ¥3,000 <b>かつ</b> 購入数 &lt; 4件</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">変更なし</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 2】 高実績ランク（購入数 ≥ 20件）
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#D69E2E;">SS+</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> ROAS ≥ 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
-  </tr>
-  <tr style="background:#FFFBEB;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#B7791F;">SS</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">購入数 ≥ 20件 <b>かつ</b> 2.0 ≤ ROAS &lt; 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 3】 ROASベースランク
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#553C9A;">S</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS ≥ 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC上げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#276749;font-weight:700;">+5円</td>
-  </tr>
-  <tr style="background:#F0FFF4;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2C7A7B;">A</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">3.0 ≤ ROAS &lt; 4.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2B6CB0;">B</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.8 ≤ ROAS &lt; 3.0</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">現状維持</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">±0円</td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C05621;">C</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">1.5 ≤ ROAS &lt; 1.8</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−5円</td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">D</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">ROAS &lt; 1.5</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">CPC下げ</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#C53030;font-weight:700;">−10円</td>
-  </tr>
-  <tr style="background:#F1F5F9;">
-    <td colspan="4" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">
-      【STEP 4】 即削除判定（広告費過多 × 低ROAS）
-    </td>
-  </tr>
-  <tr style="background:#FFF5F5;">
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#742A2A;">即削除</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-      ROAS &lt; 0.8 <b>かつ</b> 広告費が閾値以上<br>
-      <span style="font-size:.8rem;color:#718096;">
-        売価 ≤¥1,500 → 広告費 ≥¥3,000 ／
-        売価 ≤¥2,000 → 広告費 ≥¥4,000 ／
-        売価 &gt;¥2,000 → 広告費 ≥¥5,000
-      </span>
-    </td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;color:#742A2A;font-weight:700;">即削除</td>
-    <td style="padding:6px 10px;border:1px solid #BFDBFE;">—</td>
-  </tr>
-</tbody>
-</table>
-<p style="font-size:.78rem;color:#718096;margin-top:10px;">
-  ▶ 判定順序: STEP1（データ不足）→ STEP2（購入数優先） → STEP3（ROASベース） → STEP4（即削除）<br>
-  ▶ 基本思想: ROASだけでなく、広告費と購入数を重視した複合判定
-</p>''',
+        f'''🎯 対象
+{page_title}
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 判定フロー
+① データ不足判定（最優先）
+　　判断保留： 広告費 < ¥3,000 かつ 購入数 < 4件 → 変更なし（±0円）
+　　↓
+② 高実績ランク判定（購入数 ≥ 20件）
+　　SS+： 購入数 ≥ 20件 かつ ROAS ≥ 4.0 → CPC上げ（+5円）
+　　SS ： 購入数 ≥ 20件 かつ 2.0 ≤ ROAS < 4.0 → 現状維持（±0円）
+　　↓
+③ ROASベースランク判定
+　　S： ROAS ≥ 4.0 → CPC上げ（+5円）
+　　A： 3.0 ≤ ROAS < 4.0 → 現状維持（±0円）
+　　B： 1.8 ≤ ROAS < 3.0 → 現状維持（±0円）
+　　C： 1.5 ≤ ROAS < 1.8 → CPC下げ（−5円）
+　　D： ROAS < 1.5 → CPC下げ（−10円）
+　　↓
+④ 即削除判定（広告費過多 × 低ROAS）
+　　即削除： ROAS < 0.8 かつ 広告費が閾値以上 → 即削除
+　　広告費閾値： 売価 ≤ ¥1,500 → 広告費 ≥ ¥3,000／
+　　　　　　　　売価 ≤ ¥2,000 → 広告費 ≥ ¥4,000／
+　　　　　　　　売価 > ¥2,000 → 広告費 ≥ ¥5,000
+　　↓
+✅ 判定結果
+判断保留／SS+／SS／S／A／B／C／D／即削除（ランクとCPC変更幅）
+━━━━━━━━━━━━━━━━━━━━━━━━
+💡 補足
+・判定順序： STEP1（データ不足） → STEP2（購入数優先） → STEP3（ROASベース） → STEP4（即削除）
+・基本思想： ROASだけでなく、広告費と購入数を重視した複合判定''',
     )
     if dc_pt.empty:
         st.info("分析を実行してください。")
@@ -4841,37 +4771,27 @@ def _ddv4_render_sellable_top10():
     )
 
     _logic = (
-        "<table style='width:100%;border-collapse:collapse;font-size:.82rem;'>"
-        "<thead><tr style='background:#DBEAFE;'>"
-        "<th style='padding:6px 10px;border:1px solid #BFDBFE;width:22%;'>スコア軸</th>"
-        "<th style='padding:6px 10px;border:1px solid #BFDBFE;width:9%;'>配点</th>"
-        "<th style='padding:6px 10px;border:1px solid #BFDBFE;'>算出方法</th>"
-        "</tr></thead><tbody>"
-        "<tr style='background:#EAF2FF;'>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#3B82F6;'>① 需要</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>0-45点</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;'>"
-        "SV&gt;=10k:45 / &gt;=5k:38 / &gt;=1k:30 / &gt;=300:20 / &gt;=100:10 / &lt;100:3</td></tr>"
-        "<tr style='background:#EAF7EF;'>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2F855A;'>② 商品関連性</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>0-35点</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;'>"
-        "Relevancy(0-14)+商品辞書(0-12)+カテゴリ(0-7)+購買意図(0-2)</td></tr>"
-        "<tr style='background:#FFFAF0;'>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#D97706;'>③ 競争強度</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>0-15点</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;'>"
-        "Strengthベース(VW15/W12/M9/S5/VS2)+Variations補正(±2) RC単独加減点禁止</td></tr>"
-        "<tr style='background:#FFF0F5;'>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#9B2C2C;'>④ 未使用ボーナス</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>0-5点</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;'>"
-        "未使用:+5 / 部分使用:+2 / 使用中:0</td></tr>"
-        "<tr><td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>売れる予測スコア</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;'>0-100点</td>"
-        "<td style='padding:6px 10px;border:1px solid #BFDBFE;'>"
-        "需要+商品関連性+競争強度+未使用ボーナス → スコア降順TOP10を出力</td></tr>"
-        "</tbody></table>"
+        '''🎯 対象
+対象商品の全キーワード候補（ASIN単位でスコアリング）
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 判定フロー
+① 需要スコア算出（0-45点）
+　　SV ≥ 10k:45／≥5k:38／≥1k:30／≥300:20／≥100:10／<100:3
+　　↓
+② 商品関連性スコア算出（0-35点）
+　　Relevancy(0-14)+商品辞書(0-12)+カテゴリ(0-7)+購買意図(0-2)
+　　↓
+③ 競争強度スコア算出（0-15点）
+　　Strengthベース(VW15/W12/M9/S5/VS2)+Variations補正(±2)
+　　※RC単独加減点禁止
+　　↓
+④ 未使用ボーナス算出（0-5点）
+　　未使用:+5／部分使用:+2／使用中:0
+　　↓
+⑤ 売れる予測スコア = 需要+商品関連性+競争強度+未使用ボーナス（0-100点）
+　　↓
+✅ 判定結果
+スコア降順TOP10を出力'''
     )
     render_logic_section("\U0001f4ca 売れる予測KW スコアロジック（v5.1）", _logic)
 
@@ -4957,22 +4877,21 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key, hist_fname: 
         ])
         render_logic_section(
             f"[+] {camp_label}追加 判定ロジック",
-            '<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">'
-            '<thead><tr style="background:#DBEAFE;">'
-            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>'
-            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>'
-            '</tr></thead><tbody>'
-            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">対象データ</td></tr>'
-            f'<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">分析対象</td>'
-            f'<td style="padding:6px 10px;border:1px solid #BFDBFE;">{camp_label}（ASINターゲティング）</td></tr>'
-            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">信頼度フィルター</td></tr>'
-            '<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">最低条件</td>'
-            '<td style="padding:6px 10px;border:1px solid #BFDBFE;">注文数 ≥ 3件 / クリック数 ≥ 5回 / 広告費 ≥ ¥300</td></tr>'
-            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">採用条件</td></tr>'
-            '<tr style="background:#EAF7EF;"><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#2F855A;">✅ 追加対象</td>'
-            '<td style="padding:6px 10px;border:1px solid #BFDBFE;">売上 ≥ 売価 × 2 <b>かつ</b> ROAS ≥ 2.0</td></tr>'
-            '</tbody></table>'
-            '<p style="font-size:.78rem;color:#718096;margin-top:10px;">▶ 売れているASINターゲに予算を集中して利益を最大化する</p>'
+            f'''🎯 対象
+{camp_label}（ASINターゲティング）
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 判定フロー
+① 信頼度フィルター（最低条件）
+　　注文数 ≥ 3件／クリック数 ≥ 5回／広告費 ≥ ¥300
+　　↓
+② 採用条件
+　　売上 ≥ 売価 × 2 かつ ROAS ≥ 2.0
+　　↓
+✅ 判定結果
+追加対象
+━━━━━━━━━━━━━━━━━━━━━━━━
+💡 補足
+・売れているASINターゲに予算を集中して利益を最大化する'''
         )
     else:
         _cond_bar([
@@ -4982,19 +4901,18 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key, hist_fname: 
         ])
         render_logic_section(
             f"[x] {camp_label}削除 判定ロジック",
-            '<table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">'
-            '<thead><tr style="background:#DBEAFE;">'
-            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>'
-            '<th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>'
-            '</tr></thead><tbody>'
-            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">対象データ</td></tr>'
-            f'<tr><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">分析対象</td>'
-            f'<td style="padding:6px 10px;border:1px solid #BFDBFE;">{camp_label}（ASINターゲティング）</td></tr>'
-            '<tr style="background:#F1F5F9;"><td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">削除条件</td></tr>'
-            '<tr style="background:#FFF5F5;"><td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#C53030;">[x] 削除対象</td>'
-            '<td style="padding:6px 10px;border:1px solid #BFDBFE;">広告費 ≥ 売価 × 2 <b>かつ</b> ROAS &lt; 0.8</td></tr>'
-            '</tbody></table>'
-            '<p style="font-size:.78rem;color:#718096;margin-top:10px;">▶ 売価の2倍以上広告費を使ってもROASが低いASINターゲは利益を生まない</p>'
+            f'''🎯 対象
+{camp_label}（ASINターゲティング）
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 判定フロー
+① 削除条件判定
+　　広告費 ≥ 売価 × 2 かつ ROAS < 0.8
+　　↓
+✅ 判定結果
+削除対象
+━━━━━━━━━━━━━━━━━━━━━━━━
+💡 補足
+・売価の2倍以上広告費を使ってもROASが低いASINターゲは利益を生まない'''
         )
     st.markdown("")
 
