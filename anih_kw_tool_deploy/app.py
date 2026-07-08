@@ -2968,11 +2968,22 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
     _hide_extras_top7 = csv_key in ("anls_cpc_kw_top7", "anls_cpc_pt_m_top7", "anls_cpc_pt_v_top7")
     _hide_extras_top30 = csv_key in ("anls_cpc_kw_top30", "anls_cpc_pt_m_top30", "anls_cpc_pt_v_top30")
     _hide_extras = _hide_extras_top7 or _hide_extras_top30
+    # ── 不要表示の削除（表示停止のみ・キーワード追加/商品追加/動画追加
+    # (kw_add/asin_add)共通で使われる、不要な30日比較CSV案内表示のみ）──
+    # 対象：①「追加後の効果測定期間: 30日固定」案内文
+    #       ②「比較用データ取得元: 30日比較CSVバケット」表示
+    #       ③「『30日比較CSV』バケットにCSVが保持されていません。」文言
+    # CPC分析画面(cpc_kw/cpc_asin)の同等表示（_hide_extras対象外の場合）
+    # には一切影響しない。CSV読込処理・保存処理・分析履歴処理・4週間比較
+    # 保存・7日/30日分析ロジックには一切触れていない（st.*表示呼び出しの
+    # みを条件分岐で止めるだけ）。
+    _hide_add_bucket_msgs = mode in ("kw_add", "asin_add")
     if not _hide_extras:
         st.markdown(f"#### 📊 {label} 分析")
     _disp_days = 30 if mode in ("kw_add", "asin_add") else period_days
     if mode in ("kw_add", "asin_add"):
-        st.info(f"📅 追加後の効果測定期間: **{_disp_days}日固定** — 追加候補を反映してから{_disp_days}日間のレポートCSVをアップロードしてください。")
+        if not _hide_add_bucket_msgs:
+            st.info(f"📅 追加後の効果測定期間: **{_disp_days}日固定** — 追加候補を反映してから{_disp_days}日間のレポートCSVをアップロードしてください。")
     else:
         st.info(f"📅 分析期間: **{period_days}日固定** — {period_days}日レポートCSVをアップロードしてください。")
     if before_df is None or before_df.empty:
@@ -2986,7 +2997,7 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
     _bucket_key   = "csv_bucket_30d" if _disp_days == 30 else "csv_bucket_7d"
     _bucket_label = "30日比較CSV"    if _disp_days == 30 else "7日比較CSV"
     _bucket_held  = st.session_state.get(_bucket_key, {})
-    if not _hide_extras:
+    if not (_hide_extras or _hide_add_bucket_msgs):
         st.markdown(f"**比較用データ取得元: 📂 {_bucket_label}バケット（{_disp_days}日）**")
     if _bucket_held:
         if _accept_multiple:
@@ -3000,7 +3011,7 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                 st.caption(f"参照ファイル（最新1件）: {_latest_name}")
     else:
         af_files = []
-        if not _hide_extras:
+        if not (_hide_extras or _hide_add_bucket_msgs):
             st.caption(f"「{_bucket_label}」バケットにCSVが保持されていません。")
     # ── 案内表示のみ（既存ロジック・判定・DataFrameには一切影響しない） ──
     # 分析開始後、7日/30日比較CSVバケットに2件以上保持されている場合のみ、
