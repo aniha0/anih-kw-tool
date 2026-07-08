@@ -5042,11 +5042,15 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key, hist_fname: 
         st.info(msg)
         return
 
-    # ④-2 コピー用一覧（「キーワード追加」画面と同じ実装方法・表示位置・UIを流用）
+    # ④-2 コピー用一覧（「キーワード追加」/「キーワード停止」画面と同じ実装方法・表示位置・UIを流用）
     if is_add:
         _asin_list = df_view.sort_values("ROAS", ascending=False)["asin"].tolist() if "asin" in df_view.columns else []
         st.markdown(f"**📋 Amazon広告登録用{camp_label}一覧**（右上のコピーボタンでコピー）")
         st.code("\n".join(_asin_list), language=None)
+    else:
+        _asin_list_del = df_view["asin"].tolist() if "asin" in df_view.columns else []
+        st.markdown(f"**📋 停止対象{camp_label}一覧**（右上のコピーボタンでコピー）")
+        st.code("\n".join(_asin_list_del), language=None)
 
     # ⑤ 詳細テーブル
     if is_add:
