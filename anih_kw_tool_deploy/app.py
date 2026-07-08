@@ -1143,46 +1143,22 @@ def page_add_kw():
             ("最小広告費",  f'¥{sv["mco"]:,}'),
         ])
 
-        render_logic_section(
-            "📋 キーワード追加 判定ロジック",
-            '''
-    <table style="width:100%;border-collapse:collapse;font-size:.83rem;color:#2D3748;">
-    <thead>
-      <tr style="background:#DBEAFE;">
-        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:30%;">項目</th>
-        <th style="padding:7px 10px;border:1px solid #BFDBFE;text-align:left;width:70%;">内容</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr style="background:#F1F5F9;">
-        <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【目的】</td>
-      </tr>
-      <tr>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;" colspan="2">
-          オート広告で成果が出た検索語句を、手動広告（部分一致）のマニュアルキーワードへ追加する候補を抽出します。
-        </td>
-      </tr>
-      <tr style="background:#F1F5F9;">
-        <td colspan="2" style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:700;color:#1E3A5F;">【抽出条件】</td>
-      </tr>
-      <tr>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">信頼度フィルター</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">
-          注文数 ≥ 3件 <b>かつ</b> クリック数 ≥ 5 <b>かつ</b> 広告費 ≥ ¥300<br>
-          <span style="font-size:.8rem;color:#718096;">サイドバーで変更可能</span>
-        </td>
-      </tr>
-      <tr style="background:#F0FFF4;">
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;font-weight:600;">採用条件</td>
-        <td style="padding:6px 10px;border:1px solid #BFDBFE;">売上 ≥ 売価 × 2 <b>かつ</b> ROAS ≥ 2.0</td>
-      </tr>
-    </tbody>
-    </table>
-    <p style="font-size:.78rem;color:#718096;margin-top:10px;">
-      ▶ 同一意図KW統合: 語順・表記ゆれが同じKWは代表1件に集約<br>
-      ▶ ブランドワード・商品コード・タイトル文字列は自動除外
-    </p>''',
-        )
+        with st.expander("📖 判定ロジックを見る", expanded=False):
+            st.text(
+                '''📋 キーワード追加 判定ロジック
+
+【目的】
+オート広告で成果が出た検索語句を、手動広告（部分一致）のマニュアルキーワードへ
+追加する候補を抽出します。
+
+【抽出条件】
+信頼度フィルター： 注文数 ≥ 3件 かつ クリック数 ≥ 5 かつ 広告費 ≥ ¥300
+　　　　　　　　　（サイドバーで変更可能）
+採用条件　　　： 売上 ≥ 売価 × 2 かつ ROAS ≥ 2.0
+
+▶ 同一意図KW統合: 語順・表記ゆれが同じKWは代表1件に集約
+▶ ブランドワード・商品コード・タイトル文字列は自動除外'''
+            )
         st.markdown("")
         # ② キャンペーン選択
         _c1, _c3 = st.columns([3, 2])
@@ -1595,6 +1571,7 @@ def _anls_render_parent_kw_page() -> None:
 def page_auto_del_kw():
     _t1, _t2 = st.tabs(["除外候補", "🔍 親KW分析"])
     with _t1:
+        render_logic_section("📄 オートKW削除 判定ロジック", '''<div style="font-size:.88rem;color:#2D3748;line-height:2.2;text-align:center;">\n① オート広告のみ対象<br>\n↓<br>\n② マニュアル登録済み検索語を除外<br>\n↓<br>\n③ ASIN・category検索を除外<br>\n↓<br>\n④ 商品価格取得<br>\n↓<br>\n⑤ 広告費 ≥ 売価×2<br>\n↓<br>\n⑥ ROAS ≤ 0.8<br>\n↓<br>\n<span style="font-weight:700;color:#C53030;">除外候補</span>\n</div>''')
         # ── session_stateからキーワードDataFrameを取得（商品/動画は別ページへ合流済み）──
         df_auto_del_kw_keyword = st.session_state.get("df_auto_del_kw_keyword", pd.DataFrame())
 
@@ -1622,6 +1599,7 @@ def page_auto_del_kw():
         _anls_render_parent_kw_page()
 
 def page_auto_del_product():
+    render_logic_section("🎯 オート商品削除 判定ロジック", '''<div style="font-size:.88rem;color:#2D3748;line-height:2.2;text-align:center;">\n① オート商品ターゲティングのみ対象<br>\n↓<br>\n② マニュアル商品ターゲティング重複除外<br>\n↓<br>\n③ ASIN単位で集計<br>\n↓<br>\n④ 商品価格取得<br>\n↓<br>\n⑤ 広告費 ≥ 売価×2<br>\n↓<br>\n⑥ ROAS ≤ 0.8<br>\n↓<br>\n<span style="font-weight:700;color:#C53030;">除外候補</span>\n</div>''')
     df = st.session_state.get("df_auto_del_product", pd.DataFrame())
     if df.empty:
         st.info("除外候補の商品ASINはありません。（オート商品広告で出血中かつマニュアル未登録のものなし）")
@@ -1650,6 +1628,7 @@ def page_auto_del_product():
     st.download_button("📥 除外商品ASIN候補.csv", data=_csv, file_name="除外商品ASIN候補.csv", mime="text/csv")
 
 def page_auto_del_video():
+    render_logic_section("🎥 オート動画削除 判定ロジック", '''<div style="font-size:.88rem;color:#2D3748;line-height:2.2;text-align:center;">\n① オート動画ターゲティングのみ対象<br>\n↓<br>\n② マニュアル動画ターゲティング重複除外<br>\n↓<br>\n③ ASIN／カテゴリー単位で集計<br>\n↓<br>\n④ 商品価格取得<br>\n↓<br>\n⑤ 広告費 ≥ 売価×2<br>\n↓<br>\n⑥ ROAS ≤ 0.8<br>\n↓<br>\n<span style="font-weight:700;color:#C53030;">除外候補</span>\n</div>''')
     df = st.session_state.get("df_auto_del_video", pd.DataFrame())
     if df.empty:
         st.info("除外候補の動画ASINはありません。（オート動画広告で出血中かつマニュアル未登録のものなし）")
