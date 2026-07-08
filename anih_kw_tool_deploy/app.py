@@ -3929,6 +3929,11 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
                 "n_before": 1, "n_matched": 1, "n_kaizen": 0, "n_akka": 0, "n_henko": 1,
                 "rate": 0.0, "camps": [_sel_cname] if _sel_cname else [],
                 "period": None, "detail": _detail,
+                "agg_sales_b": _b_w["sales"], "agg_sales_a": _a_w["sales"],
+                "agg_cost_b": _b_w["cost"], "agg_cost_a": _a_w["cost"],
+                "agg_orders_b": _b_w["orders"], "agg_orders_a": _a_w["orders"],
+                "agg_roas_b": _b_w["roas"], "agg_roas_a": _a_w["roas"],
+                "agg_avg_cpc_b": 0.0, "agg_avg_cpc_a": 0.0,
             })
             _anls_save(_kw4wk_fname, _recs)
             st.success("✅ 4週間比較を保存しました。")
@@ -4137,6 +4142,11 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
                 "n_before": 1, "n_matched": 1, "n_kaizen": 0, "n_akka": 0, "n_henko": 1,
                 "rate": 0.0, "camps": [_sel_cname] if _sel_cname else [],
                 "period": None, "detail": _detail,
+                "agg_sales_b": _b_w["sales"], "agg_sales_a": _a_w["sales"],
+                "agg_cost_b": _b_w["cost"], "agg_cost_a": _a_w["cost"],
+                "agg_orders_b": _b_w["orders"], "agg_orders_a": _a_w["orders"],
+                "agg_roas_b": _b_w["roas"], "agg_roas_a": _a_w["roas"],
+                "agg_avg_cpc_b": 0.0, "agg_avg_cpc_a": 0.0,
             })
             _anls_save(_pt_m_4wk_fname, _recs)
             st.success("✅ 4週間比較を保存しました。")
@@ -4329,6 +4339,11 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
                 "n_before": 1, "n_matched": 1, "n_kaizen": 0, "n_akka": 0, "n_henko": 1,
                 "rate": 0.0, "camps": [_sel_cname] if _sel_cname else [],
                 "period": None, "detail": _detail,
+                "agg_sales_b": _b_w["sales"], "agg_sales_a": _a_w["sales"],
+                "agg_cost_b": _b_w["cost"], "agg_cost_a": _a_w["cost"],
+                "agg_orders_b": _b_w["orders"], "agg_orders_a": _a_w["orders"],
+                "agg_roas_b": _b_w["roas"], "agg_roas_a": _a_w["roas"],
+                "agg_avg_cpc_b": 0.0, "agg_avg_cpc_a": 0.0,
             })
             _anls_save(_pt_v_4wk_fname, _recs)
             st.success("✅ 4週間比較を保存しました。")
