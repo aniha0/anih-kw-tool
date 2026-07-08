@@ -3027,8 +3027,13 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
     if len(_results_now) >= 2:
         # 複数CSV時：①保存機能なし ②③は _anls_build_multi_period_table 側で対応。
         # ファイルごとの独立結果パネル（サマリー・対象一覧・保存ボタン）は表示しない。
+        # ── 不要表示の削除（表示停止のみ）──────────────────────────
+        # 「📊 複数期間比較表」表示を不要画面として非表示化。データ生成処理
+        # (_anls_build_multi_period_table)・表示関数本体(_anls_render_multi_period_table)
+        # はどちらも無改変のまま保持し、呼び出しのみ停止する。分析ロジック・
+        # 判定ロジック・保存処理・JSON・records構造・session_state・CSV処理・
+        # ソート/並び順には一切触れていない。
         _cmp_rows = _anls_build_multi_period_table(_results_now, id_col, mode)
-        _anls_render_multi_period_table(_cmp_rows)
     else:
         for _ri, res in enumerate(_results_now):
             merged   = res["merged"]
