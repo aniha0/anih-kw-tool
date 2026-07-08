@@ -2576,6 +2576,17 @@ def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = "")
         _4wk_mark = "📌 4週間比較保存　" if rtype in _4wk_types else ""
         header = f"{_4wk_mark}{emoji} {saved_at}　{rtype}　改善率 {rate:.1f}%　{trend}"
         with st.expander(header, expanded=(i == 0)):
+            # ── 履歴個別削除ボタンの追加のみ（既存の_anls_load/_anls_save
+            # をそのまま利用し、対象record(id一致)だけを除外して書き戻す
+            # 最小実装。新しい削除システム・新しいJSON構造は一切追加しない）──
+            _rec_id = rec.get("id", "")
+            if st.button("🗑️ 削除", key=f"_anls_hist_del_{anls_hist_fname}_{_rec_id}_{i}"):
+                _cur_recs = _anls_load(anls_hist_fname)
+                _cur_recs = [r for r in _cur_recs if r.get("id") != _rec_id]
+                _anls_save(anls_hist_fname, _cur_recs)
+                st.success("削除しました。")
+                st.rerun()
+
             if rtype in _4wk_types:
                 # ── 4週間比較保存履歴の表示分離（数値確認専用の簡易表示のみ）。
                 # 既存の通常分析カード表示（改善率/判定/星/理由/AI考察/
