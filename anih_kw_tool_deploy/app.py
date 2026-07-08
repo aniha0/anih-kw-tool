@@ -3588,6 +3588,12 @@ def page_cpc():
         # （_anls_render_tab・💾保存ボタン・📂保存済み分析履歴を含む、無改変）を
         # 呼び出すだけ。新しい保存ロジック・新しいJSON・新しい関数は一切追加しない。
         _anls_entry_point(dc_cpc)
+        # ── 分析履歴ページへの入口ボタン追加（既存ページ遷移の仕組みをそのまま利用）──
+        # サイドバーの_nav_btnと同じ「st.session_state["current_page"]を書き換える」
+        # 既存の遷移方法をそのまま使うだけで、新しい履歴表示処理・新しいデータ取得
+        # 処理は一切追加しない。押下後は既存のpage_anls_history()がそのまま描画される。
+        if st.button("📂 分析履歴を見る", key="_anls_cpc_kw_history_link"):
+            st.session_state["current_page"] = "📂 分析履歴"
 
 
 def _anls_run_cpc_kw_period_comparison(dc_cpc: pd.DataFrame, _debug: dict = None) -> list:
@@ -4375,6 +4381,12 @@ def page_cpc_product():
         # 📂保存済み分析履歴を含む、無改変）を呼び出すだけ。新しい保存ロジック・
         # 新しいJSON・新しい関数は一切追加しない。
         _anls_entry_point_cpc_product(dc_cpc_product)
+        # ── 分析履歴ページへの入口ボタン追加（既存ページ遷移の仕組みをそのまま利用）──
+        # サイドバーの_nav_btnと同じ「st.session_state["current_page"]を書き換える」
+        # 既存の遷移方法をそのまま使うだけで、新しい履歴表示処理・新しいデータ取得
+        # 処理は一切追加しない。押下後は既存のpage_anls_history()がそのまま描画される。
+        if st.button("📂 分析履歴を見る", key="_anls_cpc_pt_m_history_link"):
+            st.session_state["current_page"] = "📂 分析履歴"
 
 def _anls_entry_point_cpc_product(df_cpc_product):
     """page_cpc_product の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
@@ -4417,6 +4429,12 @@ def page_cpc_video():
         # 📂保存済み分析履歴を含む、無改変）を呼び出すだけ。新しい保存ロジック・
         # 新しいJSON・新しい関数は一切追加しない。
         _anls_entry_point_cpc_video(dc_cpc_video)
+        # ── 分析履歴ページへの入口ボタン追加（既存ページ遷移の仕組みをそのまま利用）──
+        # サイドバーの_nav_btnと同じ「st.session_state["current_page"]を書き換える」
+        # 既存の遷移方法をそのまま使うだけで、新しい履歴表示処理・新しいデータ取得
+        # 処理は一切追加しない。押下後は既存のpage_anls_history()がそのまま描画される。
+        if st.button("📂 分析履歴を見る", key="_anls_cpc_pt_v_history_link"):
+            st.session_state["current_page"] = "📂 分析履歴"
 
 def _anls_entry_point_cpc_video(df_cpc_video):
     """page_cpc_video の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
