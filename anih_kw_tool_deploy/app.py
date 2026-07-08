@@ -1135,17 +1135,15 @@ def render_logic_section(title: str, content_html: str):
 # ===================================================
 
 def page_add_kw():
-    _t1, _t2 = st.tabs(["追加候補", "分析"])
-    with _t1:
-        _cond_bar([
-            ("最小注文数",  f'{sv["mo"]}件'),
-            ("最小クリック数", f'{sv["mc"]}回'),
-            ("最小広告費",  f'¥{sv["mco"]:,}'),
-        ])
+    _cond_bar([
+        ("最小注文数",  f'{sv["mo"]}件'),
+        ("最小クリック数", f'{sv["mc"]}回'),
+        ("最小広告費",  f'¥{sv["mco"]:,}'),
+    ])
 
-        with st.expander("📖 判定ロジックを見る", expanded=False):
-            st.text(
-                '''📋 キーワード追加 判定ロジック
+    with st.expander("📖 判定ロジックを見る", expanded=False):
+        st.text(
+            '''📋 キーワード追加 判定ロジック
 
 【目的】
 オート広告で成果が出た検索語句を、手動広告（部分一致）のマニュアルキーワードへ
@@ -1158,65 +1156,63 @@ def page_add_kw():
 
 ▶ 同一意図KW統合: 語順・表記ゆれが同じKWは代表1件に集約
 ▶ ブランドワード・商品コード・タイトル文字列は自動除外'''
-            )
-        st.markdown("")
-        # ② キャンペーン選択
-        _c1, _c3 = st.columns([3, 2])
-        with _c1:
-            kw_camp = st.selectbox(
-                "キャンペーン",
-                ["全キャンペーン"] + CAMPAIGNS,
-                label_visibility="visible",
-                key="add_camp_sel",
-            )
-        sel_df = dw.copy()
-
-        if kw_camp != "全キャンペーン":
-            sel_df = sel_df[sel_df["campaign_theme"] == kw_camp].copy()
-
-        n_sel = len(sel_df)
-
-        # 件数表示
-        st.markdown(
-            f'<div class="count-badge">該当件数: <b style="font-size:1.1rem;">{n_sel}件</b>'
-            f'　<span style="color:#718096;font-size:.8rem;">キャンペーン: {kw_camp}</span></div>',
-            unsafe_allow_html=True,
         )
-
-        if sel_df.empty:
-            st.info("条件に合うキーワードはありません。")
-            return
-
-        # ④ コピー用KW一覧
-        kw_list = "\n".join(sel_df.sort_values("ROAS", ascending=False)["keyword"].tolist())
-        st.markdown("**📋 Amazon広告登録用KW一覧**（右上のコピーボタンでコピー）")
-        st.code(kw_list, language=None)
-
-        # ④-2 CSVダウンロード（History保存トリガー）
-        _kw_add_hist_cols = [c for c in ["campaign_name", "ad_group", "keyword",
-                                          "orders", "clicks", "cost", "sales", "ROAS"]
-                              if c in sel_df.columns]
-        _kw_add_hist_df = sel_df.sort_values("ROAS", ascending=False)[_kw_add_hist_cols].copy()
-        _kw_add_csv = _kw_add_hist_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-        _anls_save_kw_add_history(_kw_add_hist_df)
-        st.download_button(
-            f"📥 {kw_camp}_キーワード追加候補.csv", data=_kw_add_csv,
-            file_name=f"{kw_camp}_キーワード追加候補.csv", mime="text/csv",
+    st.markdown("")
+    # ② キャンペーン選択
+    _c1, _c3 = st.columns([3, 2])
+    with _c1:
+        kw_camp = st.selectbox(
+            "キャンペーン",
+            ["全キャンペーン"] + CAMPAIGNS,
+            label_visibility="visible",
+            key="add_camp_sel",
         )
+    sel_df = dw.copy()
 
-        # ⑤ 詳細テーブル
-        st.markdown("##### KW詳細テーブル")
-        _dd = sel_df[bcols(sel_df)].copy().sort_values("ROAS", ascending=False).reset_index(drop=True)
-        _dd.index = _dd.index + 1
-        _dd = _dd.rename(columns=RENAME)
-        _dd["売上"]  = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
-        _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
-        _dd["ROAS"]  = _dd["ROAS"].round(2)
-        if "CVR" in _dd.columns:
-            _dd["CVR"] = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
-        st.dataframe(_dd, use_container_width=True)
-    with _t2:
-        _anls_entry_point_kw_add(st.session_state.get("df_win", pd.DataFrame()))
+    if kw_camp != "全キャンペーン":
+        sel_df = sel_df[sel_df["campaign_theme"] == kw_camp].copy()
+
+    n_sel = len(sel_df)
+
+    # 件数表示
+    st.markdown(
+        f'<div class="count-badge">該当件数: <b style="font-size:1.1rem;">{n_sel}件</b>'
+        f'　<span style="color:#718096;font-size:.8rem;">キャンペーン: {kw_camp}</span></div>',
+        unsafe_allow_html=True,
+    )
+
+    if sel_df.empty:
+        st.info("条件に合うキーワードはありません。")
+        return
+
+    # ④ コピー用KW一覧
+    kw_list = "\n".join(sel_df.sort_values("ROAS", ascending=False)["keyword"].tolist())
+    st.markdown("**📋 Amazon広告登録用KW一覧**（右上のコピーボタンでコピー）")
+    st.code(kw_list, language=None)
+
+    # ④-2 CSVダウンロード（History保存トリガー）
+    _kw_add_hist_cols = [c for c in ["campaign_name", "ad_group", "keyword",
+                                      "orders", "clicks", "cost", "sales", "ROAS"]
+                          if c in sel_df.columns]
+    _kw_add_hist_df = sel_df.sort_values("ROAS", ascending=False)[_kw_add_hist_cols].copy()
+    _kw_add_csv = _kw_add_hist_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+    _anls_save_kw_add_history(_kw_add_hist_df)
+    st.download_button(
+        f"📥 {kw_camp}_キーワード追加候補.csv", data=_kw_add_csv,
+        file_name=f"{kw_camp}_キーワード追加候補.csv", mime="text/csv",
+    )
+
+    # ⑤ 詳細テーブル
+    st.markdown("##### KW詳細テーブル")
+    _dd = sel_df[bcols(sel_df)].copy().sort_values("ROAS", ascending=False).reset_index(drop=True)
+    _dd.index = _dd.index + 1
+    _dd = _dd.rename(columns=RENAME)
+    _dd["売上"]  = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
+    _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
+    _dd["ROAS"]  = _dd["ROAS"].round(2)
+    if "CVR" in _dd.columns:
+        _dd["CVR"] = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
+    st.dataframe(_dd, use_container_width=True)
 
 def _anls_entry_point_kw_add(df_win):
     """page_add_kw の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
