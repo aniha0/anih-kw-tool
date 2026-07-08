@@ -2978,7 +2978,10 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
     # 保存・7日/30日分析ロジックには一切触れていない（st.*表示呼び出しの
     # みを条件分岐で止めるだけ）。
     _hide_add_bucket_msgs = mode in ("kw_add", "asin_add")
-    if not _hide_extras:
+    # ── 不要表示の削除（表示停止のみ・キーワード追加/商品追加/動画追加の
+    # 「📊 ○○分析 分析」見出しのみ非表示化）。分析実行ボタン・分析ロジック・
+    # 結果表示・保存処理には一切触れていない。
+    if not (_hide_extras or _hide_add_bucket_msgs):
         st.markdown(f"#### 📊 {label} 分析")
     _disp_days = 30 if mode in ("kw_add", "asin_add") else period_days
     if mode in ("kw_add", "asin_add"):
