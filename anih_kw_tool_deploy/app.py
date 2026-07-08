@@ -1612,6 +1612,9 @@ def page_auto_del_product():
         st.info("除外候補の商品ASINはありません。")
         return
     st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.8 / マニュアル商品重複除外済み")
+    _asin_list_auto_pt = df["asin"].tolist() if "asin" in df.columns else []
+    st.markdown("**📋 除外対象商品一覧**（右上のコピーボタンでコピー）")
+    st.code("\n".join(_asin_list_auto_pt), language=None)
     _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
     _rn = {"asin":"ASIN","campaign_theme":"キャンペーン","cost":"広告費",
            "sales":"売上","orders":"購入数","campaign_name":"キャンペーン名","ad_group":"広告グループ"}
@@ -1641,6 +1644,9 @@ def page_auto_del_video():
         st.info("除外候補の動画ASINはありません。")
         return
     st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.8 / マニュアル動画重複除外済み")
+    _asin_list_auto_vid = df["asin"].tolist() if "asin" in df.columns else []
+    st.markdown("**📋 除外対象動画一覧**（右上のコピーボタンでコピー）")
+    st.code("\n".join(_asin_list_auto_vid), language=None)
     _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
     _rn = {"asin":"ASIN","campaign_theme":"キャンペーン","cost":"広告費",
            "sales":"売上","orders":"購入数","campaign_name":"キャンペーン名","ad_group":"広告グループ"}
