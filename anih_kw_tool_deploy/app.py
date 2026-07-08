@@ -2860,6 +2860,26 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                      id_col: str = "keyword",
                      cpc_hist_fname: str = ""):
     _sk = f"_anls_{csv_key}"
+    # ── 不要表示の削除（表示停止のみ・CPC調整ページの「⏱️ 期間別クイック分析」
+    # セクション全体を非表示化）───────────────────────────────
+    # キーワード/商品/動画CPC分析で使われる9つのcsv_key（_top7／_top30／
+    # 無題ブロックの計9種）のときは、見出し・期間表示・データ取得元・
+    # 参照ファイル・比較CSV検出メッセージ・🔍分析実行ボタン・Before/After
+    # 結果・💾保存ボタン・📂保存済み分析履歴を含む、この関数の出力全体を
+    # 非表示にする（何も描画せず即return）。KW追加/商品追加/動画追加
+    # （kw_add/asin_add）のcsv_keyには一切影響しない。
+    # 分析ロジック・CPC計算・判定ロジック・保存処理(_anls_save)・JSON・
+    # records構造・session_state操作・CSV処理には一切触れていない
+    # （この関数自体を呼び出す手前で止めるだけで、内部処理は無改変のまま）。
+    # 既存の保存済みJSON（analysis_data/anls_cpc_*.json）と、それを表示する
+    # 「📂 分析履歴」ページ（page_anls_history）・_anls_render_saved_report・
+    # _anls_render_saved_detailには一切影響しない（別経路で読み込むため）。
+    if csv_key in (
+        "anls_cpc_kw_top7", "anls_cpc_kw_top30", "anls_cpc_kw",
+        "anls_cpc_pt_m_top7", "anls_cpc_pt_m_top30", "anls_cpc_pt_m",
+        "anls_cpc_pt_v_top7", "anls_cpc_pt_v_top30", "anls_cpc_pt_v",
+    ):
+        return
     # ── 不要表示の削除（表示停止のみ・7日分析(_top7)/30日分析(_top30)ブロック限定）──
     # CPC分析ページ(キーワード/商品/動画)の「📅 7日分析」「📅 30日分析」内で
     # 使われる6つのcsv_key（anls_cpc_kw_top7／anls_cpc_pt_m_top7／
@@ -4196,13 +4216,16 @@ def _anls_entry_point(dc_cpc):
     間の st.markdown 見出し/区切り線を含め）をそのまま移設したのみで、ロジック自体・
     呼び出し先の共通関数（_anls_render_tab等）の挙動は一切変更していない。
     将来的に他ページ（page_cpc_product等）にも同型で流用可能な構造とするための分離。
+
+    【表示のみの変更】「⏱️ 期間別クイック分析」「📅 7日分析」「📅 30日分析」の
+    見出しは、_anls_render_tab側で当該csv_keyの出力全体を非表示化した結果、
+    見出しの下に何も表示されない空見出しになっていたため削除した。
+    見出し出力(st.markdown呼び出し)を削除しただけで、_anls_render_tabの
+    呼び出し・引数・順序・区切り線(st.markdown("---"))は一切変更していない。
     """
-    st.markdown("#### ⏱️ 期間別クイック分析")
-    st.markdown("**📅 7日分析**")
     _anls_render_tab(dc_cpc, 7, "anls_cpc_kw_top7.json", "anls_cpc_kw_top7",
                       "キーワードCPC分析（7日窓）", "cpc_kw", "keyword", "cpc_change_history.json")
     st.markdown("---")
-    st.markdown("**📅 30日分析**")
     _anls_render_tab(dc_cpc, 30, "anls_cpc_kw_top30.json", "anls_cpc_kw_top30",
                       "キーワードCPC分析（30日窓）", "cpc_kw", "keyword", "cpc_change_history.json")
     st.markdown("---")
@@ -4357,15 +4380,18 @@ def _anls_entry_point_cpc_product(df_cpc_product):
     """page_cpc_product の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
     中身は元々あった _anls_render_tab 呼び出し3件（引数・順序・見出しを含め）をそのまま
     移設しただけで、ロジック自体は一切変更していない（page_cpc/page_add_kwと同一パターン）。
+
+    【表示のみの変更】「⏱️ 期間別クイック分析」「📅 7日分析」「📅 30日分析」の
+    見出しは、_anls_render_tab側で当該csv_keyの出力全体を非表示化した結果、
+    見出しの下に何も表示されない空見出しになっていたため削除した。
+    見出し出力(st.markdown呼び出し)を削除しただけで、_anls_render_tabの
+    呼び出し・引数・順序・区切り線(st.markdown("---"))は一切変更していない。
     """
-    st.markdown("#### ⏱️ 期間別クイック分析")
-    st.markdown("**📅 7日分析**")
     _anls_render_tab(
         df_cpc_product,
         7, "anls_cpc_pt_m_top7.json", "anls_cpc_pt_m_top7",
         "商品CPC分析（7日窓）", "cpc_asin", "asin", "cpc_pt_m_history.json")
     st.markdown("---")
-    st.markdown("**📅 30日分析**")
     _anls_render_tab(
         df_cpc_product,
         30, "anls_cpc_pt_m_top30.json", "anls_cpc_pt_m_top30",
@@ -4396,15 +4422,18 @@ def _anls_entry_point_cpc_video(df_cpc_video):
     """page_cpc_video の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
     中身は元々あった _anls_render_tab 呼び出し3件（引数・順序・見出しを含め）をそのまま
     移設しただけで、ロジック自体は一切変更していない（他ページと同一パターン）。
+
+    【表示のみの変更】「⏱️ 期間別クイック分析」「📅 7日分析」「📅 30日分析」の
+    見出しは、_anls_render_tab側で当該csv_keyの出力全体を非表示化した結果、
+    見出しの下に何も表示されない空見出しになっていたため削除した。
+    見出し出力(st.markdown呼び出し)を削除しただけで、_anls_render_tabの
+    呼び出し・引数・順序・区切り線(st.markdown("---"))は一切変更していない。
     """
-    st.markdown("#### ⏱️ 期間別クイック分析")
-    st.markdown("**📅 7日分析**")
     _anls_render_tab(
         df_cpc_video,
         7, "anls_cpc_pt_v_top7.json", "anls_cpc_pt_v_top7",
         "動画CPC分析（7日窓）", "cpc_asin", "asin", "cpc_pt_v_history.json")
     st.markdown("---")
-    st.markdown("**📅 30日分析**")
     _anls_render_tab(
         df_cpc_video,
         30, "anls_cpc_pt_v_top30.json", "anls_cpc_pt_v_top30",
