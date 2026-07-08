@@ -3026,7 +3026,13 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
             "「🔍 分析実行」を押すと、\n"
             "現在保持されている比較CSVで複数期間比較を開始します。"
         )
-    run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
+    # ── ボタン配置のみ変更（キーワード追加/商品追加/動画追加画面で、目立たない
+    # 既存説明エリア（折りたたみ）内へ移動しただけ）。st.buttonの処理内容・key・
+    # クリック時のrun_btn判定ロジック・実行順序（ボタン直後にif run_btn:が続く点）
+    # は一切変更していない。分析処理・保存処理・履歴処理・session_state処理には
+    # 一切触れていない。
+    with st.expander("🔍 分析実行", expanded=False):
+        run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
     if run_btn:
         if not af_files:
             st.warning(f"「{_bucket_label}」バケットにCSVをアップロードしてください（画面上部のCSV管理基盤から）。"); return
