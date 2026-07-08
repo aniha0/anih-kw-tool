@@ -2574,7 +2574,15 @@ def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = "")
         # 先頭に短いラベルを付けるだけ）──────────────────────────
         _4wk_types = ("キーワードCPC分析（4週間比較）", "商品CPC分析（4週間比較）", "動画CPC分析（4週間比較）")
         _4wk_mark = "📌 4週間比較保存　" if rtype in _4wk_types else ""
-        header = f"{_4wk_mark}{emoji} {saved_at}　{rtype}　改善率 {rate:.1f}%　{trend}"
+        # ── 4週間比較保存履歴のみ、タイトルに対象名(keyword/ASIN)を追加する。
+        # 既存recordのdetail[0].keywordをそのまま読むだけで、保存recordへの
+        # 項目追加・新しい関数追加は一切行わない。4週間比較以外のtypeの
+        # headerフォーマットは従来のまま変更しない。
+        if rtype in _4wk_types:
+            _hdr_tgt_name = ((rec.get("detail") or [{}])[0]).get("keyword", "―")
+            header = f"{_4wk_mark}{emoji} {saved_at}　{_hdr_tgt_name}　{rtype}"
+        else:
+            header = f"{_4wk_mark}{emoji} {saved_at}　{rtype}　改善率 {rate:.1f}%　{trend}"
         with st.expander(header, expanded=(i == 0)):
             # ── 履歴個別削除ボタンの追加のみ（既存の_anls_load/_anls_save
             # をそのまま利用し、対象record(id一致)だけを除外して書き戻す
@@ -2600,16 +2608,39 @@ def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = "")
                 st.markdown("📌 4週間比較保存")
                 st.markdown(f"保存日：{saved_at}")
                 st.markdown(f"対象：{_tgt_name}")
-                _tbl4wk = pd.DataFrame(
-                    [
-                        ["ROAS", f'{_b4.get("ROAS", 0):.2f}', f'{_a4.get("ROAS", 0):.2f}'],
-                        ["注文数", f'{_b4.get("orders", 0):.0f}件', f'{_a4.get("orders", 0):.0f}件'],
-                        ["売上", f'¥{_b4.get("sales", 0):,.0f}', f'¥{_a4.get("sales", 0):,.0f}'],
-                        ["広告費", f'¥{_b4.get("cost", 0):,.0f}', f'¥{_a4.get("cost", 0):,.0f}'],
-                    ],
-                    columns=["指標", "Before", "After"],
-                )
-                st.table(_tbl4wk)
+                _wk_data = rec.get("weekly_data") or []
+                if _wk_data:
+                    # ── weekly_dataがある場合は週別4行表示（週|広告費|売上|
+                    # 注文数|ROAS）。既存recordのweekly_dataをそのまま読む
+                    # だけで、新しい計算処理・新しい関数は一切追加しない。
+                    st.markdown("**4週間比較結果**")
+                    _tbl4wk = pd.DataFrame(
+                        [
+                            [
+                                w.get("week", "―"),
+                                f'¥{w.get("cost", 0):,.0f}',
+                                f'¥{w.get("sales", 0):,.0f}',
+                                f'{w.get("orders", 0):.0f}件',
+                                f'{w.get("roas", 0):.2f}',
+                            ]
+                            for w in _wk_data
+                        ],
+                        columns=["週", "広告費", "売上", "注文数", "ROAS"],
+                    )
+                    st.table(_tbl4wk)
+                else:
+                    # weekly_dataが無い旧record(本変更以前に保存された履歴)への
+                    # 互換表示。既存のBefore/After簡易表示のまま維持する。
+                    _tbl4wk_legacy = pd.DataFrame(
+                        [
+                            ["ROAS", f'{_b4.get("ROAS", 0):.2f}', f'{_a4.get("ROAS", 0):.2f}'],
+                            ["注文数", f'{_b4.get("orders", 0):.0f}件', f'{_a4.get("orders", 0):.0f}件'],
+                            ["売上", f'¥{_b4.get("sales", 0):,.0f}', f'¥{_a4.get("sales", 0):,.0f}'],
+                            ["広告費", f'¥{_b4.get("cost", 0):,.0f}', f'¥{_a4.get("cost", 0):,.0f}'],
+                        ],
+                        columns=["指標", "Before", "After"],
+                    )
+                    st.table(_tbl4wk_legacy)
                 continue
 
             st.markdown(
@@ -3975,6 +4006,11 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
                 "agg_orders_b": _b_w["orders"], "agg_orders_a": _a_w["orders"],
                 "agg_roas_b": _b_w["roas"], "agg_roas_a": _a_w["roas"],
                 "agg_avg_cpc_b": 0.0, "agg_avg_cpc_a": 0.0,
+                "weekly_data": [
+                    {"week": w["period_label"], "cost": w["cost"], "sales": w["sales"],
+                     "orders": w["orders"], "roas": w["roas"]}
+                    for w in _weekly_valid
+                ],
             })
             _anls_save(_kw4wk_fname, _recs)
             st.success("✅ 4週間比較を保存しました。")
@@ -4188,6 +4224,11 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
                 "agg_orders_b": _b_w["orders"], "agg_orders_a": _a_w["orders"],
                 "agg_roas_b": _b_w["roas"], "agg_roas_a": _a_w["roas"],
                 "agg_avg_cpc_b": 0.0, "agg_avg_cpc_a": 0.0,
+                "weekly_data": [
+                    {"week": w["period_label"], "cost": w["cost"], "sales": w["sales"],
+                     "orders": w["orders"], "roas": w["roas"]}
+                    for w in _weekly_valid
+                ],
             })
             _anls_save(_pt_m_4wk_fname, _recs)
             st.success("✅ 4週間比較を保存しました。")
@@ -4385,6 +4426,11 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
                 "agg_orders_b": _b_w["orders"], "agg_orders_a": _a_w["orders"],
                 "agg_roas_b": _b_w["roas"], "agg_roas_a": _a_w["roas"],
                 "agg_avg_cpc_b": 0.0, "agg_avg_cpc_a": 0.0,
+                "weekly_data": [
+                    {"week": w["period_label"], "cost": w["cost"], "sales": w["sales"],
+                     "orders": w["orders"], "roas": w["roas"]}
+                    for w in _weekly_valid
+                ],
             })
             _anls_save(_pt_v_4wk_fname, _recs)
             st.success("✅ 4週間比較を保存しました。")
