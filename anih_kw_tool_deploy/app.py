@@ -386,7 +386,7 @@ _VALID_PAGES = {
     "➕ 商品追加", "🗑️ 商品削除",
     "📹 動画追加",     "📹 動画削除",
     "📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除",
-    "📥 ダウンロード", "📖 取扱説明書",
+    "📥 ダウンロード", "📖 取扱説明書", "📂 分析履歴",
 }
 _ADD_PAGES = {"📋 キーワード追加", "➕ 商品追加", "📹 動画追加"}
 _DEL_PAGES = {"🚫 キーワード停止", "🗑️ 商品削除", "📹 動画削除"}
@@ -430,6 +430,7 @@ with st.sidebar:
     st.markdown("---")
     _nav_btn("DateDive売れる予測KW",  "📊 DateDive売れる予測KW", "📊 ")
     _nav_btn("ダウンロード",           "📥 ダウンロード",          "📥 ")
+    _nav_btn("分析履歴",               "📂 分析履歴",              "📂 ")
     _nav_btn("取扱説明書",             "📖 取扱説明書",            "📖 ")
     st.markdown("---")
     # 💲 売価マスタ
@@ -2441,7 +2442,17 @@ def _anls_render_saved_detail(detail: list, anls_hist_fname: str = "", rec_id: s
                 for _h_saved_at, _h_rec_id, _h_row_idx, _h_d, _h_period in _hist:
                     _hist_label = _anls_hist_label(_h_period, _h_saved_at)
                     _hist_key = f"_anls_histopen_{_h_rec_id}_{_h_row_idx}"
-                    if st.checkbox(_hist_label, key=_hist_key):
+                    # ── 表示改善（既存値の見せ方のみ）: 保存回が1件のみの場合、
+                    # 選ぶ対象が無いのに毎回チェックボックスを押させるのは冗長なため、
+                    # その場合だけ日付見出しを表示のうえBefore/After等を直接展開する。
+                    # 2件以上ある場合の既存チェックボックス選択UIはそのまま変更しない。
+                    # Before/After・改善率・判定結果はすべて既存records内の値を
+                    # 既存関数（_anls_detail_html・_anls_generate_insight）でそのまま
+                    # 表示するだけで、新しい計算・新しい判定は一切行わない。
+                    _only_one_hist = len(_hist) == 1
+                    if _only_one_hist:
+                        st.markdown(f"**{_hist_label}**")
+                    if _only_one_hist or st.checkbox(_hist_label, key=_hist_key):
                         _hb, _ha = (_h_d.get("before") or {}), (_h_d.get("after") or {})
                         _hrow = {
                             "keyword": kw,
@@ -2467,6 +2478,34 @@ def _anls_render_saved_detail(detail: list, anls_hist_fname: str = "", rec_id: s
                                 "自分メモ", key=_h_memo_key,
                                 on_change=_anls_save_memo,
                                 args=(anls_hist_fname, _h_rec_id, _h_row_idx, _h_memo_key))
+                            # ── 実施済み／未対応（既存action_taken・_anls_save_action_takenを
+                            # そのまま利用。表示位置・デザインは直前の「自分メモ」と統一。
+                            # 新しい保存/読込処理・新しいJSON・新しいrecords構造は追加しない）──
+                            _h_action_key = f"_anls_action_{_h_rec_id}_{_h_row_idx}"
+                            _action_options = ["未対応", "実施済み"]
+                            if _h_action_key not in st.session_state:
+                                _cur_action = _h_d.get("action_taken", "") or "未対応"
+                                st.session_state[_h_action_key] = (
+                                    _cur_action if _cur_action in _action_options else "未対応")
+                            st.selectbox(
+                                "実施状況", _action_options, key=_h_action_key,
+                                on_change=_anls_save_action_taken,
+                                args=(anls_hist_fname, _h_rec_id, _h_row_idx, _h_action_key))
+                            # ── 次回確認日（既存next_eval・_anls_save_next_evalをそのまま
+                            # 利用。表示位置・デザインは直前の「実施状況」「自分メモ」と統一。
+                            # 新しい保存/読込処理・新しいJSON・新しいrecords構造は追加しない）。
+                            # _anls_save_next_eval はsession_stateの値をそのままJSONへ書き込む
+                            # 実装のため、date型ではなくJSON化可能な文字列を扱うst.text_inputで
+                            # 接続する（st.date_inputだとdateオブジェクトとなり保存時にJSON化で
+                            # 失敗するため。既存関数側の型変換ロジックには一切手を加えない）──
+                            _h_next_eval_key = f"_anls_nexteval_{_h_rec_id}_{_h_row_idx}"
+                            if _h_next_eval_key not in st.session_state:
+                                st.session_state[_h_next_eval_key] = _h_d.get("next_eval", "") or ""
+                            st.text_input(
+                                "📅 次回確認日", key=_h_next_eval_key,
+                                placeholder="例: 2026/08/01",
+                                on_change=_anls_save_next_eval,
+                                args=(anls_hist_fname, _h_rec_id, _h_row_idx, _h_next_eval_key))
 
 
 def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = ""):
@@ -3490,6 +3529,11 @@ def page_cpc():
         # 新規のKW生成・判定・順位付けは一切行わない。_anls_entry_point・
         # _anls_render_tab等の既存分析ロジック本体も無改変のまま保持している。
         _anls_render_analysis_page(_kwl_target)
+        # ── 保存導線の復活（既存処理への再接続のみ） ──────────────────
+        # 4週間比較への移行時に呼び出し元を失っていた既存関数_anls_entry_point
+        # （_anls_render_tab・💾保存ボタン・📂保存済み分析履歴を含む、無改変）を
+        # 呼び出すだけ。新しい保存ロジック・新しいJSON・新しい関数は一切追加しない。
+        _anls_entry_point(dc_cpc)
 
 
 def _anls_run_cpc_kw_period_comparison(dc_cpc: pd.DataFrame, _debug: dict = None) -> list:
@@ -4268,6 +4312,12 @@ def page_cpc_product():
         # _render_pt_cpc_page（tab1・既存無改変）の判定結果(dc_cpc_product)を
         # そのまま渡すのみで、判定ロジック自体には一切影響しない。
         _anls_render_analysis_page_product(dc_cpc_product)
+        # ── 保存導線の復活（既存処理への再接続のみ） ──────────────────
+        # 4週間比較への移行時に呼び出し元を失っていた既存関数
+        # _anls_entry_point_cpc_product（_anls_render_tab・💾保存ボタン・
+        # 📂保存済み分析履歴を含む、無改変）を呼び出すだけ。新しい保存ロジック・
+        # 新しいJSON・新しい関数は一切追加しない。
+        _anls_entry_point_cpc_product(dc_cpc_product)
 
 def _anls_entry_point_cpc_product(df_cpc_product):
     """page_cpc_product の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
@@ -4301,6 +4351,12 @@ def page_cpc_video():
         # _render_pt_cpc_page（tab1・既存無改変）の判定結果(dc_cpc_video)を
         # そのまま渡すのみで、判定ロジック自体には一切影響しない。
         _anls_render_analysis_page_video(dc_cpc_video)
+        # ── 保存導線の復活（既存処理への再接続のみ） ──────────────────
+        # 4週間比較への移行時に呼び出し元を失っていた既存関数
+        # _anls_entry_point_cpc_video（_anls_render_tab・💾保存ボタン・
+        # 📂保存済み分析履歴を含む、無改変）を呼び出すだけ。新しい保存ロジック・
+        # 新しいJSON・新しい関数は一切追加しない。
+        _anls_entry_point_cpc_video(dc_cpc_video)
 
 def _anls_entry_point_cpc_video(df_cpc_video):
     """page_cpc_video の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
@@ -5072,6 +5128,47 @@ def page_pt_del_video():
 def page_dd_v4():
     _ddv4_render_sellable_top10()
 
+
+def page_anls_history():
+    """📂 分析履歴 — 既存資産のみを流用した一覧表示専用の新規ページ。
+
+    表示対象は analysis_data 配下の anls_*.json のみ。既存の _anls_load()で
+    そのまま読み込み、既存の _anls_render_saved_report()（内部で
+    _anls_render_saved_detail()も既存のまま呼び出す）へそのまま渡すだけで、
+    新しい保存処理・新しい読込処理・新しいJSON・新しい集計ロジックは
+    一切追加していない。records[]構造・_anls_save/_anls_load/
+    _anls_render_saved_report/_anls_render_saved_detailはすべて無改変。
+    """
+    st.markdown("### 📂 分析履歴")
+    st.caption(
+        "📌 保存済みの分析結果（analysis_data配下のanls_*.json）を種別ごとに一覧表示します。"
+        "表示のみで、保存・読込の仕組みは各分析画面の「💾 分析結果を保存」と共通です。"
+    )
+    _anls_hist_targets = [
+        ("anls_kw_add.json", "KW追加分析"),
+        ("anls_cpc_kw_top7.json", "キーワードCPC分析（7日窓）"),
+        ("anls_cpc_kw_top30.json", "キーワードCPC分析（30日窓）"),
+        ("anls_cpc_kw.json", "キーワードCPC分析"),
+        ("anls_cpc_pt_m_top7.json", "商品CPC分析（7日窓）"),
+        ("anls_cpc_pt_m_top30.json", "商品CPC分析（30日窓）"),
+        ("anls_cpc_pt_m.json", "商品CPC分析"),
+        ("anls_cpc_pt_v_top7.json", "動画CPC分析（7日窓）"),
+        ("anls_cpc_pt_v_top30.json", "動画CPC分析（30日窓）"),
+        ("anls_cpc_pt_v.json", "動画CPC分析"),
+        ("anls_pt_add_m.json", "商品追加分析"),
+        ("anls_pt_add_v.json", "動画追加分析"),
+    ]
+    _shown_any = False
+    for _fname, _label in _anls_hist_targets:
+        _recs = _anls_load(_fname)
+        if not _recs:
+            continue
+        _shown_any = True
+        st.markdown(f"#### {_label}")
+        _anls_render_saved_report(_recs, _label, _fname)
+        st.markdown("---")
+    if not _shown_any:
+        st.info("保存済み分析履歴はまだありません。各分析画面で「💾 分析結果を保存」を押すと、ここに表示されます。")
 
 def page_download():
     st.markdown("### 📥 ダウンロード")
@@ -5973,6 +6070,7 @@ _PAGE_FUNCS = {
     "🎯 オート商品削除":             page_auto_del_product,
     "🎥 オート動画削除":             page_auto_del_video,
     "📥 ダウンロード":                 page_download,
+    "📂 分析履歴":                     page_anls_history,
     "📖 取扱説明書":                   page_manual,
 }
 _PAGE_FUNCS[current_page]()
