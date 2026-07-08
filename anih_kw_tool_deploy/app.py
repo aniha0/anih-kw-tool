@@ -2860,7 +2860,24 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                      id_col: str = "keyword",
                      cpc_hist_fname: str = ""):
     _sk = f"_anls_{csv_key}"
-    st.markdown(f"#### 📊 {label} 分析")
+    # ── 不要表示の削除（表示停止のみ・7日分析(_top7)/30日分析(_top30)ブロック限定）──
+    # CPC分析ページ(キーワード/商品/動画)の「📅 7日分析」「📅 30日分析」内で
+    # 使われる6つのcsv_key（anls_cpc_kw_top7／anls_cpc_pt_m_top7／
+    # anls_cpc_pt_v_top7／anls_cpc_kw_top30／anls_cpc_pt_m_top30／
+    # anls_cpc_pt_v_top30）のときだけ、以下の表示を非表示にする：
+    #   ①「📊 ○○CPC分析（7日窓/30日窓） 分析」見出し
+    #   ②「比較用データ取得元」行・参照ファイル表示
+    #   ③「比較CSVを検出しました…複数期間比較を開始します。」案内メッセージ
+    # 見出しなしの分析ブロック（_anls_cpc_kw等）・kw_add/asin_add（キーワード/
+    # 商品/動画追加）・保存済み分析履歴（📂 保存済み分析履歴）には一切影響しない。
+    # データ取得・集計・判定・保存・JSON・session_state等の処理内容
+    # （af_files計算・_bucket_held等）は変更せず、st.*表示呼び出しのみを
+    # 条件分岐で止める。
+    _hide_extras_top7 = csv_key in ("anls_cpc_kw_top7", "anls_cpc_pt_m_top7", "anls_cpc_pt_v_top7")
+    _hide_extras_top30 = csv_key in ("anls_cpc_kw_top30", "anls_cpc_pt_m_top30", "anls_cpc_pt_v_top30")
+    _hide_extras = _hide_extras_top7 or _hide_extras_top30
+    if not _hide_extras:
+        st.markdown(f"#### 📊 {label} 分析")
     _disp_days = 30 if mode in ("kw_add", "asin_add") else period_days
     if mode in ("kw_add", "asin_add"):
         st.info(f"📅 追加後の効果測定期間: **{_disp_days}日固定** — 追加候補を反映してから{_disp_days}日間のレポートCSVをアップロードしてください。")
@@ -2877,22 +2894,26 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
     _bucket_key   = "csv_bucket_30d" if _disp_days == 30 else "csv_bucket_7d"
     _bucket_label = "30日比較CSV"    if _disp_days == 30 else "7日比較CSV"
     _bucket_held  = st.session_state.get(_bucket_key, {})
-    st.markdown(f"**比較用データ取得元: 📂 {_bucket_label}バケット（{_disp_days}日）**")
+    if not _hide_extras:
+        st.markdown(f"**比較用データ取得元: 📂 {_bucket_label}バケット（{_disp_days}日）**")
     if _bucket_held:
         if _accept_multiple:
             af_files = list(_bucket_held.values())
-            st.caption(f"参照ファイル（{len(af_files)}件・保持分すべて）: " + "、".join(sorted(_bucket_held.keys())))
+            if not _hide_extras:
+                st.caption(f"参照ファイル（{len(af_files)}件・保持分すべて）: " + "、".join(sorted(_bucket_held.keys())))
         else:
             _latest_name = list(_bucket_held.keys())[-1]
             af_files = [_bucket_held[_latest_name]]
-            st.caption(f"参照ファイル（最新1件）: {_latest_name}")
+            if not _hide_extras:
+                st.caption(f"参照ファイル（最新1件）: {_latest_name}")
     else:
         af_files = []
-        st.caption(f"「{_bucket_label}」バケットにCSVが保持されていません。")
+        if not _hide_extras:
+            st.caption(f"「{_bucket_label}」バケットにCSVが保持されていません。")
     # ── 案内表示のみ（既存ロジック・判定・DataFrameには一切影響しない） ──
     # 分析開始後、7日/30日比較CSVバケットに2件以上保持されている場合のみ、
     # 「分析開始の再実行は不要」であることをユーザーに案内する。
-    if _accept_multiple and len(_bucket_held) >= 2:
+    if _accept_multiple and len(_bucket_held) >= 2 and not _hide_extras:
         st.info(
             "📊 比較CSVを検出しました。\n"
             "分析開始は再度実行する必要はありません。\n"
@@ -3065,6 +3086,11 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
                               **_agg, "detail": _detail})
                 _anls_save(anls_hist_fname, _recs)
                 st.success("✅ 分析結果を保存しました。")
+                # ── 分析履歴導線改善（案内文1行の追加のみ）─────────────
+                # 保存処理(_anls_save)・JSON・records構造・履歴表示処理
+                # (page_anls_history/_anls_render_saved_report/
+                # _anls_render_saved_detail)には一切触れていない。
+                st.caption("📂 保存済み分析履歴から確認できます。")
     with st.expander("📂 保存済み分析履歴", expanded=False):
         st.caption(
             "📌 保存済み分析履歴は、過去に保存した分析結果です。分析履歴はJSONとして保存され、"
