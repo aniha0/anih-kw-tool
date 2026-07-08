@@ -2569,8 +2569,38 @@ def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = "")
         stars_n = max(0, min(5, round(rate / 20)))
         stars = "★" * stars_n + "☆" * (5 - stars_n)
 
-        header = f"{emoji} {saved_at}　{rtype}　改善率 {rate:.1f}%　{trend}"
+        # ── 4週間比較保存履歴の識別表示のみ追加（保存処理・保存データ・
+        # 既存カード構造には一切触れない。対象typeの時だけheader文字列の
+        # 先頭に短いラベルを付けるだけ）──────────────────────────
+        _4wk_types = ("キーワードCPC分析（4週間比較）", "商品CPC分析（4週間比較）", "動画CPC分析（4週間比較）")
+        _4wk_mark = "📌 4週間比較保存　" if rtype in _4wk_types else ""
+        header = f"{_4wk_mark}{emoji} {saved_at}　{rtype}　改善率 {rate:.1f}%　{trend}"
         with st.expander(header, expanded=(i == 0)):
+            if rtype in _4wk_types:
+                # ── 4週間比較保存履歴の表示分離（数値確認専用の簡易表示のみ）。
+                # 既存の通常分析カード表示（改善率/判定/星/理由/AI考察/
+                # _anls_render_saved_detail等）は一切使わない。既存recordの
+                # detail[0].before/afterをそのまま読むだけで、新しい保存形式・
+                # 新しい計算処理・新しい関数は一切追加しない。
+                _d0 = (rec.get("detail") or [{}])[0]
+                _tgt_name = _d0.get("keyword", "―")
+                _b4 = _d0.get("before", {}) or {}
+                _a4 = _d0.get("after", {}) or {}
+                st.markdown("📌 4週間比較保存")
+                st.markdown(f"保存日：{saved_at}")
+                st.markdown(f"対象：{_tgt_name}")
+                _tbl4wk = pd.DataFrame(
+                    [
+                        ["ROAS", f'{_b4.get("ROAS", 0):.2f}', f'{_a4.get("ROAS", 0):.2f}'],
+                        ["注文数", f'{_b4.get("orders", 0):.0f}件', f'{_a4.get("orders", 0):.0f}件'],
+                        ["売上", f'¥{_b4.get("sales", 0):,.0f}', f'¥{_a4.get("sales", 0):,.0f}'],
+                        ["広告費", f'¥{_b4.get("cost", 0):,.0f}', f'¥{_a4.get("cost", 0):,.0f}'],
+                    ],
+                    columns=["指標", "Before", "After"],
+                )
+                st.table(_tbl4wk)
+                continue
+
             st.markdown(
                 f'<div style="border-bottom:2px solid #ddd;padding-bottom:8px;margin-bottom:12px;">'
                 f'<div style="font-size:20px;font-weight:700;">📊 {rtype}</div>'
