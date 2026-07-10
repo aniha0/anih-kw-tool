@@ -151,6 +151,7 @@ def tonum(s: pd.Series) -> pd.Series:
 
 def clear():
     for k in ["has_results", "df_win", "df_del", "df_cpc", "df_cpc_product", "df_cpc_video",
+              "df_cpc_video_kw",
               "df_pt_add", "df_pt_del", "stats", "dbg",
               "df_auto_del_kw_keyword", "df_auto_del_kw_product", "df_auto_del_kw_video",
               "df_auto_del_product", "df_auto_del_video"]:
@@ -757,6 +758,42 @@ if run:
             df_cpc_ = pd.DataFrame()
             n_cpc_auto = n_cpc_pt = n_cpc_empty = n_cpc_manual = 0
 
+        # ── SB広告(動画)：KWターゲ CPC調整用 DataFrame（新規追加・第1弾）────
+        # 既存のSP広告キーワードCPC調整(_sp_manual_mask/_agg_cpc/df_cpc_)とは
+        # 完全に独立した並列処理。既存の_sp_manual_mask・_agg_cpc・df_cpc_・
+        # _mask_m・_mask_v・_build_pt_cpc_dfには一切触れない。
+        # 集計の形（campaign_name/campaign_theme/keyword/ad_group/sales/cost/
+        # orders/clicks/ROAS/price）は_agg_cpcと同一パターンをそのまま流用し、
+        # 対象マスクのみをSB広告(動画)：KWターゲ用に変更している。
+        # 判定はbuild_cpc_df()（無改変・既存関数）にそのまま渡すのみで、
+        # 新しい判定ロジック・新しいランク・新しい計算式は一切追加していない。
+        _sb_video_kw_mask = (
+            dfs[cc].str.contains("SB広告", na=False)
+            & dfs[cc].str.contains("動画", na=False)
+            & dfs[cc].str.contains("KWターゲ", na=False)
+        )
+        _sb_video_kw_raw = dfs[_sb_video_kw_mask].copy()
+        if cpc_kw_col and not _sb_video_kw_raw.empty:
+            _sb_video_kw_raw["_kw_norm"] = _sb_video_kw_raw[cpc_kw_col].apply(norm)
+            _agg_sb_video_kw_d = {
+                "keyword":        (cpc_kw_col, "first"),
+                "campaign_name":  (cc,  "first"),
+                "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
+                "sales":          (sc,  "sum"),
+                "cost":           (oc_, "sum"),
+            }
+            if od:  _agg_sb_video_kw_d["orders"] = (od, "sum")
+            if clk: _agg_sb_video_kw_d["clicks"] = (clk, "sum")
+            if agn: _agg_sb_video_kw_d["ad_group"] = (agn, "first")
+            _agg_sb_video_kw = _sb_video_kw_raw.groupby(["ct", "_kw_norm"]).agg(**_agg_sb_video_kw_d).reset_index(drop=True)
+            _agg_sb_video_kw["ROAS"] = _agg_sb_video_kw.apply(
+                lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+            _agg_sb_video_kw["price"] = _agg_sb_video_kw["campaign_theme"].map(PRICES)
+            _agg_sb_video_kw = _agg_sb_video_kw[_agg_sb_video_kw["price"].notna()].copy()
+            df_cpc_video_kw_ = build_cpc_df(_agg_sb_video_kw)
+        else:
+            df_cpc_video_kw_ = pd.DataFrame()
+
         # ── 商品ターゲ分析: マニュアル / 動画 を分離抽出 ──────────────
         import re as _re_asin
 
@@ -1052,6 +1089,7 @@ if run:
             "df_pt_add_m": df_pt_add_m_, "df_pt_del_m": df_pt_del_m_,
             "df_pt_add_v": df_pt_add_v_, "df_pt_del_v": df_pt_del_v_,
             "df_cpc_product": df_cpc_product_, "df_cpc_video": df_cpc_video_,
+            "df_cpc_video_kw": df_cpc_video_kw_,
             "df_auto_del_kw_keyword": df_auto_del_kw_keyword_,
             "df_auto_del_product": df_auto_del_product_,
             "df_auto_del_video":   df_auto_del_video_,
@@ -1096,6 +1134,7 @@ dd:  pd.DataFrame = st.session_state.get("df_del", pd.DataFrame())
 dc_cpc:         pd.DataFrame = st.session_state.get("df_cpc",         pd.DataFrame())
 dc_cpc_product: pd.DataFrame = st.session_state.get("df_cpc_product", pd.DataFrame())
 dc_cpc_video:   pd.DataFrame = st.session_state.get("df_cpc_video",   pd.DataFrame())
+dc_cpc_video_kw: pd.DataFrame = st.session_state.get("df_cpc_video_kw", pd.DataFrame())
 sv = st.session_state["stats"]
 df_auto_del_product: pd.DataFrame = st.session_state.get("df_auto_del_product", pd.DataFrame())
 df_auto_del_video:   pd.DataFrame = st.session_state.get("df_auto_del_video",   pd.DataFrame())
@@ -3616,13 +3655,15 @@ def page_cpc():
         df_c.index = df_c.index + 1
         df_disp = df_c[df_c["cpc_delta"] != 0].copy()
         df_disp.index = range(1, len(df_disp) + 1)
-        _d = df_disp[disp_cols].rename(columns=_rn).copy()
+        _disp9_cols = [c for c in ["campaign_name","keyword","ROAS","cost","sales","orders","avg_cpc","cpc_delta","cpc_rank"] if c in df_disp.columns]
+        _rn9 = {"campaign_name":"キャンペーン","keyword":"キーワード","cost":"広告費","sales":"売上",
+                "orders":"注文数","avg_cpc":"現在CPC","cpc_delta":"推奨調整額","cpc_rank":"ランク"}
+        _d = df_disp[_disp9_cols].rename(columns=_rn9).copy()
         if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
         if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
         if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
-        if "変更幅" in _d.columns: _d["変更幅"] = _d["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
+        if "推奨調整額" in _d.columns: _d["推奨調整額"] = _d["推奨調整額"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
         if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-        if "推奨CPC" in _d.columns: _d["推奨CPC"] = _d["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
         # ③ KW一覧（実行対象抽出のみ）。表示条件は以下2つを厳密AND評価する：
         # ①cpc_delta が数値としてnon-zero（NaN/文字列は数値0として扱い除外）
         # ②cpc_rank が判定保留・未確定・空ではない（確定済み状態のみ許可）
@@ -3651,18 +3692,11 @@ def page_cpc():
             if _kwl_target.empty:
                 st.info("調整対象のキーワードはありません（すべて変更不要または判定保留）。")
             else:
-                _kwl_cols = [c for c in ["keyword", "avg_cpc", "cpc_delta", "cpc_rank"] if c in _kwl_target.columns]
-                _kwl = _kwl_target[_kwl_cols].rename(columns={
-                    "keyword": "keyword", "avg_cpc": "CPC", "cpc_delta": "推奨調整額", "cpc_rank": "ランク",
-                }).copy()
-                if "CPC" in _kwl.columns:
-                    _kwl["CPC"] = _kwl["CPC"].apply(lambda x: f"{x:,.0f}円" if x else "—")
-                if "推奨調整額" in _kwl.columns:
-                    _kwl["推奨調整額"] = pd.to_numeric(_kwl["推奨調整額"], errors="coerce").fillna(0.0).apply(
-                        lambda x: f"+{int(x)}円" if x > 0 else f"{int(x)}円" if x < 0 else "±0円"
-                    )
-                _kwl.index = range(1, len(_kwl) + 1)
-                st.dataframe(_kwl, use_container_width=True, height=460)
+                def _cr9(row):
+                    c = _RC.get(row.get("ランク", ""), "")
+                    return [f"color:{c};font-weight:700" if col == "ランク" else "" for col in row.index]
+                _d.index = range(1, len(_d) + 1)
+                st.dataframe(_d.style.apply(_cr9, axis=1), use_container_width=True, height=460)
         st.markdown("---")
         _c1, _c2 = st.columns(2)
         with _c1:
@@ -4488,7 +4522,7 @@ def _anls_entry_point(dc_cpc):
     st.markdown("---")
     _anls_render_tab(dc_cpc, 7, "anls_cpc_kw.json", "anls_cpc_kw", "キーワードCPC分析", "cpc_kw", "keyword", "cpc_change_history.json")
 
-def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = ""):
+def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = "", id_col: str = "asin", csv_disp_only: bool = False):
     """商品ターゲ CPC調整ページ共通レンダラー（page_cpc()と同一ロジック・UI）"""
     _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
     _RC = {
@@ -4578,8 +4612,8 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
         <div class="kpi-value" style="color:#2B6CB0;font-size:1.5rem;">{_n_adj}</div>
         <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
     st.markdown("---")
-    disp_cols = [c for c in ["campaign_name","ad_group","asin","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
-    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","asin":"ASIN",
+    disp_cols = [c for c in ["campaign_name","ad_group",id_col,"ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
+    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ",id_col:("ASIN" if id_col == "asin" else "KWテキスト"),
            "cost":"広告費","sales":"売上","orders":"購入数",
            "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
            "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
@@ -4590,16 +4624,19 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
     # ① 一覧テーブルは変更幅≠0（CPC上げ・CPC下げ）のみ表示
     df_disp = df_c[df_c["cpc_delta"] != 0].copy()
     df_disp.index = range(1, len(df_disp) + 1)
-    _d = df_disp[disp_cols].rename(columns=_rn).copy()
+    _disp9_cols = [c for c in ["campaign_name", id_col, "ROAS","cost","sales","orders","avg_cpc","cpc_delta","cpc_rank"] if c in df_disp.columns]
+    _rn9 = {"campaign_name":"キャンペーン", id_col:("ASIN" if id_col == "asin" else "キーワード"),
+            "cost":"広告費","sales":"売上","orders":"注文数","avg_cpc":"現在CPC",
+            "cpc_delta":"推奨調整額","cpc_rank":"ランク"}
+    _d = df_disp[_disp9_cols].rename(columns=_rn9).copy()
     if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
     if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
     if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
-    if "変更幅" in _d.columns: _d["変更幅"] = _d["変更幅"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
+    if "推奨調整額" in _d.columns: _d["推奨調整額"] = _d["推奨調整額"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
     if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
-    if "推奨CPC" in _d.columns: _d["推奨CPC"] = _d["推奨CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
     def _cr(row):
-        c = _RC.get(row.get("判定ランク", ""), "")
-        return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
+        c = _RC.get(row.get("ランク", ""), "")
+        return [f"color:{c};font-weight:700" if col == "ランク" else "" for col in row.index]
     if df_disp.empty:
         st.info("変更幅が発生するASINはありません（全件 現状維持 または 判断保留）。")
     else:
@@ -4612,7 +4649,8 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
         st.download_button(f"📥 {_dl_fname}", data=_dl_csv,
             file_name=_dl_fname, mime="text/csv")
     else:
-        _dl_csv = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+        _dl_src = df_disp if csv_disp_only else df_c
+        _dl_csv = _dl_src[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
         st.download_button(f"📥 {_dl_fname}", data=_dl_csv,
             file_name=_dl_fname, mime="text/csv")
 
@@ -4666,9 +4704,14 @@ def _anls_entry_point_cpc_product(df_cpc_product):
         "商品CPC分析", "cpc_asin", "asin", "cpc_pt_m_history.json")
 
 def page_cpc_video():
-    _t1, _t2 = st.tabs(["CPC調整", "分析"])
+    _t1, _t2, _t3 = st.tabs(["CPC調整", "分析", "SB動画KW"])
     with _t1:
         _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel", "cpc_pt_v_history.json")
+    with _t3:
+        # SB広告(動画)：KWターゲ CPC調整（新規追加・第1弾）。既存の_render_pt_cpc_page
+        # （id_col引数追加のみで無改変のロジック）をid_col="keyword"で呼び出すだけ。
+        # hist_fnameは渡さないため、保存機能・履歴・JSON書き込みは一切発生しない。
+        _render_pt_cpc_page(dc_cpc_video_kw, "SB動画KWターゲCPC調整", "cpc_video_kw_sel", id_col="keyword", csv_disp_only=True)
     with _t2:
         # KW版と同一仕様の「対象ごとの個別4週間比較タブ＋状態アイコン」。
         # _render_pt_cpc_page（tab1・既存無改変）の判定結果(dc_cpc_video)を
