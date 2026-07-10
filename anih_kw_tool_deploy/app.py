@@ -2620,9 +2620,14 @@ def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = "")
         # 既存recordのdetail[0].keywordをそのまま読むだけで、保存recordへの
         # 項目追加・新しい関数追加は一切行わない。4週間比較以外のtypeの
         # headerフォーマットは従来のまま変更しない。
+        # ── タイトルへキャンペーン名を追加（表示のみ）。既存recordの
+        # detail[0].campaignをそのまま読むだけで、保存項目追加・JSON構造
+        # 変更は一切行わない。campaignが存在しない旧履歴は従来表示を維持する。
         if rtype in _4wk_types:
             _hdr_tgt_name = ((rec.get("detail") or [{}])[0]).get("keyword", "―")
-            header = f"{_4wk_mark}{emoji} {saved_at}　{_hdr_tgt_name}　{rtype}"
+            _hdr_campaign = ((rec.get("detail") or [{}])[0]).get("campaign", "")
+            _hdr_camp_seg = f"{_hdr_campaign}　" if _hdr_campaign else ""
+            header = f"{_4wk_mark}{emoji} {saved_at}　{_hdr_camp_seg}{_hdr_tgt_name}　{rtype}"
         else:
             header = f"{_4wk_mark}{emoji} {saved_at}　{rtype}　改善率 {rate:.1f}%　{trend}"
         with st.expander(header, expanded=(i == 0)):
