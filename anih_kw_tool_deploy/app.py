@@ -2132,7 +2132,7 @@ def _anls_save_asin_add_history(df_disp, fname: str):
     _anls_save(fname, existing)
 
 
-def _anls_render_list(merged, id_col):
+def _anls_render_list(merged, id_col, mode=None):
     _ICON = {"改善": "🟢", "悪化": "🔴", "変化なし": "🟡"}
     _CLR  = {"改善": "#276749", "悪化": "#C53030", "変化なし": "#744210"}
     for _, row in merged.iterrows():
@@ -2143,6 +2143,8 @@ def _anls_render_list(merged, id_col):
         kw_disp = kw[:40] + ("…" if len(kw) > 40 else "")
         st.markdown("---")
         st.markdown(f"**{icon} {kw_disp}**")
+        if mode == "cpc_kw":
+            st.caption(f"キャンペーン: {row.get('campaign_name', '')} ｜ 広告グループ: {row.get('ad_group', '')} ｜ ROAS: {row.get('ROAS_a', '')}")
         st.markdown(f'　<span style="color:{clr};font-weight:700;">{j}</span>', unsafe_allow_html=True)
         with st.expander("▶ 詳細", expanded=False):
             st.markdown(_anls_detail_html(row, id_col), unsafe_allow_html=True)
@@ -3188,7 +3190,7 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
             with st.expander("📊 キャンペーン別サマリー", expanded=True):
                 st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
             st.markdown("#### 📋 対象一覧")
-            _anls_render_list(view, res_id_col)
+            _anls_render_list(view, res_id_col, mode)
             if st.button("💾 分析結果を保存", key=f"{_sk}_{_ri}_save"):
                 _recs = _anls_load(anls_hist_fname)
                 _agg = _anls_aggregate_before_after(merged)
