@@ -1422,6 +1422,66 @@ def _render_del_kw_block(df, badge_label, list_label, table_label,
     else:
         st.info(empty_msg or "削除対象キーワードはありません。")
 
+# ===================================================
+# 親KW分析 分かち書き高精度化（Sudachi導入・既存非破壊）
+# -----------------------------------------------------
+# 既存の _anls_render_parent_kw_page() 内のネスト関数 _pkw_tokenize()
+# 自体は一切変更しない。Sudachi（形態素解析器）が利用可能な環境では
+# Sudachiによる形態素解析結果を優先的に使用し、利用できない場合
+# （未インストール・辞書未取得・初期化失敗等）は既存の _pkw_tokenize()
+# （自作の簡易分かち書き）へそのままフォールバックする。戻り値の型は
+# 既存と同じ「トークン文字列のlist」であり、呼び出し元（親KW候補生成・
+# 集計・表示処理）のロジックには一切手を加えていない。
+# ===================================================
+_PKW_SUDACHI_CACHE = {"tried": False, "tokenizer": None, "mode": None}
+
+
+def _pkw_get_sudachi_tokenizer():
+    """SudachiPyのTokenizerを取得する（親KW分析専用の新規追加関数）。
+
+    未インストール・辞書未取得・初期化失敗などの場合はNoneを返す。
+    呼び出し元（_pkw_tokenize_smart）はNoneの場合、必ず既存の
+    _pkw_tokenize にフォールバックするため、本関数の失敗が既存機能に
+    影響することはない。
+    """
+    if _PKW_SUDACHI_CACHE["tried"]:
+        return _PKW_SUDACHI_CACHE["tokenizer"]
+    _PKW_SUDACHI_CACHE["tried"] = True
+    try:
+        from sudachipy import tokenizer as _sudachi_tokenizer_mod
+        from sudachipy import dictionary as _sudachi_dictionary_mod
+        _dic = _sudachi_dictionary_mod.Dictionary(dict_type="core")
+        _PKW_SUDACHI_CACHE["tokenizer"] = _dic.create()
+        _PKW_SUDACHI_CACHE["mode"] = _sudachi_tokenizer_mod.Tokenizer.SplitMode.C
+    except Exception:
+        _PKW_SUDACHI_CACHE["tokenizer"] = None
+        _PKW_SUDACHI_CACHE["mode"] = None
+    return _PKW_SUDACHI_CACHE["tokenizer"]
+
+
+def _pkw_tokenize_smart(_term, _fallback_tokenize):
+    """親KW分析の分かち書きディスパッチャ（親KW分析専用の新規追加関数）。
+
+    Sudachiが利用可能ならSudachiで分割する。利用不可、または結果が
+    空になった場合は、既存の _pkw_tokenize（呼び出し元から渡される・
+    中身は無改修）へそのままフォールバックする。
+    """
+    _tokenizer = _pkw_get_sudachi_tokenizer()
+    if _tokenizer is None:
+        return _fallback_tokenize(_term)
+    try:
+        _term_s = str(_term).strip()
+        if not _term_s:
+            return _fallback_tokenize(_term)
+        _mode = _PKW_SUDACHI_CACHE.get("mode")
+        _morphemes = _tokenizer.tokenize(_term_s, _mode) if _mode is not None \
+            else _tokenizer.tokenize(_term_s)
+        _toks = [_m.surface() for _m in _morphemes if _m.surface()]
+        return _toks if _toks else _fallback_tokenize(_term)
+    except Exception:
+        return _fallback_tokenize(_term)
+
+
 def _anls_render_parent_kw_page() -> None:
     """親KW分析ページ(page_auto_del_kwのtab2)用の関数（表示専用・実験機能）。
 
@@ -1504,7 +1564,7 @@ def _anls_render_parent_kw_page() -> None:
 
     _parent_map = {}
     for _kw in _all_priced["keyword"]:
-        _toks = _pkw_tokenize(_kw)
+        _toks = _pkw_tokenize_smart(_kw, _pkw_tokenize)
         _cands = set()
         for _n in range(2, len(_toks) + 1):
             for _i in range(len(_toks) - _n + 1):
