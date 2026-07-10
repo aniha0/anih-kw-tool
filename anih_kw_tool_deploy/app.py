@@ -3960,6 +3960,7 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     _tab_labels = []
     _tab_weeklies = []
     _tab_targets = []
+    _tab_ad_groups = []
     for _, _row in _kwl_target.iterrows():
         _kw = _row.get("keyword", "")
         _cname = _row.get("campaign_name", "")
@@ -3970,6 +3971,7 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
         _tab_labels.append(f"{_kw} {_icon}")
         _tab_weeklies.append(_weekly)
         _tab_targets.append((_cname, _kw))
+        _tab_ad_groups.append(_agname)
 
     if not _tab_labels:
         st.caption("表示対象のキーワードがありません。")
@@ -3980,6 +3982,10 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     )
     _sel_idx = _tab_labels.index(_sel_label)
     _weekly = _tab_weeklies[_sel_idx]
+    _disp_cname, _disp_kw = _tab_targets[_sel_idx]
+    _disp_agname = _tab_ad_groups[_sel_idx]
+    _cur_roas = next((w["roas"] for w in reversed(_weekly) if w), None)
+    st.caption(f"キャンペーン: {_disp_cname} ｜ 広告グループ: {_disp_agname} ｜ ROAS: {_fmt_roas(_cur_roas)}")
     _col_labels = [w["period_label"] if w else "―" for w in _weekly]
     _tbl_df = pd.DataFrame(
         [
