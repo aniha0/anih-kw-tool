@@ -3033,7 +3033,7 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
     # 一切触れていない。
     if mode in ("kw_add", "asin_add"):
         with st.columns([20, 1])[-1]:
-            run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
+            run_btn = st.button("·", key=f"{_sk}_run", type="primary")
     else:
         with st.expander("🔍 分析実行", expanded=False):
             run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
