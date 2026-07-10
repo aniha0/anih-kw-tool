@@ -1482,6 +1482,59 @@ def _pkw_tokenize_smart(_term, _fallback_tokenize):
         return _fallback_tokenize(_term)
 
 
+# 親KW候補生成専用：意味を持たない一般語（除外語）。
+# 「犬」「猫」「口臭」「歯磨き」「サプリ」「ケア」等、Amazon商品検索で
+# 意味を持つ可能性がある語は含めない。親KW候補の生成にのみ使用し、
+# 既存の除外対象KW判定（広告費・ROAS基準）や他の処理には一切使用しない。
+_PKW_PARENT_STOPWORDS = {
+    "おすすめ", "人気", "ランキング", "口コミ", "最安", "激安",
+    "通販", "購入", "商品", "方法", "使い方",
+}
+
+
+def _pkw_extract_parent_kw_tokens(_term, _fallback_tokenize):
+    """親KW候補生成専用のトークン抽出（親KW分析専用の新規追加関数）。
+
+    既存の _pkw_get_sudachi_tokenizer（既存ヘルパー・無改修）を再利用し、
+    Sudachiが利用可能な場合のみ、形態素解析結果のうち品詞が「名詞」の
+    トークンだけを抽出し、さらに _PKW_PARENT_STOPWORDS に含まれる一般語を
+    除外してから返す。これは「親KW候補の生成」にのみ使う追加処理であり、
+    既存の _pkw_tokenize_smart（既存の呼び出し箇所での動作）・
+    _pkw_tokenize（自作の簡易分かち書き本体）には一切手を加えない。
+
+    Sudachiが利用できない場合、品詞抽出・除外語処理は一切行わず、
+    既存の _fallback_tokenize（= 既存の _pkw_tokenize）の結果を
+    そのまま返す（既存動作を完全維持）。名詞抽出後に1トークンも残らな
+    かった場合や、解析中に例外が発生した場合も、同様に
+    _fallback_tokenize の結果へフォールバックする。
+    """
+    _tokenizer = _pkw_get_sudachi_tokenizer()
+    if _tokenizer is None:
+        return _fallback_tokenize(_term)
+    try:
+        _term_s = str(_term).strip()
+        if not _term_s:
+            return _fallback_tokenize(_term)
+        _mode = _PKW_SUDACHI_CACHE.get("mode")
+        _morphemes = _tokenizer.tokenize(_term_s, _mode) if _mode is not None \
+            else _tokenizer.tokenize(_term_s)
+        _toks = []
+        for _m in _morphemes:
+            _surface = _m.surface()
+            if not _surface:
+                continue
+            _pos = _m.part_of_speech()
+            _pos0 = _pos[0] if _pos else ""
+            if _pos0 != "名詞":
+                continue
+            if _surface in _PKW_PARENT_STOPWORDS:
+                continue
+            _toks.append(_surface)
+        return _toks if _toks else _fallback_tokenize(_term)
+    except Exception:
+        return _fallback_tokenize(_term)
+
+
 def _anls_render_parent_kw_page() -> None:
     """親KW分析ページ(page_auto_del_kwのtab2)用の関数（表示専用・実験機能）。
 
@@ -1564,7 +1617,7 @@ def _anls_render_parent_kw_page() -> None:
 
     _parent_map = {}
     for _kw in _all_priced["keyword"]:
-        _toks = _pkw_tokenize_smart(_kw, _pkw_tokenize)
+        _toks = _pkw_extract_parent_kw_tokens(_kw, _pkw_tokenize)
         _cands = set()
         for _n in range(2, len(_toks) + 1):
             for _i in range(len(_toks) - _n + 1):
