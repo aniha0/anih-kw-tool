@@ -1095,8 +1095,12 @@ if run:
                 _parent_kw_all_priced["ROAS"] = _parent_kw_all_priced.apply(
                     lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1
                 )
+                _pkw_campaign_map = _pkw_full.groupby("kn")["ct"].agg(
+                    lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"
+                ).to_dict()
             else:
                 _parent_kw_all_priced = pd.DataFrame()
+                _pkw_campaign_map = {}
 
             # ── 商品専用DataFrame: ASINのみ残す ──
             _base_pt = _auto_kw_base[_auto_kw_base["kn"].apply(
@@ -1202,6 +1206,7 @@ if run:
             "df_auto_del_video":   df_auto_del_video_,
             "dbg_auto_kw": _dbg_auto_kw_,
             "parent_kw_all_priced": _parent_kw_all_priced,
+            "parent_kw_campaign_map": _pkw_campaign_map,
             "parent_kw_period_days": _pkw_period_days,
             "parent_kw_period_label": _pkw_period_label,
             "dbg_auto_pt": _dbg_auto_pt_,
@@ -1750,6 +1755,7 @@ def _anls_render_parent_kw_page() -> None:
     """
     _bad = st.session_state.get("df_auto_del_kw_keyword", pd.DataFrame())
     _all_priced = st.session_state.get("parent_kw_all_priced", pd.DataFrame())
+    _pkw_campaign_map = st.session_state.get("parent_kw_campaign_map", {})
     _period_days = st.session_state.get("parent_kw_period_days")
     _period_label = st.session_state.get("parent_kw_period_label")
 
@@ -1846,7 +1852,7 @@ def _anls_render_parent_kw_page() -> None:
             _verdict = "🟨 要確認"
         for _k in _kws:
             _kw_detail_rows.append({
-                "キャンペーン": _bad_campaign_map.get(_k, ""),
+                "キャンペーン": _bad_campaign_map.get(_k, "") or _pkw_campaign_map.get(_k, ""),
                 "親KW": _parent, "検索語句": _k,
                 "広告費": float(_agg_idx.loc[_k, "cost"]),
                 "売上": float(_agg_idx.loc[_k, "sales"]),
