@@ -722,13 +722,8 @@ if run:
         _vkw_nf = len(dw_video_kw)
 
         # ── キーワード削除用: マニュアルキャンペーンのみを母集団にして集計 ──
-        # オートキャンペーンを含まない行のみ抽出（オート除外KWとは完全に別ロジック）。
-        # 動画KWターゲキャンペーン（_vkw_mask該当）は動画KW停止側の専用集計に
-        # 分離するため、ここでは母集団から除外する（停止判定式・閾値は無変更）。
-        _del_manual_mask = (
-            ~dfs[cc].str.contains("オート|auto", case=False, na=False)
-            & ~_vkw_mask
-        )
+        # オートキャンペーンを含まない行のみ抽出（オート除外KWとは完全に別ロジック）
+        _del_manual_mask = ~dfs[cc].str.contains("オート|auto", case=False, na=False)
         _del_d0 = dfs[_del_manual_mask].copy()
         # ── ASIN / asin: / category: を groupby前に除外（検索語のみ残す）──
         _del_d0 = _del_d0[~_del_d0["kn"].apply(
@@ -755,39 +750,6 @@ if run:
         df_del_ = _del_agg[del_mask].copy()
         df_del_ = df_del_[~df_del_["keyword"].isin(win_kws)].copy()
         df_del_.drop(columns=["price"], inplace=True, errors="ignore")
-
-        # ── 動画KW停止専用: 動画KWターゲキャンペーンのみを母集団にして集計 ──
-        # 上記キーワード停止処理（_del_manual_mask以降）には一切手を加えていない。
-        # 母集団を_vkw_mask（動画KW追加と同一のキャンペーン抽出条件）に変更した、
-        # 動画KW停止専用の並列処理。停止判定の閾値式（cost>=price*2 かつ
-        # ROAS<0.8）・is_asin_kn/is_category_kn除外・集計方法は上記と完全に
-        # 同一のものをそのまま再利用している。
-        _vkw_del_d0 = dfs[_vkw_mask].copy()
-        _vkw_del_d0 = _vkw_del_d0[~_vkw_del_d0["kn"].apply(
-            lambda k: is_asin_kn(k) or is_category_kn(k)
-        )].copy()
-        _vkw_del_agg_d = {
-            "keyword":        (kc,   "first"),
-            "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
-            "sales":          (sc,   "sum"),
-            "cost":           (oc_,  "sum"),
-        }
-        if od:  _vkw_del_agg_d["orders"]      = (od,  "sum")
-        if clk: _vkw_del_agg_d["clicks"]      = (clk, "sum")
-        if imp: _vkw_del_agg_d["impressions"] = (imp, "sum")
-        _vkw_del_agg = _vkw_del_d0.groupby("kn").agg(**_vkw_del_agg_d).reset_index(drop=True)
-        _vkw_del_agg["ROAS"] = _vkw_del_agg.apply(
-            lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
-        if "clicks" in _vkw_del_agg.columns and "orders" in _vkw_del_agg.columns:
-            _vkw_del_agg["CVR"] = _vkw_del_agg.apply(
-                lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0, axis=1)
-        _vkw_del_agg["price"] = _vkw_del_agg["campaign_theme"].map(PRICES)
-        _vkw_del_agg = _vkw_del_agg[_vkw_del_agg["price"].notna()].copy()
-        _vkw_del_mask = (_vkw_del_agg["cost"] >= _vkw_del_agg["price"] * 2) & (_vkw_del_agg["ROAS"] < 0.8)
-        df_del_video_kw_ = _vkw_del_agg[_vkw_del_mask].copy()
-        win_kws_video = set(dw_video_kw["keyword"].tolist())
-        df_del_video_kw_ = df_del_video_kw_[~df_del_video_kw_["keyword"].isin(win_kws_video)].copy()
-        df_del_video_kw_.drop(columns=["price"], inplace=True, errors="ignore")
         # ── CPC用: Manual KWのみ抽出（Customer Search Termではなく Keyword Text単位）
         import re as _re
         _cpc_raw = dfs.copy()
@@ -1192,7 +1154,7 @@ if run:
         st.session_state.update({
             "has_results": True, "df_win": dw,
             "df_win_video_kw": dw_video_kw,
-            "df_del": df_del_, "df_del_video_kw": df_del_video_kw_, "df_cpc": df_cpc_,
+            "df_del": df_del_, "df_cpc": df_cpc_,
             "df_pt_add_m": df_pt_add_m_, "df_pt_del_m": df_pt_del_m_,
             "df_pt_add_v": df_pt_add_v_, "df_pt_del_v": df_pt_del_v_,
             "df_cpc_product": df_cpc_product_, "df_cpc_video": df_cpc_video_,
@@ -1239,7 +1201,6 @@ if not st.session_state.get("has_results"):
 dw:  pd.DataFrame = st.session_state["df_win"]
 dw_video_kw: pd.DataFrame = st.session_state.get("df_win_video_kw", pd.DataFrame())
 dd:  pd.DataFrame = st.session_state.get("df_del", pd.DataFrame())
-dd_video_kw: pd.DataFrame = st.session_state.get("df_del_video_kw", pd.DataFrame())
 dc_cpc:         pd.DataFrame = st.session_state.get("df_cpc",         pd.DataFrame())
 dc_cpc_product: pd.DataFrame = st.session_state.get("df_cpc_product", pd.DataFrame())
 dc_cpc_video:   pd.DataFrame = st.session_state.get("df_cpc_video",   pd.DataFrame())
@@ -5846,66 +5807,7 @@ def page_pt_del_video():
 # かつROAS<0.8）・CSV読み込み処理・DataFrame生成処理は一切変更していない。
 # ===================================================
 def page_pt_del_video_kw():
-    """動画KW停止ページ（表示・判定表記は「🚫 キーワード停止」(page_del_kw)
-    と同一仕様。母集団のみdd_video_kw（動画KWターゲキャンペーン抽出）を使用。
-    既存のpage_del_kw()には一切手を加えていない。停止判定の閾値式（cost>=
-    price*2 かつ ROAS<0.8）はpage_del_kw側と完全に同一。
-    """
-    _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "< 0.8"), ("勝ちKW", "除外")])
-    render_logic_section(
-        "🚫 動画KW停止 判定ロジック",
-        '''🎯 対象
-動画KWターゲキャンペーン（SB広告(動画)：KWターゲ）の検索語句のみ
-━━━━━━━━━━━━━━━━━━━━━━━━
-📊 判定フロー
-① 広告費 ≥ 売価 × 2 かつ ROAS < 0.8 を判定
-　　↓
-② 条件を満たす場合
-　　🚫 停止対象 → 完全一致で除外登録することを推奨
-　　↓
-③ 条件を満たさない場合
-　　⚪ データ不足 → 変更なし（経過観察）
-　　↓
-④ 動画KW追加用KW（勝ちKW）と重複するものは停止対象から除外
-　　→ 勝ちKWを誤って停止しないための保護処理
-　　↓
-✅ 判定結果
-停止対象／データ不足／除外（勝ちKW重複）
-━━━━━━━━━━━━━━━━━━━━━━━━
-💡 補足
-・基本思想: 売価の2倍以上広告費を使っても売上が立たない検索語句を除外する''',
-    )
-    st.markdown("")
-    _del_camps = ["全キャンペーン"] + CAMPAIGNS
-    _sc4v, _ = st.columns([3, 2])
-    with _sc4v:
-        del_camp = st.selectbox("キャンペーン（動画KW停止用）",
-            _del_camps, label_visibility="visible", key="del_camp_v_kw_sel")
-    sel_dd = dd_video_kw.copy()
-    if del_camp != "全キャンペーン" and "campaign_theme" in sel_dd.columns:
-        sel_dd = sel_dd[sel_dd["campaign_theme"] == del_camp].copy()
-    n_del = len(sel_dd)
-    st.markdown(
-        f'<div class="count-badge" style="border-left-color:#E53E3E;">停止対象件数: '
-        f'<b style="font-size:1.1rem;color:#C53030;">{n_del}件</b></div>',
-        unsafe_allow_html=True,
-    )
-    if not sel_dd.empty:
-        kw_list_del = "\n".join(sel_dd["keyword"].tolist())
-        st.markdown("**📋 停止対象KW一覧**（右上のコピーボタンでコピー）")
-        st.code(kw_list_del, language=None)
-        st.markdown("##### 停止KW詳細テーブル")
-        _disp_cols = [c for c in ["keyword", "campaign_theme", "ROAS", "cost", "sales"] if c in sel_dd.columns]
-        _dd2 = sel_dd[_disp_cols].copy().sort_values("ROAS", ascending=True).reset_index(drop=True)
-        _dd2.index = _dd2.index + 1
-        _rn2 = {"keyword": "KW", "campaign_theme": "キャンペーン", "cost": "広告費", "sales": "売上"}
-        _dd2 = _dd2.rename(columns=_rn2)
-        if "広告費" in _dd2.columns: _dd2["広告費"] = _dd2["広告費"].apply(lambda x: f"¥{x:,.0f}")
-        if "売上"   in _dd2.columns: _dd2["売上"]   = _dd2["売上"].apply(lambda x: f"¥{x:,.0f}")
-        if "ROAS"   in _dd2.columns: _dd2["ROAS"]   = _dd2["ROAS"].round(2)
-        st.dataframe(_dd2, use_container_width=True)
-    else:
-        st.info("停止対象キーワードはありません。")
+    _render_pt_page("df_pt_del_v", False, "動画", "pt_del_v_kw_sel")
 
 def page_pt_del_video_product():
     _render_pt_page("df_pt_del_v", False, "動画", "pt_del_v_product_sel")
