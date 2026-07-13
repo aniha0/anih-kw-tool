@@ -2132,7 +2132,7 @@ def _anls_save_asin_add_history(df_disp, fname: str):
     _anls_save(fname, existing)
 
 
-def _anls_render_list(merged, id_col, mode=None):
+def _anls_render_list(merged, id_col):
     _ICON = {"改善": "🟢", "悪化": "🔴", "変化なし": "🟡"}
     _CLR  = {"改善": "#276749", "悪化": "#C53030", "変化なし": "#744210"}
     for _, row in merged.iterrows():
@@ -2143,8 +2143,6 @@ def _anls_render_list(merged, id_col, mode=None):
         kw_disp = kw[:40] + ("…" if len(kw) > 40 else "")
         st.markdown("---")
         st.markdown(f"**{icon} {kw_disp}**")
-        if mode == "cpc_kw":
-            st.caption(f"キャンペーン: {row.get('campaign_name', '')} ｜ 広告グループ: {row.get('ad_group', '')} ｜ ROAS: {row.get('ROAS_a', '')}")
         st.markdown(f'　<span style="color:{clr};font-weight:700;">{j}</span>', unsafe_allow_html=True)
         with st.expander("▶ 詳細", expanded=False):
             st.markdown(_anls_detail_html(row, id_col), unsafe_allow_html=True)
@@ -3034,8 +3032,7 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
     # は一切変更していない。分析処理・保存処理・履歴処理・session_state処理には
     # 一切触れていない。
     if mode in ("kw_add", "asin_add"):
-        with st.columns([20, 1])[-1]:
-            run_btn = st.button("·", key=f"{_sk}_run", type="secondary")
+        run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
     else:
         with st.expander("🔍 分析実行", expanded=False):
             run_btn = st.button("🔍 分析実行", key=f"{_sk}_run", type="primary")
@@ -3190,7 +3187,7 @@ def _anls_render_tab(before_df: pd.DataFrame, period_days: int,
             with st.expander("📊 キャンペーン別サマリー", expanded=True):
                 st.markdown(_anls_camp_table_html(view), unsafe_allow_html=True)
             st.markdown("#### 📋 対象一覧")
-            _anls_render_list(view, res_id_col, mode)
+            _anls_render_list(view, res_id_col)
             if st.button("💾 分析結果を保存", key=f"{_sk}_{_ri}_save"):
                 _recs = _anls_load(anls_hist_fname)
                 _agg = _anls_aggregate_before_after(merged)
@@ -3960,7 +3957,6 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     _tab_labels = []
     _tab_weeklies = []
     _tab_targets = []
-    _tab_ad_groups = []
     for _, _row in _kwl_target.iterrows():
         _kw = _row.get("keyword", "")
         _cname = _row.get("campaign_name", "")
@@ -3971,7 +3967,6 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
         _tab_labels.append(f"{_kw} {_icon}")
         _tab_weeklies.append(_weekly)
         _tab_targets.append((_cname, _kw))
-        _tab_ad_groups.append(_agname)
 
     if not _tab_labels:
         st.caption("表示対象のキーワードがありません。")
@@ -3982,10 +3977,6 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     )
     _sel_idx = _tab_labels.index(_sel_label)
     _weekly = _tab_weeklies[_sel_idx]
-    _disp_cname, _disp_kw = _tab_targets[_sel_idx]
-    _disp_agname = _tab_ad_groups[_sel_idx]
-    _cur_roas = next((w["roas"] for w in reversed(_weekly) if w), None)
-    st.caption(f"キャンペーン: {_disp_cname} ｜ 広告グループ: {_disp_agname} ｜ ROAS: {_fmt_roas(_cur_roas)}")
     _col_labels = [w["period_label"] if w else "―" for w in _weekly]
     _tbl_df = pd.DataFrame(
         [
