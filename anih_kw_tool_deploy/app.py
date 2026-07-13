@@ -5777,7 +5777,8 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key, hist_fname: 
     _disp = [c for c in _disp_cols if c in _df.columns or c == reason_col]
     _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","asin":"ASIN",
            "clicks":"クリック数","orders":"注文数","cost":"広告費","sales":"売上"}
-    _show = _df[[c for c in _disp if c in _df.columns]].rename(columns=_rn).copy()
+    _show_cols = [c for c in _disp if c in _df.columns and not ("_m_" in selectbox_key and c == reason_col)]
+    _show = _df[_show_cols].rename(columns=_rn).copy()
     _show.index = _show.index + 1
     if "広告費" in _show.columns: _show["広告費"] = _show["広告費"].apply(lambda x: f"¥{x:,.0f}")
     if "売上"   in _show.columns: _show["売上"]   = _show["売上"].apply(lambda x: f"¥{x:,.0f}")
