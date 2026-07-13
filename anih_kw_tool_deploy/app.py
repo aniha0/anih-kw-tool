@@ -655,6 +655,70 @@ if run:
         dw = deduplicate_keyword_intent(d1)
         nf = len(dw)
         win_kws = set(dw["keyword"].tolist())
+
+        # ── 動画KW追加専用: 動画KWターゲキャンペーンを母集団にして抽出 ──
+        # 既存の「📋 キーワード追加」ロジック（上記のmask/d0/agg/d1/dw等）には
+        # 一切手を加えていない。母集団の抽出条件のみを「オート広告」から
+        # 「動画KWターゲキャンペーン」に変更した、動画KW追加専用の並列処理。
+        # covered()・is_code()・is_title()・ブランド除外(brands)・
+        # deduplicate_keyword_intent()・reg（すぐ上のキーワード追加処理で
+        # 生成した同一のreg集合）・min_ord/min_clk/min_cost・PRICESは、
+        # 上記キーワード追加処理と完全に同一のものをそのまま再利用している。
+        _vkw_mask = (
+            dfs[cc].str.contains("SB広告", na=False)
+            & dfs[cc].str.contains("動画", na=False)
+            & dfs[cc].str.contains("KWターゲ", na=False)
+        )
+        _vkw_d0 = dfs[_vkw_mask].copy()
+        _vkw_n_ex = int(_vkw_d0["kn"].isin(reg).sum())
+        _vkw_d0 = _vkw_d0[~_vkw_d0["kn"].isin(reg)]
+        _vkw_n_pt = int(_vkw_d0["kn"].apply(lambda k: covered(k, reg)).sum())
+        _vkw_d0 = _vkw_d0[~_vkw_d0["kn"].apply(lambda k: covered(k, reg))]
+        _vkw_n_ar = len(_vkw_d0)
+        _vkw_n_br = int(_vkw_d0["kn"].apply(lambda k: any(b in k for b in brands)).sum())
+        _vkw_d0 = _vkw_d0[~_vkw_d0["kn"].apply(lambda k: any(b in k for b in brands))]
+        _vkw_n_cd = int(_vkw_d0["kn"].apply(is_code).sum())
+        _vkw_d0 = _vkw_d0[~_vkw_d0["kn"].apply(is_code)]
+        _vkw_n_tl = int(_vkw_d0[kc].apply(is_title).sum())
+        _vkw_d0 = _vkw_d0[~_vkw_d0[kc].apply(is_title)]
+        _vkw_n_ae = len(_vkw_d0)
+        _vkw_agg_d = {
+            "keyword":        (kc,   "first"),
+            "campaign_theme": ("ct", lambda x: x.mode().iloc[0] if len(x) > 0 else "未分類"),
+            "sales":          (sc,   "sum"),
+            "cost":           (oc_,  "sum"),
+        }
+        if od:  _vkw_agg_d["orders"]      = (od,  "sum")
+        if clk: _vkw_agg_d["clicks"]      = (clk, "sum")
+        if imp: _vkw_agg_d["impressions"] = (imp, "sum")
+        _vkw_agg = _vkw_d0.groupby("kn").agg(**_vkw_agg_d).reset_index(drop=True)
+        _vkw_agg["ROAS"] = _vkw_agg.apply(
+            lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+        if "clicks" in _vkw_agg.columns and "orders" in _vkw_agg.columns:
+            _vkw_agg["CVR"] = _vkw_agg.apply(
+                lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0, axis=1)
+        _vkw_agg["price"] = _vkw_agg["campaign_theme"].map(PRICES)
+        _vkw_agg = _vkw_agg[_vkw_agg["price"].notna()].copy()
+        _vkw_n_pre = len(_vkw_agg)
+        _vkw_n_sl  = int((_vkw_agg["sales"] >= _vkw_agg["price"] * 2).sum())
+        _vkw_d1    = _vkw_agg[_vkw_agg["sales"] >= _vkw_agg["price"] * 2].copy()
+        _vkw_n_ro  = int((_vkw_d1["ROAS"] >= 2.0).sum())
+        _vkw_d1    = _vkw_d1[_vkw_d1["ROAS"] >= 2.0].copy()
+        if "orders" in _vkw_d1.columns:
+            _vkw_n_of = int((_vkw_d1["orders"] < min_ord).sum())
+            _vkw_d1   = _vkw_d1[_vkw_d1["orders"] >= min_ord].copy()
+        else: _vkw_n_of = 0
+        if "clicks" in _vkw_d1.columns:
+            _vkw_n_clk_f = int((_vkw_d1["clicks"] < min_clk).sum())
+            _vkw_d1 = _vkw_d1[_vkw_d1["clicks"] >= min_clk].copy()
+        else: _vkw_n_clk_f = 0
+        _vkw_n_cost_f = int((_vkw_d1["cost"] < min_cost).sum())
+        _vkw_d1 = _vkw_d1[_vkw_d1["cost"] >= min_cost].copy()
+        _vkw_n_af = len(_vkw_d1)
+        _vkw_d1.drop(columns=["price"], inplace=True, errors="ignore")
+        dw_video_kw = deduplicate_keyword_intent(_vkw_d1)
+        _vkw_nf = len(dw_video_kw)
+
         # ── キーワード削除用: マニュアルキャンペーンのみを母集団にして集計 ──
         # オートキャンペーンを含まない行のみ抽出（オート除外KWとは完全に別ロジック）
         _del_manual_mask = ~dfs[cc].str.contains("オート|auto", case=False, na=False)
@@ -1087,6 +1151,7 @@ if run:
 
         st.session_state.update({
             "has_results": True, "df_win": dw,
+            "df_win_video_kw": dw_video_kw,
             "df_del": df_del_, "df_cpc": df_cpc_,
             "df_pt_add_m": df_pt_add_m_, "df_pt_del_m": df_pt_del_m_,
             "df_pt_add_v": df_pt_add_v_, "df_pt_del_v": df_pt_del_v_,
@@ -1132,6 +1197,7 @@ if not st.session_state.get("has_results"):
 
 # ─── Retrieve session data ───────────────────────────
 dw:  pd.DataFrame = st.session_state["df_win"]
+dw_video_kw: pd.DataFrame = st.session_state.get("df_win_video_kw", pd.DataFrame())
 dd:  pd.DataFrame = st.session_state.get("df_del", pd.DataFrame())
 dc_cpc:         pd.DataFrame = st.session_state.get("df_cpc",         pd.DataFrame())
 dc_cpc_product: pd.DataFrame = st.session_state.get("df_cpc_product", pd.DataFrame())
@@ -1273,6 +1339,22 @@ def _anls_entry_point_kw_add(df_win):
         df_win,
         7, "anls_kw_add.json", "anls_kw_add",
         "KW追加分析", "kw_add", "keyword", "kw_add_history.json")
+
+
+def _anls_entry_point_video_kw_add(df_win_video_kw):
+    """page_pt_add_video_kw の分析入口専用エントリ関数（新規追加）。
+
+    既存の _anls_entry_point_kw_add()（「📋 キーワード追加」専用）は
+    無改修のまま。本関数は動画KW追加専用に、渡すJSONファイル名・ラベルの
+    みを変更した並列の新規関数。呼び出し先の _anls_render_tab() 自体は
+    既存のまま（無改修）で、複数ページから共有利用する既存パターンに
+    そのまま倣っている。
+    """
+    _anls_render_tab(
+        df_win_video_kw,
+        7, "anls_video_kw_add.json", "anls_video_kw_add",
+        "動画KW追加分析", "kw_add", "keyword", "video_kw_add_history.json")
+
 
 def page_del_kw():
     _cond_bar([("広告費", "≥ 商品売価×2"), ("ROAS", "< 0.8"), ("勝ちKW", "除外")])
@@ -2338,6 +2420,29 @@ def _anls_save_kw_add_history(df_disp):
         return
     existing.append(record)
     _anls_save("kw_add_history.json", existing)
+
+
+def _anls_save_video_kw_add_history(df_disp):
+    """動画KW追加専用の分析履歴保存関数（新規追加）。
+
+    既存の _anls_save_kw_add_history()（「📋 キーワード追加」専用、
+    "kw_add_history.json"に保存）は無改修のまま。本関数は動画KW追加
+    専用に、保存先ファイル名のみを"video_kw_add_history.json"に変更した
+    並列の新規関数。保存する列構成・正規化処理・重複チェックロジックは
+    _anls_save_kw_add_history()と完全に同一。
+    """
+    save_cols = [c for c in ["campaign_name", "ad_group", "keyword",
+                              "orders", "clicks", "cost", "sales", "ROAS"] if c in df_disp.columns]
+    record = {
+        "exported_at": _anls_dt.datetime.now().isoformat(),
+        "entries": _anls_normalize_entries(df_disp[save_cols].to_dict(orient="records")),
+    }
+    existing = _anls_load("video_kw_add_history.json")
+    _new_entries_norm = _anls_normalize_entries(record.get("entries") or [])
+    if any(_anls_normalize_entries(_r.get("entries") or []) == _new_entries_norm for _r in existing):
+        return
+    existing.append(record)
+    _anls_save("video_kw_add_history.json", existing)
 
 
 def _anls_save_asin_add_history(df_disp, fname: str):
@@ -5704,86 +5809,93 @@ def page_pt_del_video():
 # 等）は既存の動画追加ページの文言をそのまま維持している。
 # ===================================================
 def page_pt_add_video_kw():
+    """動画KW追加ページ（表示・除外・集計ロジックは「📋 キーワード追加」
+    (page_add_kw)と同一仕様。母集団のみdw_video_kw（動画KWターゲキャンペーン
+    抽出）を使用。既存のpage_add_kw()には一切手を加えていない。
+    """
     _cond_bar([
-        ("注文数",   "≥ 3"),
-        ("クリック数", "≥ 5"),
-        ("広告費",   "≥ ¥300"),
-        ("売上",     "≥ 売価×2"),
-        ("ROAS",     "≥ 2.0"),
-        ("対象",     "動画"),
+        ("最小注文数",  f'{sv["mo"]}件'),
+        ("最小クリック数", f'{sv["mc"]}回'),
+        ("最小広告費",  f'¥{sv["mco"]:,}'),
     ])
-    render_logic_section(
-        "[+] 動画追加 判定ロジック",
-        '''🎯 対象
-動画（ASINターゲティング）
+
+    with st.expander("📖 判定ロジックを見る", expanded=False):
+        st.text(
+            '''📋 動画KW追加 判定ロジック
+━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 対象
+動画KWターゲキャンペーン（SB広告(動画)：KWターゲ）で成果が出た検索語句を、
+動画KW追加候補として抽出します。
 ━━━━━━━━━━━━━━━━━━━━━━━━
 📊 判定フロー
-① 信頼度フィルター（最低条件）
-　　注文数 ≥ 3件／クリック数 ≥ 5回／広告費 ≥ ¥300
+① 信頼度フィルター
+　　注文数 ≥ 3件 かつ クリック数 ≥ 5 かつ 広告費 ≥ ¥300
+　　（サイドバーで変更可能）
 　　↓
 ② 採用条件
 　　売上 ≥ 売価 × 2 かつ ROAS ≥ 2.0
 　　↓
 ✅ 判定結果
-追加対象
+追加候補
 ━━━━━━━━━━━━━━━━━━━━━━━━
 💡 補足
-・売れているASINターゲに予算を集中して利益を最大化する'''
-    )
+・同一意図KW統合: 語順・表記ゆれが同じKWは代表1件に集約
+・ブランドワード・商品コード・タイトル文字列は自動除外'''
+        )
     st.markdown("")
-
-    _c1, _c2 = st.columns([3, 2])
+    _c1, _c3 = st.columns([3, 2])
     with _c1:
-        sel = st.selectbox(
-            "商品選択",
-            ["全商品"] + CAMPAIGNS,
+        kw_camp = st.selectbox(
+            "キャンペーン",
+            ["全キャンペーン"] + CAMPAIGNS,
             label_visibility="visible",
             key="pt_add_v_kw_sel",
         )
-    df_all = st.session_state.get("df_pt_add_v", pd.DataFrame())
-    df_view = df_all.copy()
-    if sel != "全商品" and "campaign_theme" in df_view.columns:
-        df_view = df_view[df_view["campaign_theme"] == sel].copy()
+    sel_df = dw_video_kw.copy()
 
-    n_rows = len(df_view)
+    if kw_camp != "全キャンペーン":
+        sel_df = sel_df[sel_df["campaign_theme"] == kw_camp].copy()
+
+    n_sel = len(sel_df)
+
     st.markdown(
-        f'<div class="count-badge" style="border-left-color:#2F855A;">'
-        f'追加対象件数: <b style="font-size:1.1rem;color:#2F855A;">{n_rows}件</b>'
-        f'　<span style="color:#718096;font-size:.8rem;">商品: {sel}</span></div>',
+        f'<div class="count-badge">該当件数: <b style="font-size:1.1rem;">{n_sel}件</b>'
+        f'　<span style="color:#718096;font-size:.8rem;">キャンペーン: {kw_camp}</span></div>',
         unsafe_allow_html=True,
     )
 
-    if df_view.empty:
-        st.info("追加候補の動画はありません。（条件: 注文≥3 / クリック≥5 / 広告費≥¥300 / 売上≥売価×2 / ROAS≥2.0）")
+    if sel_df.empty:
+        st.info("条件に合うキーワードはありません。")
         return
 
-    _asin_list = df_view.sort_values("ROAS", ascending=False)["asin"].tolist() if "asin" in df_view.columns else []
-    st.markdown("**📋 Amazon広告登録用動画一覧**（右上のコピーボタンでコピー）")
-    st.code("\n".join(_asin_list), language=None)
+    kw_list = "\n".join(sel_df.sort_values("ROAS", ascending=False)["keyword"].tolist())
+    st.markdown("**📋 Amazon広告登録用KW一覧**（右上のコピーボタンでコピー）")
+    st.code(kw_list, language=None)
 
-    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","asin":"ASIN",
-           "clicks":"クリック数","orders":"注文数","cost":"広告費","sales":"売上"}
-    _asin_add_hist_cols = [c for c in ["campaign_name", "ad_group", "asin",
-                                        "orders", "clicks", "cost", "sales", "ROAS"]
-                            if c in df_view.columns]
-    _hist_df = df_view[_asin_add_hist_cols].copy()
-    _csv = _hist_df.rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    _anls_save_asin_add_history(_hist_df.copy(), "video_add_history.json")
-    st.download_button(f"📥 動画追加_{sel}.csv", data=_csv,
-        file_name=f"動画追加_{sel}.csv", mime="text/csv", use_container_width=True)
+    _vkw_add_hist_cols = [c for c in ["campaign_name", "ad_group", "keyword",
+                                       "orders", "clicks", "cost", "sales", "ROAS"]
+                           if c in sel_df.columns]
+    _vkw_add_hist_df = sel_df.sort_values("ROAS", ascending=False)[_vkw_add_hist_cols].copy()
+    _vkw_add_csv = _vkw_add_hist_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+    _anls_save_video_kw_add_history(_vkw_add_hist_df)
+    st.download_button(
+        f"📥 {kw_camp}_動画KW追加候補.csv", data=_vkw_add_csv,
+        file_name=f"{kw_camp}_動画KW追加候補.csv", mime="text/csv",
+    )
 
-    st.markdown("##### 動画詳細テーブル")
-    _dd = df_view[[c for c in ["campaign_name","ad_group","asin","orders","clicks","cost","sales","ROAS"]
-                   if c in df_view.columns]].copy()
+    st.markdown("##### KW詳細テーブル")
+    _dd = sel_df[bcols(sel_df)].copy().sort_values("ROAS", ascending=False).reset_index(drop=True)
     _dd.index = _dd.index + 1
-    _dd = _dd.rename(columns=_rn)
-    if "広告費" in _dd.columns: _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    if "売上"   in _dd.columns: _dd["売上"]   = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
-    if "ROAS"   in _dd.columns: _dd["ROAS"]   = _dd["ROAS"].round(2)
+    _dd = _dd.rename(columns=RENAME)
+    _dd["売上"]  = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
+    _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
+    _dd["ROAS"]  = _dd["ROAS"].round(2)
+    if "CVR" in _dd.columns:
+        _dd["CVR"] = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
     st.dataframe(_dd, use_container_width=True)
 
-    # ── 分析入口の表示導線（既存関数の呼び出しのみ。内部は無改変）──
-    _anls_entry_point_pt_add_video(st.session_state.get("df_pt_add_v", pd.DataFrame()))
+    # ── 分析入口の表示導線（新規関数の呼び出しのみ）──
+    _anls_entry_point_video_kw_add(dw_video_kw)
 
 
 def page_pt_add_video_product():
