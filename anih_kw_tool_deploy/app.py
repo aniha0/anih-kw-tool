@@ -1443,14 +1443,14 @@ def page_del_kw():
         st.markdown("**📋 停止対象KW一覧**（右上のコピーボタンでコピー）")
         st.code(kw_list_del, language=None)
         st.markdown("##### 停止KW詳細テーブル")
-        _disp_cols = [c for c in ["keyword", "campaign_theme", "ROAS", "cost", "sales"] if c in sel_dd.columns]
-        _dd2 = sel_dd[_disp_cols].copy().sort_values("ROAS", ascending=True).reset_index(drop=True)
+        _dd2 = sel_dd[bcols(sel_dd)].copy().sort_values("ROAS", ascending=True).reset_index(drop=True)
         _dd2.index = _dd2.index + 1
-        _rn2 = {"keyword": "KW", "campaign_theme": "キャンペーン", "cost": "広告費", "sales": "売上"}
-        _dd2 = _dd2.rename(columns=_rn2)
-        if "広告費" in _dd2.columns: _dd2["広告費"] = _dd2["広告費"].apply(lambda x: f"¥{x:,.0f}")
+        _dd2 = _dd2.rename(columns=RENAME)
         if "売上"   in _dd2.columns: _dd2["売上"]   = _dd2["売上"].apply(lambda x: f"¥{x:,.0f}")
+        if "広告費" in _dd2.columns: _dd2["広告費"] = _dd2["広告費"].apply(lambda x: f"¥{x:,.0f}")
         if "ROAS"   in _dd2.columns: _dd2["ROAS"]   = _dd2["ROAS"].round(2)
+        if "CVR" in _dd2.columns:
+            _dd2["CVR"] = _dd2["CVR"].apply(lambda x: f"{x:.1f}%")
         st.dataframe(_dd2, use_container_width=True)
     else:
         st.info("停止対象キーワードはありません。")
@@ -5768,7 +5768,7 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key, hist_fname: 
             rs += ["費用対効果が悪い", "利益貢献がない", "削除優先度が高い"]
             return " / ".join(rs[:4])
         reason_col = "削除理由"
-        _disp_cols = ["campaign_name","ad_group","asin","cost","sales","ROAS",reason_col]
+        _disp_cols = ["campaign_name","ad_group","asin","orders","clicks","cost","sales","ROAS",reason_col]
         hdr = f"##### \U0001f5d1 {camp_label}削除詳細テーブル"
 
     st.markdown(hdr)
@@ -5895,14 +5895,14 @@ def page_pt_del_video_kw():
         st.markdown("**📋 停止対象KW一覧**（右上のコピーボタンでコピー）")
         st.code(kw_list_del, language=None)
         st.markdown("##### 停止KW詳細テーブル")
-        _disp_cols = [c for c in ["keyword", "campaign_theme", "ROAS", "cost", "sales"] if c in sel_dd.columns]
-        _dd2 = sel_dd[_disp_cols].copy().sort_values("ROAS", ascending=True).reset_index(drop=True)
+        _dd2 = sel_dd[bcols(sel_dd)].copy().sort_values("ROAS", ascending=True).reset_index(drop=True)
         _dd2.index = _dd2.index + 1
-        _rn2 = {"keyword": "KW", "campaign_theme": "キャンペーン", "cost": "広告費", "sales": "売上"}
-        _dd2 = _dd2.rename(columns=_rn2)
-        if "広告費" in _dd2.columns: _dd2["広告費"] = _dd2["広告費"].apply(lambda x: f"¥{x:,.0f}")
+        _dd2 = _dd2.rename(columns=RENAME)
         if "売上"   in _dd2.columns: _dd2["売上"]   = _dd2["売上"].apply(lambda x: f"¥{x:,.0f}")
+        if "広告費" in _dd2.columns: _dd2["広告費"] = _dd2["広告費"].apply(lambda x: f"¥{x:,.0f}")
         if "ROAS"   in _dd2.columns: _dd2["ROAS"]   = _dd2["ROAS"].round(2)
+        if "CVR" in _dd2.columns:
+            _dd2["CVR"] = _dd2["CVR"].apply(lambda x: f"{x:.1f}%")
         st.dataframe(_dd2, use_container_width=True)
     else:
         st.info("停止対象キーワードはありません。")
