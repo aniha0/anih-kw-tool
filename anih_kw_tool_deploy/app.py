@@ -1858,10 +1858,22 @@ def _anls_render_parent_kw_page() -> None:
         "（広告費 ≥ 売価×2 かつ ROAS ≤ 0.8）には一切影響しません。"
     )
 
+    _kw_to_parents = {}
+    for _parent, _kws in _parent_map.items():
+        _uniq_kws = sorted(set(_kws))
+        if len(_uniq_kws) < 2:
+            continue
+        for _k in _uniq_kws:
+            _kw_to_parents.setdefault(_k, []).append(_parent)
+
     with st.expander(f"① 現在の除外対象キーワード一覧（{len(_bad)}件）", expanded=False):
-        _bcols = [c for c in ["keyword", "campaign_theme", "cost", "sales", "ROAS"] if c in _bad.columns]
-        _brn = {"keyword": "検索語", "campaign_theme": "テーマ", "cost": "広告費", "sales": "売上", "ROAS": "ROAS"}
-        st.dataframe(_bad[_bcols].rename(columns=_brn), use_container_width=True)
+        _bad_disp = _bad.copy()
+        _bad_disp["親KW"] = _bad_disp["keyword"].apply(
+            lambda k: ", ".join(sorted(_kw_to_parents.get(k, []))))
+        _bcols = [c for c in ["campaign_theme", "ad_group", "親KW", "keyword", "orders", "cost", "sales", "ROAS"] if c in _bad_disp.columns]
+        _brn = {"campaign_theme": "キャンペーン名", "ad_group": "広告グループ", "keyword": "検索語句",
+                "orders": "注文数", "cost": "広告費", "sales": "売上", "ROAS": "ROAS"}
+        st.dataframe(_bad_disp[_bcols].rename(columns=_brn), use_container_width=True)
 
     if not _rows:
         st.info("除外対象キーワードを含む「2語以上」の親KW候補は見つかりませんでした。")
