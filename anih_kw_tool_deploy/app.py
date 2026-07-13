@@ -4857,7 +4857,7 @@ def _anls_entry_point(dc_cpc):
     st.markdown("---")
     _anls_render_tab(dc_cpc, 7, "anls_cpc_kw.json", "anls_cpc_kw", "キーワードCPC分析", "cpc_kw", "keyword", "cpc_change_history.json")
 
-def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = "", id_col: str = "asin", csv_disp_only: bool = False):
+def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = "", id_col: str = "asin", csv_disp_only: bool = False, select_label: str = None):
     """商品ターゲ CPC調整ページ共通レンダラー（page_cpc()と同一ロジック・UI）"""
     _RANK_ORDER = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除", "判断保留"]
     _RC = {
@@ -4906,7 +4906,7 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
     sel_options = ["全商品"] + [c for c in CAMPAIGNS if not dc_pt[dc_pt["campaign_theme"] == c].empty]
     _sc, _ = st.columns([3, 2])
     with _sc:
-        cpc_camp = st.selectbox(f"商品選択（{page_title}）", sel_options,
+        cpc_camp = st.selectbox(f"商品選択（{select_label if select_label else page_title}）", sel_options,
                                 label_visibility="visible", key=sel_key)
     if cpc_camp == "全商品":
         df_c = dc_pt.copy()
@@ -5041,7 +5041,7 @@ def _anls_entry_point_cpc_product(df_cpc_product):
 def page_cpc_video():
     _t1, _t2 = st.tabs(["CPC調整", "分析"])
     with _t1:
-        _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel", "cpc_pt_v_history.json")
+        _render_pt_cpc_page(dc_cpc_video, "動画CPC調整", "cpc_video_sel", "cpc_pt_v_history.json", select_label="動画商品")
     with _t2:
         # KW版と同一仕様の「対象ごとの個別4週間比較タブ＋状態アイコン」。
         # _render_pt_cpc_page（tab1・既存無改変）の判定結果(dc_cpc_video)を
@@ -7037,7 +7037,7 @@ def page_cpc_sbvideo():
     # （_render_pt_cpc_page・判定・CSV・保存）は一切変更していない。
     _t1, _t2 = st.tabs(["CPC調整", "分析"])
     with _t1:
-        _render_pt_cpc_page(dc_cpc_video_kw, "SB動画KWターゲCPC調整", "cpc_video_kw_sel", id_col="keyword", csv_disp_only=True)
+        _render_pt_cpc_page(dc_cpc_video_kw, "SB動画KWターゲCPC調整", "cpc_video_kw_sel", id_col="keyword", csv_disp_only=True, select_label="動画KW")
     with _t2:
         st.info("この機能は現在未対応です。")
 
