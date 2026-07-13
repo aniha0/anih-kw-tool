@@ -1773,6 +1773,7 @@ def _anls_render_parent_kw_page() -> None:
         return
 
     _bad_set = set(_bad["keyword"].astype(str))
+    _bad_campaign_map = dict(zip(_bad["keyword"].astype(str), _bad["campaign_theme"])) if "campaign_theme" in _bad.columns else {}
     _agg_idx = _all_priced.set_index("keyword")
 
     _vocab = {}
@@ -1845,6 +1846,7 @@ def _anls_render_parent_kw_page() -> None:
             _verdict = "🟨 要確認"
         for _k in _kws:
             _kw_detail_rows.append({
+                "キャンペーン": _bad_campaign_map.get(_k, ""),
                 "親KW": _parent, "検索語句": _k,
                 "広告費": float(_agg_idx.loc[_k, "cost"]),
                 "売上": float(_agg_idx.loc[_k, "sales"]),
@@ -1892,7 +1894,7 @@ def _anls_render_parent_kw_page() -> None:
     st.markdown(f"**② 親KW候補一覧（除外対象語を含むもの: {len(_pdf)}件）**")
     _pdf_kw = pd.DataFrame(_kw_detail_rows)
     if not _pdf_kw.empty:
-        _disp = _pdf_kw[["親KW", "検索語句", "広告費", "売上", "ROAS", "判定"]].copy()
+        _disp = _pdf_kw[["キャンペーン", "親KW", "検索語句", "広告費", "売上", "ROAS", "判定"]].copy()
         _disp = _disp.sort_values(["判定", "広告費"], ascending=[True, False]).reset_index(drop=True)
         _disp["広告費"] = _disp["広告費"].apply(lambda x: f"¥{x:,.0f}")
         _disp["売上"] = _disp["売上"].apply(lambda x: f"¥{x:,.0f}")
