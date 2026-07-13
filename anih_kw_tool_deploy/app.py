@@ -1819,6 +1819,7 @@ def _anls_render_parent_kw_page() -> None:
             _parent_map.setdefault(_c, []).append(_kw)
 
     _rows = []
+    _kw_detail_rows = []
     for _parent, _kws in _parent_map.items():
         _kws = sorted(set(_kws))
         if len(_kws) < 2:
@@ -1842,6 +1843,14 @@ def _anls_render_parent_kw_page() -> None:
             _verdict = "🟥 危険"
         else:
             _verdict = "🟨 要確認"
+        for _k in _kws:
+            _kw_detail_rows.append({
+                "親KW": _parent, "検索語句": _k,
+                "広告費": float(_agg_idx.loc[_k, "cost"]),
+                "売上": float(_agg_idx.loc[_k, "sales"]),
+                "ROAS": float(_agg_idx.loc[_k, "ROAS"]),
+                "判定": _verdict,
+            })
         _rows.append({
             "親KW候補": _parent, "関連検索語数": len(_kws),
             "広告費": _total_cost, "売上": _total_sales, "ROAS": _roas,
@@ -1881,9 +1890,15 @@ def _anls_render_parent_kw_page() -> None:
 
     _pdf = pd.DataFrame(_rows).sort_values(["判定", "広告費"], ascending=[True, False])
     st.markdown(f"**② 親KW候補一覧（除外対象語を含むもの: {len(_pdf)}件）**")
-    _disp = _pdf.copy()
-    _disp["広告費"] = _disp["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    _disp["売上"] = _disp["売上"].apply(lambda x: f"¥{x:,.0f}")
+    _pdf_kw = pd.DataFrame(_kw_detail_rows)
+    if not _pdf_kw.empty:
+        _disp = _pdf_kw[["親KW", "検索語句", "広告費", "売上", "ROAS", "判定"]].copy()
+        _disp = _disp.sort_values(["判定", "広告費"], ascending=[True, False]).reset_index(drop=True)
+        _disp["広告費"] = _disp["広告費"].apply(lambda x: f"¥{x:,.0f}")
+        _disp["売上"] = _disp["売上"].apply(lambda x: f"¥{x:,.0f}")
+        _disp["ROAS"] = _disp["ROAS"].round(2)
+    else:
+        _disp = _pdf_kw
     st.dataframe(_disp, use_container_width=True)
 
     _n_danger = int((_pdf["判定"] == "🟥 危険").sum())
