@@ -385,12 +385,13 @@ _VALID_PAGES = {
     "📋 キーワード追加", "📊 DateDive売れる予測KW",
     "🚫 キーワード停止", "📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整", "📹 SB動画CPC調整",
     "➕ 商品追加", "🗑️ 商品削除",
-    "📹 動画KW追加",   "📹 動画商品追加",   "📹 動画削除",
+    "📹 動画KW追加",   "📹 動画商品追加",
+    "📹 動画KW停止",   "📹 動画商品停止",
     "📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除",
     "📥 ダウンロード", "📖 取扱説明書", "📂 分析履歴",
 }
 _ADD_PAGES = {"📋 キーワード追加", "➕ 商品追加", "📹 動画KW追加", "📹 動画商品追加"}
-_DEL_PAGES = {"🚫 キーワード停止", "🗑️ 商品削除", "📹 動画削除"}
+_DEL_PAGES = {"🚫 キーワード停止", "🗑️ 商品削除", "📹 動画KW停止", "📹 動画商品停止"}
 _AUTO_DEL_PAGES = {"📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除"}
 _CPC_PAGES = {"📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整", "📹 SB動画CPC調整"}
 
@@ -411,13 +412,14 @@ with st.sidebar:
     with st.expander("➕  キーワード追加", expanded=(_cp in _ADD_PAGES)):
         _nav_btn("キーワード",  "📋 キーワード追加",               "📋 ")
         _nav_btn("商品",        "➕ 商品追加", "🎯 ")
-        _nav_btn("動画 KW追加",   "📹 動画KW追加",     "📹 ")
-        _nav_btn("動画 商品追加", "📹 動画商品追加",   "📹 ")
+        _nav_btn("動画KW",   "📹 動画KW追加",     "📹 ")
+        _nav_btn("動画商品", "📹 動画商品追加",   "📹 ")
     # ── 削除
     with st.expander("🚫  キーワード停止", expanded=(_cp in _DEL_PAGES)):
         _nav_btn("キーワード",  "🚫 キーワード停止",               "📋 ")
         _nav_btn("商品",        "🗑️ 商品削除", "🎯 ")
-        _nav_btn("動画",        "📹 動画削除",        "📹 ")
+        _nav_btn("動画KW",   "📹 動画KW停止",     "📹 ")
+        _nav_btn("動画商品", "📹 動画商品停止",   "📹 ")
     # ── CPC調整
     with st.expander("📈  CPC調整", expanded=(_cp in _CPC_PAGES)):
         _nav_btn("キーワード",  "📈 キーワードCPC調整",   "📋 ")
@@ -5793,6 +5795,25 @@ def page_pt_del_video():
 
 
 # ===================================================
+# 動画停止ページ UI分割（新規追加・既存非破壊）
+# -----------------------------------------------------
+# 「📹 動画削除」（page_pt_del_video）を「📹 動画KW停止」「📹 動画商品停止」
+# の2ページへUIのみ分割する。既存のpage_pt_del_video・_render_pt_page・
+# st.session_state["df_pt_del_v"]の生成処理（if run以降）には一切
+# 手を加えていない。両ページとも、既存の「📹 動画削除」ページが表示して
+# いたのと全く同じデータ（st.session_state["df_pt_del_v"]）をそのまま
+# 表示するだけの、UIレイアウトのみの新規追加（キーワード追加/動画追加の
+# UI分割と同一パターン）。停止対象抽出ロジック・停止条件（広告費≥売価×2
+# かつROAS<0.8）・CSV読み込み処理・DataFrame生成処理は一切変更していない。
+# ===================================================
+def page_pt_del_video_kw():
+    _render_pt_page("df_pt_del_v", False, "動画", "pt_del_v_kw_sel")
+
+def page_pt_del_video_product():
+    _render_pt_page("df_pt_del_v", False, "動画", "pt_del_v_product_sel")
+
+
+# ===================================================
 # 動画追加ページ UI分割（新規追加・既存非破壊）
 # -----------------------------------------------------
 # 「📹 動画追加」（page_pt_add_video）を「📹 動画 KW追加」「📹 動画 商品追加」
@@ -5821,11 +5842,11 @@ def page_pt_add_video_kw():
 
     with st.expander("📖 判定ロジックを見る", expanded=False):
         st.text(
-            '''📋 動画KW追加 判定ロジック
+            '''📋 動画KW 判定ロジック
 ━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 対象
 動画KWターゲキャンペーン（SB広告(動画)：KWターゲ）で成果が出た検索語句を、
-動画KW追加候補として抽出します。
+動画KW候補として抽出します。
 ━━━━━━━━━━━━━━━━━━━━━━━━
 📊 判定フロー
 ① 信頼度フィルター
@@ -5879,8 +5900,8 @@ def page_pt_add_video_kw():
     _vkw_add_csv = _vkw_add_hist_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
     _anls_save_video_kw_add_history(_vkw_add_hist_df)
     st.download_button(
-        f"📥 {kw_camp}_動画KW追加候補.csv", data=_vkw_add_csv,
-        file_name=f"{kw_camp}_動画KW追加候補.csv", mime="text/csv",
+        f"📥 {kw_camp}_動画KW候補.csv", data=_vkw_add_csv,
+        file_name=f"{kw_camp}_動画KW候補.csv", mime="text/csv",
     )
 
     st.markdown("##### KW詳細テーブル")
@@ -6934,7 +6955,8 @@ _PAGE_FUNCS = {
     "🗑️ 商品削除":                    page_pt_del_manual,
     "📹 動画KW追加":                  page_pt_add_video_kw,
     "📹 動画商品追加":                page_pt_add_video_product,
-    "📹 動画削除":                     page_pt_del_video,
+    "📹 動画KW停止":                   page_pt_del_video_kw,
+    "📹 動画商品停止":                 page_pt_del_video_product,
     "📄 オートKW削除":               page_auto_del_kw,
     "🎯 オート商品削除":             page_auto_del_product,
     "🎥 オート動画削除":             page_auto_del_video,
