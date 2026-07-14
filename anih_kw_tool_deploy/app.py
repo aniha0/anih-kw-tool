@@ -760,7 +760,8 @@ if run:
         # 動画KW停止専用の並列処理。停止判定の閾値式（cost>=price*2 かつ
         # ROAS<0.8）・is_asin_kn/is_category_kn除外・集計方法は上記と完全に
         # 同一のものをそのまま再利用している。
-        _vkw_del_d0 = dfs[_vkw_mask].copy()
+        _vkw_del_manual_mask = _del_manual_mask
+        _vkw_del_d0 = dfs[_vkw_del_manual_mask].copy()
         _vkw_del_d0 = _vkw_del_d0[~_vkw_del_d0["kn"].apply(
             lambda k: is_asin_kn(k) or is_category_kn(k)
         )].copy()
@@ -961,7 +962,9 @@ if run:
         )
 
         df_pt_add_m_, df_pt_del_m_ = _build_pt_dfs(_mask_m)
-        df_pt_add_v_, df_pt_del_v_ = _build_pt_dfs(_mask_v)
+        df_pt_add_v_, _ = _build_pt_dfs(_mask_v)
+        _vdel_mask = _mask_m
+        _, df_pt_del_v_ = _build_pt_dfs(_vdel_mask)
 
         n_mpt_add = len(df_pt_add_m_) + len(df_pt_add_v_)
         n_mpt_del = len(df_pt_del_m_) + len(df_pt_del_v_)
