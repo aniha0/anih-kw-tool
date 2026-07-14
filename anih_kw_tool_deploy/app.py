@@ -657,10 +657,11 @@ if run:
         nf = len(dw)
         win_kws = set(dw["keyword"].tolist())
 
-        # ── 動画KW追加専用: 動画KWターゲキャンペーンを母集団にして抽出 ──
+        # ── 動画KW追加専用: オート広告を母集団にして抽出 ──
         # 既存の「📋 キーワード追加」ロジック（上記のmask/d0/agg/d1/dw等）には
-        # 一切手を加えていない。母集団の抽出条件のみを「オート広告」から
-        # 「動画KWターゲキャンペーン」に変更した、動画KW追加専用の並列処理。
+        # 一切手を加えていない。母集団の抽出条件は「オート広告」（オートで
+        # 成果が出ている検索語をマニュアル側・動画側の両方に登録候補として
+        # 出す、という考え方のため）。
         # covered()・is_code()・is_title()・ブランド除外(brands)・
         # deduplicate_keyword_intent()・reg（すぐ上のキーワード追加処理で
         # 生成した同一のreg集合）・min_ord/min_clk/min_cost・PRICESは、
@@ -668,15 +669,14 @@ if run:
         _vkw_mask = (
             dfs[cc].str.contains("オート|auto", case=False, na=False)
         )
-        # 動画KW追加の母集団を実際のSB広告(動画)：KWターゲキャンペーンに変更。
-        # _sb_video_kw_mask定義をここへ前方移動（条件式は無変更、後方の
-        # 動画KW停止・動画KW CPC調整からも同一の定義をそのまま再利用する）。
+        # _sb_video_kw_mask定義はここに維持（キーワード停止の動画KW除外・
+        # 動画KW停止・動画KW CPC調整で引き続き参照するため、削除・移動しない）。
         _sb_video_kw_mask = (
             dfs[cc].str.contains("SB広告", na=False)
             & dfs[cc].str.contains("動画", na=False)
             & dfs[cc].str.contains("KWターゲ", na=False)
         )
-        _vkw_d0 = dfs[_sb_video_kw_mask].copy()
+        _vkw_d0 = dfs[_vkw_mask].copy()
         _vkw_n_ex = int(_vkw_d0["kn"].isin(reg).sum())
         _vkw_d0 = _vkw_d0[~_vkw_d0["kn"].isin(reg)]
         _vkw_n_pt = int(_vkw_d0["kn"].apply(lambda k: covered(k, reg)).sum())
