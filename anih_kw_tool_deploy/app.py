@@ -392,7 +392,7 @@ _VALID_PAGES = {
 }
 _ADD_PAGES = {"📋 キーワード追加", "➕ 商品追加", "📹 動画KW追加", "📹 動画商品追加"}
 _DEL_PAGES = {"🚫 キーワード停止", "🗑️ 商品削除", "📹 動画KW停止", "📹 動画商品停止"}
-_AUTO_DEL_PAGES = {"📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除"}
+_AUTO_DEL_PAGES = {"📄 オートKW削除", "🎯 オート商品削除"}
 _CPC_PAGES = {"📈 キーワードCPC調整", "🎯 商品CPC調整", "📹 動画CPC調整", "📹 SB動画CPC調整"}
 
 if "current_page" not in st.session_state or st.session_state["current_page"] not in _VALID_PAGES:
@@ -430,7 +430,6 @@ with st.sidebar:
     with st.expander("🧹  オート除外KW", expanded=(_cp in _AUTO_DEL_PAGES)):
         _nav_btn("キーワード",  "📄 オートKW削除",    "📄 ")
         _nav_btn("商品",        "🎯 オート商品削除",  "🎯 ")
-        _nav_btn("動画",        "🎥 オート動画削除",  "🎥 ")
     # ── その他
     st.markdown("---")
     _nav_btn("DateDive売れる予測KW",  "📊 DateDive売れる予測KW", "📊 ")
@@ -2036,54 +2035,6 @@ def page_auto_del_product():
     st.dataframe(_d, use_container_width=True)
     _csv = df[_dcols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
     st.download_button("📥 除外商品ASIN候補.csv", data=_csv, file_name="除外商品ASIN候補.csv", mime="text/csv")
-
-def page_auto_del_video():
-    render_logic_section("🎥 オート動画削除 判定ロジック", '''🎯 対象
-オート動画ターゲティングのみ
-━━━━━━━━━━━━━━━━━━━━━━━━
-📊 判定フロー
-① マニュアル動画ターゲティング重複除外
-　　↓
-② ASIN／カテゴリー単位で集計
-　　↓
-③ 商品価格取得
-　　↓
-④ 広告費 ≥ 売価×2
-　　↓
-⑤ ROAS ≤ 0.8
-　　↓
-✅ 判定結果
-除外候補''')
-    df = st.session_state.get("df_auto_del_video", pd.DataFrame())
-    if df.empty:
-        st.info("除外候補の動画ASINはありません。（オート動画広告で出血中かつマニュアル未登録のものなし）")
-        return
-    st.metric("🎬 動画件数", f"{len(df)}件")
-    _del_camps = ["全キャンペーン"] + CAMPAIGNS
-    _sc, _ = st.columns([3, 2])
-    with _sc:
-        _sel = st.selectbox("キャンペーン（動画）", _del_camps,
-                            label_visibility="visible", key="auto_vid_camp_sel")
-    if _sel != "全キャンペーン" and "campaign_theme" in df.columns:
-        df = df[df["campaign_theme"] == _sel].copy()
-    if df.empty:
-        st.info("除外候補の動画ASINはありません。")
-        return
-    st.markdown(f"**除外候補: {len(df)}件** — 広告費 ≥ 売価×2 かつ ROAS ≤ 0.8 / マニュアル動画重複除外済み")
-    _asin_list_auto_vid = df["asin"].tolist() if "asin" in df.columns else []
-    st.markdown("**📋 除外対象動画一覧**（右上のコピーボタンでコピー）")
-    st.code("\n".join(_asin_list_auto_vid), language=None)
-    _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
-    _rn = {"asin":"ASIN","campaign_theme":"キャンペーン","cost":"広告費",
-           "sales":"売上","orders":"購入数","campaign_name":"キャンペーン名","ad_group":"広告グループ"}
-    _d = df[_dcols].rename(columns=_rn).copy()
-    if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
-    if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
-    st.dataframe(_d, use_container_width=True)
-    _csv = df[_dcols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-    st.download_button("📥 除外動画ASIN候補.csv", data=_csv, file_name="除外動画ASIN候補.csv", mime="text/csv")
-
 
 # ===================================================
 # 分析ヘルパー関数
@@ -7118,7 +7069,6 @@ _PAGE_FUNCS = {
     "📹 動画商品停止":                 page_pt_del_video_product,
     "📄 オートKW削除":               page_auto_del_kw,
     "🎯 オート商品削除":             page_auto_del_product,
-    "🎥 オート動画削除":             page_auto_del_video,
     "📥 ダウンロード":                 page_download,
     "📂 分析履歴":                     page_anls_history,
     "📖 取扱説明書":                   page_manual,
