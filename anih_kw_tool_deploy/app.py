@@ -667,9 +667,7 @@ if run:
         # 生成した同一のreg集合）・min_ord/min_clk/min_cost・PRICESは、
         # 上記キーワード追加処理と完全に同一のものをそのまま再利用している。
         _vkw_mask = (
-            dfs[cc].str.contains("SB広告", na=False)
-            & dfs[cc].str.contains("動画", na=False)
-            & dfs[cc].str.contains("KWターゲ", na=False)
+            dfs[cc].str.contains("オート|auto", case=False, na=False)
         )
         _vkw_d0 = dfs[_vkw_mask].copy()
         _vkw_n_ex = int(_vkw_d0["kn"].isin(reg).sum())
@@ -959,8 +957,7 @@ if run:
         )
         # 動画: 「商品ターゲ」含む AND「動画」含む
         _mask_v = (
-            _mpt_base[cc].str.contains("商品ターゲ", na=False) &
-            _mpt_base[cc].str.contains("動画", na=False)
+            _mpt_base[cc].str.contains("オート|auto", case=False, na=False)
         )
 
         df_pt_add_m_, df_pt_del_m_ = _build_pt_dfs(_mask_m)
