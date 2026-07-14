@@ -761,7 +761,13 @@ if run:
         # ROAS<0.8）・is_asin_kn/is_category_kn除外・集計方法は上記と完全に
         # 同一のものをそのまま再利用している。
         _vkw_del_manual_mask = _del_manual_mask
+        _sb_video_kw_mask = (
+            dfs[cc].str.contains("SB広告", na=False)
+            & dfs[cc].str.contains("動画", na=False)
+            & dfs[cc].str.contains("KWターゲ", na=False)
+        )
         _vkw_del_d0 = dfs[_vkw_del_manual_mask].copy()
+        _vkw_del_d0 = _vkw_del_d0[_sb_video_kw_mask]
         _vkw_del_d0 = _vkw_del_d0[~_vkw_del_d0["kn"].apply(
             lambda k: is_asin_kn(k) or is_category_kn(k)
         )].copy()
@@ -872,11 +878,6 @@ if run:
         # 対象マスクのみをSB広告(動画)：KWターゲ用に変更している。
         # 判定はbuild_cpc_df()（無改変・既存関数）にそのまま渡すのみで、
         # 新しい判定ロジック・新しいランク・新しい計算式は一切追加していない。
-        _sb_video_kw_mask = (
-            dfs[cc].str.contains("SB広告", na=False)
-            & dfs[cc].str.contains("動画", na=False)
-            & dfs[cc].str.contains("KWターゲ", na=False)
-        )
         _sb_video_kw_raw = dfs[_sb_video_kw_mask].copy()
         if cpc_kw_col and not _sb_video_kw_raw.empty:
             _sb_video_kw_raw["_kw_norm"] = _sb_video_kw_raw[cpc_kw_col].apply(norm)
