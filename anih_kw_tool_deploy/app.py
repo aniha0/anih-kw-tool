@@ -669,7 +669,15 @@ if run:
         _vkw_mask = (
             dfs[cc].str.contains("オート|auto", case=False, na=False)
         )
-        _vkw_d0 = dfs[_vkw_mask].copy()
+        # 動画KW追加の母集団を実際のSB広告(動画)：KWターゲキャンペーンに変更。
+        # _sb_video_kw_mask定義をここへ前方移動（条件式は無変更、後方の
+        # 動画KW停止・動画KW CPC調整からも同一の定義をそのまま再利用する）。
+        _sb_video_kw_mask = (
+            dfs[cc].str.contains("SB広告", na=False)
+            & dfs[cc].str.contains("動画", na=False)
+            & dfs[cc].str.contains("KWターゲ", na=False)
+        )
+        _vkw_d0 = dfs[_sb_video_kw_mask].copy()
         _vkw_n_ex = int(_vkw_d0["kn"].isin(reg).sum())
         _vkw_d0 = _vkw_d0[~_vkw_d0["kn"].isin(reg)]
         _vkw_n_pt = int(_vkw_d0["kn"].apply(lambda k: covered(k, reg)).sum())
@@ -721,11 +729,13 @@ if run:
 
         # ── キーワード削除用: マニュアルキャンペーンのみを母集団にして集計 ──
         # オートキャンペーンを含まない行のみ抽出（オート除外KWとは完全に別ロジック）。
-        # 動画KWターゲキャンペーン（_vkw_mask該当）は動画KW停止側の専用集計に
-        # 分離するため、ここでは母集団から除外する（停止判定式・閾値は無変更）。
+        # 動画KWターゲキャンペーン（_vkw_mask該当・_sb_video_kw_mask該当）は
+        # 動画KW停止側の専用集計に分離するため、ここでは母集団から除外する
+        # （停止判定式・閾値は無変更）。
         _del_manual_mask = (
             ~dfs[cc].str.contains("オート|auto", case=False, na=False)
             & ~_vkw_mask
+            & ~_sb_video_kw_mask
         )
         _del_d0 = dfs[_del_manual_mask].copy()
         # ── ASIN / asin: / category: を groupby前に除外（検索語のみ残す）──
@@ -756,15 +766,17 @@ if run:
 
         # ── 動画KW停止専用: 動画KWターゲキャンペーンのみを母集団にして集計 ──
         # 上記キーワード停止処理（_del_manual_mask以降）には一切手を加えていない。
-        # 母集団を_vkw_mask（動画KW追加と同一のキャンペーン抽出条件）に変更した、
-        # 動画KW停止専用の並列処理。停止判定の閾値式（cost>=price*2 かつ
-        # ROAS<0.8）・is_asin_kn/is_category_kn除外・集計方法は上記と完全に
+        # 母集団を_sb_video_kw_mask（動画KW追加と同一のキャンペーン抽出条件、
+        # 定義は前方へ移動済み）に変更した、動画KW停止専用の並列処理。
+        # 停止判定の閾値式（cost>=price*2 かつROAS<0.8）・
+        # is_asin_kn/is_category_kn除外・集計方法は上記と完全に
         # 同一のものをそのまま再利用している。
-        _vkw_del_manual_mask = _del_manual_mask
-        _sb_video_kw_mask = (
-            dfs[cc].str.contains("SB広告", na=False)
-            & dfs[cc].str.contains("動画", na=False)
-            & dfs[cc].str.contains("KWターゲ", na=False)
+        # _vkw_del_manual_maskは、_del_manual_maskへ動画KW除外条件が
+        # 追加された後も動画KW停止の母集団を変えないよう、追加前と
+        # 完全に同一の式（~オート & ~_vkw_mask）を独立して保持する。
+        _vkw_del_manual_mask = (
+            ~dfs[cc].str.contains("オート|auto", case=False, na=False)
+            & ~_vkw_mask
         )
         _vkw_del_d0 = dfs[_vkw_del_manual_mask].copy()
         _vkw_del_d0 = _vkw_del_d0[_sb_video_kw_mask]
@@ -962,13 +974,15 @@ if run:
             _mpt_base[cc].str.contains("オート|auto", case=False, na=False)
         )
 
-        df_pt_add_m_, df_pt_del_m_ = _build_pt_dfs(_mask_m)
-        df_pt_add_v_, _ = _build_pt_dfs(_mask_v)
-        # 動画商品停止の母集団: キャンペーン名で「商品ターゲ」かつ「動画」を含むものを抽出
+        # 動画商品の母集団: キャンペーン名で「商品ターゲ」かつ「動画」を含むものを抽出
+        # （_vdel_mask定義をここへ前方移動。条件式は無変更、動画商品追加・
+        # 動画商品停止・動画商品CPC調整で同一の定義をそのまま再利用する）
         _vdel_mask = (
             _mpt_base[cc].str.contains("商品ターゲ", na=False) &
             _mpt_base[cc].str.contains("動画", na=False)
         )
+        df_pt_add_m_, df_pt_del_m_ = _build_pt_dfs(_mask_m)
+        df_pt_add_v_, _ = _build_pt_dfs(_vdel_mask)
         _, df_pt_del_v_ = _build_pt_dfs(_vdel_mask)
 
         n_mpt_add = len(df_pt_add_m_) + len(df_pt_add_v_)
