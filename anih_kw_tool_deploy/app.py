@@ -964,7 +964,11 @@ if run:
 
         df_pt_add_m_, df_pt_del_m_ = _build_pt_dfs(_mask_m)
         df_pt_add_v_, _ = _build_pt_dfs(_mask_v)
-        _vdel_mask = _mask_m
+        # 動画商品停止の母集団: キャンペーン名で「商品ターゲ」かつ「動画」を含むものを抽出
+        _vdel_mask = (
+            _mpt_base[cc].str.contains("商品ターゲ", na=False) &
+            _mpt_base[cc].str.contains("動画", na=False)
+        )
         _, df_pt_del_v_ = _build_pt_dfs(_vdel_mask)
 
         n_mpt_add = len(df_pt_add_m_) + len(df_pt_add_v_)
@@ -1001,7 +1005,7 @@ if run:
             return build_cpc_df(_agg2)
 
         df_cpc_product_ = _build_pt_cpc_df(_mask_m)
-        df_cpc_video_   = _build_pt_cpc_df(_mask_v)
+        df_cpc_video_   = _build_pt_cpc_df(_vdel_mask)
 
         # ── オート除外KW用 DataFrame ───────────────────────────────
         # キーワード / 商品(ASIN) / 動画(category:) を最初から独立して生成する
