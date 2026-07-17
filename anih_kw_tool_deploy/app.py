@@ -161,8 +161,8 @@ def clear():
 # CSV / ZIP
 # ===================================================
 def bcols(df: pd.DataFrame, ex: list = []) -> list:
-    base = ["campaign_theme", "keyword", "ROAS", "sales", "cost"]
-    for c in ["orders", "CVR", "clicks"] + ex:
+    base = ["campaign_theme", "keyword", "orders", "cost", "sales", "ROAS"]
+    for c in ex:
         if c in df.columns: base.append(c)
     return [c for c in base if c in df.columns]
 
@@ -3995,7 +3995,7 @@ def page_cpc():
         df_c.index = df_c.index + 1
         df_disp = df_c[df_c["cpc_delta"] != 0].copy()
         df_disp.index = range(1, len(df_disp) + 1)
-        _disp9_cols = [c for c in ["campaign_name","keyword","ROAS","cost","sales","orders","avg_cpc","cpc_delta","cpc_rank"] if c in df_disp.columns]
+        _disp9_cols = [c for c in ["campaign_name","keyword","orders","cost","sales","ROAS","avg_cpc","cpc_delta","cpc_rank"] if c in df_disp.columns]
         _rn9 = {"campaign_name":"キャンペーン","keyword":"キーワード","cost":"広告費","sales":"売上",
                 "orders":"注文数","avg_cpc":"現在CPC","cpc_delta":"推奨調整額","cpc_rank":"ランク"}
         _d = df_disp[_disp9_cols].rename(columns=_rn9).copy()
@@ -4976,7 +4976,7 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
     # ① 一覧テーブルは変更幅≠0（CPC上げ・CPC下げ）のみ表示
     df_disp = df_c[df_c["cpc_delta"] != 0].copy()
     df_disp.index = range(1, len(df_disp) + 1)
-    _disp9_cols = [c for c in ["campaign_name", id_col, "ROAS","cost","sales","orders","avg_cpc","cpc_delta","cpc_rank"] if c in df_disp.columns]
+    _disp9_cols = [c for c in ["campaign_name", id_col, "orders","cost","sales","ROAS","avg_cpc","cpc_delta","cpc_rank"] if c in df_disp.columns]
     _rn9 = {"campaign_name":"キャンペーン", id_col:("ASIN" if id_col == "asin" else "キーワード"),
             "cost":"広告費","sales":"売上","orders":"注文数","avg_cpc":"現在CPC",
             "cpc_delta":"推奨調整額","cpc_rank":"ランク"}
@@ -5770,7 +5770,7 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key, hist_fname: 
             rs += ["商品展開候補", "予算追加候補"]
             return " / ".join(rs[:4])
         reason_col = "採用理由"
-        _disp_cols = ["campaign_name","ad_group","asin","orders","clicks","cost","sales","ROAS",reason_col]
+        _disp_cols = ["campaign_name","asin","orders","cost","sales","ROAS",reason_col]
         hdr = f"##### ✅ {camp_label}追加詳細テーブル"
     else:
         def _reason(row):
@@ -5785,7 +5785,7 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key, hist_fname: 
             rs += ["費用対効果が悪い", "利益貢献がない", "削除優先度が高い"]
             return " / ".join(rs[:4])
         reason_col = "削除理由"
-        _disp_cols = ["campaign_name","ad_group","asin","orders","clicks","cost","sales","ROAS",reason_col]
+        _disp_cols = ["campaign_name","asin","orders","cost","sales","ROAS",reason_col]
         hdr = f"##### \U0001f5d1 {camp_label}削除詳細テーブル"
 
     st.markdown(hdr)
@@ -6105,7 +6105,7 @@ def page_pt_add_video_product():
         file_name=f"動画追加_{sel}.csv", mime="text/csv", use_container_width=True)
 
     st.markdown("##### 動画詳細テーブル")
-    _dd = df_view[[c for c in ["campaign_name","ad_group","asin","orders","clicks","cost","sales","ROAS"]
+    _dd = df_view[[c for c in ["campaign_name","asin","orders","cost","sales","ROAS"]
                    if c in df_view.columns]].copy()
     _dd.index = _dd.index + 1
     _dd = _dd.rename(columns=_rn)
