@@ -1995,11 +1995,6 @@ def _anls_render_parent_kw_page() -> None:
         _disp = _pdf_kw
     st.dataframe(_disp, use_container_width=True)
 
-    _n_danger = int((_pdf["判定"] == "🟥 危険").sum())
-    _n_check = int((_pdf["判定"] == "🟨 要確認").sum())
-    _n_safe = int((_pdf["判定"] == "🟩 安全").sum())
-    st.caption(f"判定内訳： 🟥危険 {_n_danger}件 / 🟨要確認 {_n_check}件 / 🟩安全 {_n_safe}件")
-
     with st.expander("判定基準・限界について", expanded=False):
         # 【表示テキストのみの変更】従来この「限界」の一文は、Sudachiの
         # 導入有無に関わらず常に同じ固定文言を表示していたため、Sudachiが
