@@ -43,10 +43,10 @@ PRICES = {
 }
 
 RENAME = {
-    "campaign_theme": "キャンペーン名", "keyword": "検索語句",
+    "campaign_theme": "キャンペーン", "ad_group": "広告グループ", "keyword": "キーワード",
     "ROAS": "ROAS", "sales": "売上",
     "cost": "広告費", "orders": "注文数",
-    "CVR": "CVR", "clicks": "クリック数", "impressions": "インプレ",
+    "CVR": "CVR", "clicks": "クリック", "impressions": "インプレッション",
 }
 
 # ===================================================
@@ -161,7 +161,8 @@ def clear():
 # CSV / ZIP
 # ===================================================
 def bcols(df: pd.DataFrame, ex: list = []) -> list:
-    base = ["campaign_theme", "keyword", "orders", "cost", "sales", "ROAS"]
+    base = ["campaign_theme", "ad_group", "keyword", "impressions", "clicks",
+            "cost", "sales", "orders", "ROAS", "CVR"]
     for c in ex:
         if c in df.columns: base.append(c)
     return [c for c in base if c in df.columns]
@@ -628,6 +629,7 @@ if run:
         if od:  agg_d["orders"]      = (od,  "sum")
         if clk: agg_d["clicks"]      = (clk, "sum")
         if imp: agg_d["impressions"] = (imp, "sum")
+        if agn: agg_d["ad_group"]    = (agn, "first")
         agg = d0.groupby("kn").agg(**agg_d).reset_index(drop=True)
         agg["ROAS"] = agg.apply(
             lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
@@ -698,6 +700,7 @@ if run:
         if od:  _vkw_agg_d["orders"]      = (od,  "sum")
         if clk: _vkw_agg_d["clicks"]      = (clk, "sum")
         if imp: _vkw_agg_d["impressions"] = (imp, "sum")
+        if agn: _vkw_agg_d["ad_group"]    = (agn, "first")
         _vkw_agg = _vkw_d0.groupby("kn").agg(**_vkw_agg_d).reset_index(drop=True)
         _vkw_agg["ROAS"] = _vkw_agg.apply(
             lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
@@ -750,6 +753,7 @@ if run:
         if od:  _del_agg_d["orders"]      = (od,  "sum")
         if clk: _del_agg_d["clicks"]      = (clk, "sum")
         if imp: _del_agg_d["impressions"] = (imp, "sum")
+        if agn: _del_agg_d["ad_group"]    = (agn, "first")
         _del_agg = _del_d0.groupby("kn").agg(**_del_agg_d).reset_index(drop=True)
         _del_agg["ROAS"] = _del_agg.apply(
             lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
@@ -791,6 +795,7 @@ if run:
         if od:  _vkw_del_agg_d["orders"]      = (od,  "sum")
         if clk: _vkw_del_agg_d["clicks"]      = (clk, "sum")
         if imp: _vkw_del_agg_d["impressions"] = (imp, "sum")
+        if agn: _vkw_del_agg_d["ad_group"]    = (agn, "first")
         _vkw_del_agg = _vkw_del_d0.groupby("kn").agg(**_vkw_del_agg_d).reset_index(drop=True)
         _vkw_del_agg["ROAS"] = _vkw_del_agg.apply(
             lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
@@ -869,10 +874,14 @@ if run:
             }
             if od:  _agg_cpc_d["orders"] = (od, "sum")
             if clk: _agg_cpc_d["clicks"] = (clk, "sum")
+            if imp: _agg_cpc_d["impressions"] = (imp, "sum")
             if agn: _agg_cpc_d["ad_group"] = (agn, "first")
             _agg_cpc = _cpc_raw.groupby(["ct", "_kw_norm"]).agg(**_agg_cpc_d).reset_index(drop=True)
             _agg_cpc["ROAS"] = _agg_cpc.apply(
                 lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+            if "clicks" in _agg_cpc.columns and "orders" in _agg_cpc.columns:
+                _agg_cpc["CVR"] = _agg_cpc.apply(
+                    lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0, axis=1)
             _agg_cpc["price"] = _agg_cpc["campaign_theme"].map(PRICES)
             _agg_cpc = _agg_cpc[_agg_cpc["price"].notna()].copy()
             df_cpc_ = build_cpc_df(_agg_cpc)
@@ -901,10 +910,14 @@ if run:
             }
             if od:  _agg_sb_video_kw_d["orders"] = (od, "sum")
             if clk: _agg_sb_video_kw_d["clicks"] = (clk, "sum")
+            if imp: _agg_sb_video_kw_d["impressions"] = (imp, "sum")
             if agn: _agg_sb_video_kw_d["ad_group"] = (agn, "first")
             _agg_sb_video_kw = _sb_video_kw_raw.groupby(["ct", "_kw_norm"]).agg(**_agg_sb_video_kw_d).reset_index(drop=True)
             _agg_sb_video_kw["ROAS"] = _agg_sb_video_kw.apply(
                 lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+            if "clicks" in _agg_sb_video_kw.columns and "orders" in _agg_sb_video_kw.columns:
+                _agg_sb_video_kw["CVR"] = _agg_sb_video_kw.apply(
+                    lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0, axis=1)
             _agg_sb_video_kw["price"] = _agg_sb_video_kw["campaign_theme"].map(PRICES)
             _agg_sb_video_kw = _agg_sb_video_kw[_agg_sb_video_kw["price"].notna()].copy()
             df_cpc_video_kw_ = build_cpc_df(_agg_sb_video_kw)
@@ -938,10 +951,14 @@ if run:
             }
             if od:  _agg_d["orders"]   = (od,  "sum")
             if clk: _agg_d["clicks"]   = (clk, "sum")
+            if imp: _agg_d["impressions"] = (imp, "sum")
             if agn: _agg_d["ad_group"] = (agn, "first")
             _agg = _d.groupby("_asin_key").agg(**_agg_d).reset_index(drop=True)
             _agg["ROAS"]  = _agg.apply(
                 lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+            if "clicks" in _agg.columns and "orders" in _agg.columns:
+                _agg["CVR"] = _agg.apply(
+                    lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0, axis=1)
             _agg["price"] = _agg["campaign_theme"].map(PRICES)
             _agg = _agg[_agg["price"].notna()].copy()
             # 追加: 信頼度フィルター + 条件
@@ -1009,10 +1026,14 @@ if run:
             }
             if od:  _agg_d2["orders"]   = (od,  "sum")
             if clk: _agg_d2["clicks"]   = (clk, "sum")
+            if imp: _agg_d2["impressions"] = (imp, "sum")
             if agn: _agg_d2["ad_group"] = (agn, "first")
             _agg2 = _d.groupby("_asin_key").agg(**_agg_d2).reset_index(drop=True)
             _agg2["ROAS"]  = _agg2.apply(
                 lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+            if "clicks" in _agg2.columns and "orders" in _agg2.columns:
+                _agg2["CVR"] = _agg2.apply(
+                    lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0, axis=1)
             _agg2["price"] = _agg2["campaign_theme"].map(PRICES)
             _agg2 = _agg2[_agg2["price"].notna()].copy()
             return build_cpc_df(_agg2)
@@ -1049,6 +1070,8 @@ if run:
                     "cost":           (oc_,  "sum"),
                 }
                 if od:  _d["orders"]   = (od,  "sum")
+                if clk: _d["clicks"]   = (clk, "sum")
+                if imp: _d["impressions"] = (imp, "sum")
                 if agn: _d["ad_group"] = (agn, "first")
                 return _d
 
@@ -1060,12 +1083,17 @@ if run:
                     "cost":           (oc_,  "sum"),
                 }
                 if od:  _d["orders"]   = (od,  "sum")
+                if clk: _d["clicks"]   = (clk, "sum")
+                if imp: _d["impressions"] = (imp, "sum")
                 if agn: _d["ad_group"] = (agn, "first")
                 return _d
 
             def _apply_del_filter(df_agg):
                 df_agg["ROAS"]  = df_agg.apply(
                     lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+                if "clicks" in df_agg.columns and "orders" in df_agg.columns:
+                    df_agg["CVR"] = df_agg.apply(
+                        lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0, axis=1)
                 df_agg["price"] = df_agg["campaign_theme"].map(PRICES)
                 df_agg = df_agg[df_agg["price"].notna()].copy()
                 result = df_agg[
@@ -1167,11 +1195,16 @@ if run:
                 "cost":           (oc_,            "sum"),
             }
             if od:  _agg_d3["orders"]   = (od,  "sum")
+            if clk: _agg_d3["clicks"]   = (clk, "sum")
+            if imp: _agg_d3["impressions"] = (imp, "sum")
             if agn: _agg_d3["ad_group"] = (agn, "first")
             _agg3 = _d.groupby("_asin_key").agg(**_agg_d3).reset_index(drop=True)
             _c3 = len(_agg3)                                                       # ③ groupby後ASIN数
             _agg3["ROAS"]  = _agg3.apply(
                 lambda r: round(r["sales"] / r["cost"], 2) if r["cost"] > 0 else 0.0, axis=1)
+            if "clicks" in _agg3.columns and "orders" in _agg3.columns:
+                _agg3["CVR"] = _agg3.apply(
+                    lambda r: round(r["orders"] / r["clicks"] * 100, 1) if r["clicks"] > 0 else 0.0, axis=1)
             _agg3["price"] = _agg3["campaign_theme"].map(PRICES)
             _agg3 = _agg3[_agg3["price"].notna()].copy()
             _c4 = len(_agg3)                                                       # ④ price取得成功数
@@ -1549,14 +1582,18 @@ def _render_del_kw_block(df, badge_label, list_label, table_label,
         st.markdown(f"**📋 {list_label}**（右上のコピーボタンでコピー）")
         st.code(kw_list, language=None)
         st.markdown(f"##### {table_label}")
-        _disp = [c for c in ["keyword", "campaign_theme", "ROAS", "cost", "sales"]
+        _rn_unified = {"campaign_theme":"キャンペーン","ad_group":"広告グループ","keyword":"キーワード",
+                       "impressions":"インプレッション","clicks":"クリック",
+                       "cost":"広告費","sales":"売上","orders":"注文数","CVR":"CVR"}
+        _disp = [c for c in ["campaign_theme","ad_group","keyword","impressions","clicks","cost","sales","orders","ROAS","CVR"]
                  if c in _sec.columns]
         _dd = _sec[_disp].copy().sort_values("ROAS", ascending=True).reset_index(drop=True)
         _dd.index = _dd.index + 1
-        _dd = _dd.rename(columns=_rn)
+        _dd = _dd.rename(columns=_rn_unified)
         if "広告費" in _dd.columns: _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
         if "売上"   in _dd.columns: _dd["売上"]   = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
         if "ROAS"   in _dd.columns: _dd["ROAS"]   = _dd["ROAS"].round(2)
+        if "CVR"    in _dd.columns: _dd["CVR"]    = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
         st.dataframe(_dd, use_container_width=True)
         if csv_fname and dl_key:
             _rn_csv = {**_rn, "orders": "購入数", "ad_group": "広告グループ"}
@@ -2028,10 +2065,15 @@ def page_auto_del_product():
     _dcols = [c for c in ["asin","campaign_theme","cost","ROAS","sales","orders","campaign_name","ad_group"] if c in df.columns]
     _rn = {"asin":"ASIN","campaign_theme":"キャンペーン","cost":"広告費",
            "sales":"売上","orders":"購入数","campaign_name":"キャンペーン名","ad_group":"広告グループ"}
-    _d = df[_dcols].rename(columns=_rn).copy()
+    _rn_unified = {"campaign_theme":"キャンペーン","ad_group":"広告グループ","asin":"ASIN",
+                   "impressions":"インプレッション","clicks":"クリック",
+                   "cost":"広告費","sales":"売上","orders":"注文数","CVR":"CVR"}
+    _unified_cols = [c for c in ["campaign_theme","ad_group","asin","impressions","clicks","cost","sales","orders","ROAS","CVR"] if c in df.columns]
+    _d = df[_unified_cols].rename(columns=_rn_unified).copy()
     if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
     if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
     if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].round(2)
+    if "CVR"    in _d.columns: _d["CVR"]    = _d["CVR"].apply(lambda x: f"{x:.1f}%")
     st.dataframe(_d, use_container_width=True)
     _csv = df[_dcols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
     st.download_button("📥 除外商品ASIN候補.csv", data=_csv, file_name="除外商品ASIN候補.csv", mime="text/csv")
@@ -3995,15 +4037,15 @@ def page_cpc():
         df_c.index = df_c.index + 1
         df_disp = df_c[df_c["cpc_delta"] != 0].copy()
         df_disp.index = range(1, len(df_disp) + 1)
-        _disp9_cols = [c for c in ["campaign_name","keyword","orders","cost","sales","ROAS","avg_cpc","cpc_delta","cpc_rank"] if c in df_disp.columns]
-        _rn9 = {"campaign_name":"キャンペーン","keyword":"キーワード","cost":"広告費","sales":"売上",
-                "orders":"注文数","avg_cpc":"現在CPC","cpc_delta":"推奨調整額","cpc_rank":"ランク"}
+        _disp9_cols = [c for c in ["campaign_theme","ad_group","keyword","impressions","clicks","cost","sales","orders","ROAS","CVR"] if c in df_disp.columns]
+        _rn9 = {"campaign_theme":"キャンペーン","ad_group":"広告グループ","keyword":"キーワード",
+                "impressions":"インプレッション","clicks":"クリック","cost":"広告費","sales":"売上",
+                "orders":"注文数","ROAS":"ROAS","CVR":"CVR"}
         _d = df_disp[_disp9_cols].rename(columns=_rn9).copy()
         if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
         if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
         if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].apply(lambda x: f"{x:.2f}")
-        if "推奨調整額" in _d.columns: _d["推奨調整額"] = _d["推奨調整額"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
-        if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
+        if "CVR"    in _d.columns: _d["CVR"]    = _d["CVR"].apply(lambda x: f"{x:.1f}%")
         # ③ KW一覧（実行対象抽出のみ）。表示条件は以下2つを厳密AND評価する：
         # ①cpc_delta が数値としてnon-zero（NaN/文字列は数値0として扱い除外）
         # ②cpc_rank が判定保留・未確定・空ではない（確定済み状態のみ許可）
@@ -4976,16 +5018,15 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
     # ① 一覧テーブルは変更幅≠0（CPC上げ・CPC下げ）のみ表示
     df_disp = df_c[df_c["cpc_delta"] != 0].copy()
     df_disp.index = range(1, len(df_disp) + 1)
-    _disp9_cols = [c for c in ["campaign_name", id_col, "orders","cost","sales","ROAS","avg_cpc","cpc_delta","cpc_rank"] if c in df_disp.columns]
-    _rn9 = {"campaign_name":"キャンペーン", id_col:("ASIN" if id_col == "asin" else "キーワード"),
-            "cost":"広告費","sales":"売上","orders":"注文数","avg_cpc":"現在CPC",
-            "cpc_delta":"推奨調整額","cpc_rank":"ランク"}
+    _disp9_cols = [c for c in ["campaign_theme","ad_group", id_col, "impressions","clicks","cost","sales","orders","ROAS","CVR"] if c in df_disp.columns]
+    _rn9 = {"campaign_theme":"キャンペーン","ad_group":"広告グループ", id_col:("ASIN" if id_col == "asin" else "キーワード"),
+            "impressions":"インプレッション","clicks":"クリック",
+            "cost":"広告費","sales":"売上","orders":"注文数","ROAS":"ROAS","CVR":"CVR"}
     _d = df_disp[_disp9_cols].rename(columns=_rn9).copy()
     if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
     if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
     if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].apply(lambda x: f"{x:.2f}")
-    if "推奨調整額" in _d.columns: _d["推奨調整額"] = _d["推奨調整額"].apply(lambda x: f"+{x}円" if x > 0 else f"{x}円" if x < 0 else "±0円")
-    if "現在CPC" in _d.columns: _d["現在CPC"] = _d["現在CPC"].apply(lambda x: f"¥{x:,.0f}" if x else "—")
+    if "CVR"    in _d.columns: _d["CVR"]    = _d["CVR"].apply(lambda x: f"{x:.1f}%")
     def _cr(row):
         c = _RC.get(row.get("ランク", ""), "")
         return [f"color:{c};font-weight:700" if col == "ランク" else "" for col in row.index]
@@ -5792,14 +5833,15 @@ def _render_pt_page(session_key, is_add, camp_label, selectbox_key, hist_fname: 
     _df = df_view.copy()
     _df[reason_col] = _df.apply(_reason, axis=1)
     _disp = [c for c in _disp_cols if c in _df.columns or c == reason_col]
-    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","asin":"ASIN",
-           "clicks":"クリック数","orders":"注文数","cost":"広告費","sales":"売上"}
-    _show_cols = [c for c in _disp if c in _df.columns and not ("_m_" in selectbox_key and c == reason_col)]
-    _show = _df[_show_cols].rename(columns=_rn).copy()
+    _rn = {"campaign_name":"キャンペーン名","campaign_theme":"キャンペーン","ad_group":"広告グループ","asin":"ASIN",
+           "impressions":"インプレッション","clicks":"クリック","orders":"注文数","cost":"広告費","sales":"売上","CVR":"CVR"}
+    _unified_cols = [c for c in ["campaign_theme","ad_group","asin","impressions","clicks","cost","sales","orders","ROAS","CVR"] if c in _df.columns]
+    _show = _df[_unified_cols].rename(columns=_rn).copy()
     _show.index = _show.index + 1
     if "広告費" in _show.columns: _show["広告費"] = _show["広告費"].apply(lambda x: f"¥{x:,.0f}")
     if "売上"   in _show.columns: _show["売上"]   = _show["売上"].apply(lambda x: f"¥{x:,.0f}")
     if "ROAS"   in _show.columns: _show["ROAS"]   = _show["ROAS"].round(2)
+    if "CVR"    in _show.columns: _show["CVR"]    = _show["CVR"].apply(lambda x: f"{x:.1f}%")
     st.dataframe(_show, use_container_width=True)
 
     # ⑥ CSV
@@ -6105,13 +6147,17 @@ def page_pt_add_video_product():
         file_name=f"動画追加_{sel}.csv", mime="text/csv", use_container_width=True)
 
     st.markdown("##### 動画詳細テーブル")
-    _dd = df_view[[c for c in ["campaign_name","asin","orders","cost","sales","ROAS"]
+    _rn_unified = {"campaign_theme":"キャンペーン","ad_group":"広告グループ","asin":"ASIN",
+                   "impressions":"インプレッション","clicks":"クリック",
+                   "orders":"注文数","cost":"広告費","sales":"売上","CVR":"CVR"}
+    _dd = df_view[[c for c in ["campaign_theme","ad_group","asin","impressions","clicks","cost","sales","orders","ROAS","CVR"]
                    if c in df_view.columns]].copy()
     _dd.index = _dd.index + 1
-    _dd = _dd.rename(columns=_rn)
+    _dd = _dd.rename(columns=_rn_unified)
     if "広告費" in _dd.columns: _dd["広告費"] = _dd["広告費"].apply(lambda x: f"¥{x:,.0f}")
     if "売上"   in _dd.columns: _dd["売上"]   = _dd["売上"].apply(lambda x: f"¥{x:,.0f}")
     if "ROAS"   in _dd.columns: _dd["ROAS"]   = _dd["ROAS"].round(2)
+    if "CVR"    in _dd.columns: _dd["CVR"]    = _dd["CVR"].apply(lambda x: f"{x:.1f}%")
     st.dataframe(_dd, use_container_width=True)
 
     # ── 分析入口の表示導線（既存関数の呼び出しのみ。内部は無改変）──
