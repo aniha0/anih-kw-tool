@@ -2948,8 +2948,8 @@ def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = "")
         # ── 4週間比較保存履歴の識別表示のみ追加（保存処理・保存データ・
         # 既存カード構造には一切触れない。対象typeの時だけheader文字列の
         # 先頭に短いラベルを付けるだけ）──────────────────────────
-        _4wk_types = ("キーワードCPC分析（4週間比較）", "商品CPC分析（4週間比較）", "動画CPC分析（4週間比較）")
-        _4wk_mark = "📌 4週間比較保存　" if rtype in _4wk_types else ""
+        _4wk_types = ("キーワードCPC分析（4週間比較）", "商品CPC分析（4週間比較）", "動画CPC分析（4週間比較）", "キーワードCPC分析（比較）", "商品CPC分析（比較）", "動画CPC分析（比較）")
+        _4wk_mark = "📌 比較保存　" if rtype in _4wk_types else ""
         # ── 4週間比較保存履歴のみ、タイトルに対象名(keyword/ASIN)を追加する。
         # 既存recordのdetail[0].keywordをそのまま読むだけで、保存recordへの
         # 項目追加・新しい関数追加は一切行わない。4週間比較以外のtypeの
@@ -2986,7 +2986,7 @@ def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = "")
                 _tgt_name = _d0.get("keyword", "―")
                 _b4 = _d0.get("before", {}) or {}
                 _a4 = _d0.get("after", {}) or {}
-                st.markdown("📌 4週間比較保存")
+                st.markdown("📌 比較保存")
                 st.markdown(f"保存日：{saved_at}")
                 st.markdown(f"対象：{_tgt_name}")
                 _wk_data = rec.get("weekly_data") or []
@@ -2994,7 +2994,7 @@ def _anls_render_saved_report(recs: list, label: str, anls_hist_fname: str = "")
                     # ── weekly_dataがある場合は週別4行表示（週|広告費|売上|
                     # 注文数|ROAS）。既存recordのweekly_dataをそのまま読む
                     # だけで、新しい計算処理・新しい関数は一切追加しない。
-                    st.markdown("**4週間比較結果**")
+                    st.markdown("**比較結果**")
                     _tbl4wk = pd.DataFrame(
                         [
                             [
@@ -4231,9 +4231,13 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
         st.info("表示対象のキーワードがありません。")
         return
 
-    _bucket_held = st.session_state.get("csv_bucket_7d", {})
+    _cmp_period_sel = st.radio("比較期間", ["7日", "30日"], index=0, key="_anls_cmp_period_kw", horizontal=True)
+    _cmp_bucket_key = "csv_bucket_7d" if _cmp_period_sel == "7日" else "csv_bucket_30d"
+    _cmp_days = 7 if _cmp_period_sel == "7日" else 30
+
+    _bucket_held = st.session_state.get(_cmp_bucket_key, {})
     if not _bucket_held:
-        st.caption("📅 7日比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると4週間比較が表示されます。")
+        st.caption(f"📅 {_cmp_period_sel}比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると比較が表示されます。")
         return
 
     def _target_key_fn(cn, ag, kw):
@@ -4270,7 +4274,7 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
                 _ends = pd.to_datetime(_parts[1], format="%Y/%m/%d", errors="coerce") if _parts.shape[1] > 1 else _starts
                 if _starts.notna().any() and _ends.notna().any():
                     _s_min, _e_max = _starts.min(), _ends.max()
-                    _period_str = f"{_s_min.month}/{_s_min.day}〜{_e_max.month}/{_e_max.day}"
+                    _period_str = f"{_s_min.year}/{_s_min.month}/{_s_min.day}〜{_e_max.year}/{_e_max.month}/{_e_max.day}"
                     _period_end = _e_max
             except Exception:
                 _period_str = None
@@ -4383,7 +4387,7 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
     # (anls_cpc_kw_top30.json)のJSONには一切触れない。
     _sel_cname, _sel_kw = _tab_targets[_sel_idx]
     _weekly_valid = [w for w in _weekly if w]
-    if st.button("💾 4週間比較を保存", key="_anls_4wk_kw_save"):
+    if st.button("💾 比較を保存", key="_anls_4wk_kw_save"):
         if not _weekly_valid:
             st.warning("保存できる週次データがありません。")
         else:
@@ -4402,8 +4406,8 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
             _recs.append({
                 "id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
                 "saved_at": _anls_dt.date.today().isoformat(),
-                "type": "キーワードCPC分析（4週間比較）",
-                "period_days": len(_weekly_valid) * 7,
+                "type": "キーワードCPC分析（比較）",
+                "period_days": len(_weekly_valid) * _cmp_days,
                 "n_before": 1, "n_matched": 1, "n_kaizen": 0, "n_akka": 0, "n_henko": 1,
                 "rate": 0.0, "camps": [_sel_cname] if _sel_cname else [],
                 "period": None, "detail": _detail,
@@ -4419,7 +4423,7 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
                 ],
             })
             _anls_save(_kw4wk_fname, _recs)
-            st.success("✅ 4週間比較を保存しました。")
+            st.success("✅ 比較を保存しました。")
 
 
 def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
@@ -4460,9 +4464,13 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
         st.info("表示対象の商品がありません。")
         return
 
-    _bucket_held = st.session_state.get("csv_bucket_7d", {})
+    _cmp_period_sel = st.radio("比較期間", ["7日", "30日"], index=0, key="_anls_cmp_period_pt_m", horizontal=True)
+    _cmp_bucket_key = "csv_bucket_7d" if _cmp_period_sel == "7日" else "csv_bucket_30d"
+    _cmp_days = 7 if _cmp_period_sel == "7日" else 30
+
+    _bucket_held = st.session_state.get(_cmp_bucket_key, {})
     if not _bucket_held:
-        st.caption("📅 7日比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると4週間比較が表示されます。")
+        st.caption(f"📅 {_cmp_period_sel}比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると比較が表示されます。")
         return
 
     def _target_key_fn(cn, ag, asin):
@@ -4497,7 +4505,7 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
                 _ends = pd.to_datetime(_parts[1], format="%Y/%m/%d", errors="coerce") if _parts.shape[1] > 1 else _starts
                 if _starts.notna().any() and _ends.notna().any():
                     _s_min, _e_max = _starts.min(), _ends.max()
-                    _period_str = f"{_s_min.month}/{_s_min.day}〜{_e_max.month}/{_e_max.day}"
+                    _period_str = f"{_s_min.year}/{_s_min.month}/{_s_min.day}〜{_e_max.year}/{_e_max.month}/{_e_max.day}"
                     _period_end = _e_max
             except Exception:
                 _period_str = None
@@ -4601,7 +4609,7 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
     # 無題ブロック用JSON)を再利用し、新規JSONファイルは作成しない。
     _sel_cname, _sel_asin = _tab_targets[_sel_idx]
     _weekly_valid = [w for w in _weekly if w]
-    if st.button("💾 4週間比較を保存", key="_anls_4wk_pt_m_save"):
+    if st.button("💾 比較を保存", key="_anls_4wk_pt_m_save"):
         if not _weekly_valid:
             st.warning("保存できる週次データがありません。")
         else:
@@ -4620,8 +4628,8 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
             _recs.append({
                 "id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
                 "saved_at": _anls_dt.date.today().isoformat(),
-                "type": "商品CPC分析（4週間比較）",
-                "period_days": len(_weekly_valid) * 7,
+                "type": "商品CPC分析（比較）",
+                "period_days": len(_weekly_valid) * _cmp_days,
                 "n_before": 1, "n_matched": 1, "n_kaizen": 0, "n_akka": 0, "n_henko": 1,
                 "rate": 0.0, "camps": [_sel_cname] if _sel_cname else [],
                 "period": None, "detail": _detail,
@@ -4637,7 +4645,7 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
                 ],
             })
             _anls_save(_pt_m_4wk_fname, _recs)
-            st.success("✅ 4週間比較を保存しました。")
+            st.success("✅ 比較を保存しました。")
 
 def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
     """動画CPC調整ページ(page_cpc_videoのtab2)用の関数（表示専用）。
@@ -4662,9 +4670,13 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
         st.info("表示対象の動画がありません。")
         return
 
-    _bucket_held = st.session_state.get("csv_bucket_7d", {})
+    _cmp_period_sel = st.radio("比較期間", ["7日", "30日"], index=0, key="_anls_cmp_period_pt_v", horizontal=True)
+    _cmp_bucket_key = "csv_bucket_7d" if _cmp_period_sel == "7日" else "csv_bucket_30d"
+    _cmp_days = 7 if _cmp_period_sel == "7日" else 30
+
+    _bucket_held = st.session_state.get(_cmp_bucket_key, {})
     if not _bucket_held:
-        st.caption("📅 7日比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると4週間比較が表示されます。")
+        st.caption(f"📅 {_cmp_period_sel}比較CSVバケットにCSVがアップロードされていません。画面上部からアップロードすると比較が表示されます。")
         return
 
     def _target_key_fn(cn, ag, asin):
@@ -4699,7 +4711,7 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
                 _ends = pd.to_datetime(_parts[1], format="%Y/%m/%d", errors="coerce") if _parts.shape[1] > 1 else _starts
                 if _starts.notna().any() and _ends.notna().any():
                     _s_min, _e_max = _starts.min(), _ends.max()
-                    _period_str = f"{_s_min.month}/{_s_min.day}〜{_e_max.month}/{_e_max.day}"
+                    _period_str = f"{_s_min.year}/{_s_min.month}/{_s_min.day}〜{_e_max.year}/{_e_max.month}/{_e_max.day}"
                     _period_end = _e_max
             except Exception:
                 _period_str = None
@@ -4803,7 +4815,7 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
     # 無題ブロック用JSON)を再利用し、新規JSONファイルは作成しない。
     _sel_cname, _sel_asin = _tab_targets[_sel_idx]
     _weekly_valid = [w for w in _weekly if w]
-    if st.button("💾 4週間比較を保存", key="_anls_4wk_pt_v_save"):
+    if st.button("💾 比較を保存", key="_anls_4wk_pt_v_save"):
         if not _weekly_valid:
             st.warning("保存できる週次データがありません。")
         else:
@@ -4822,8 +4834,8 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
             _recs.append({
                 "id": _anls_dt.datetime.now().strftime("%Y%m%d_%H%M%S"),
                 "saved_at": _anls_dt.date.today().isoformat(),
-                "type": "動画CPC分析（4週間比較）",
-                "period_days": len(_weekly_valid) * 7,
+                "type": "動画CPC分析（比較）",
+                "period_days": len(_weekly_valid) * _cmp_days,
                 "n_before": 1, "n_matched": 1, "n_kaizen": 0, "n_akka": 0, "n_henko": 1,
                 "rate": 0.0, "camps": [_sel_cname] if _sel_cname else [],
                 "period": None, "detail": _detail,
@@ -4839,7 +4851,7 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
                 ],
             })
             _anls_save(_pt_v_4wk_fname, _recs)
-            st.success("✅ 4週間比較を保存しました。")
+            st.success("✅ 比較を保存しました。")
 
 def _anls_entry_point(dc_cpc):
     """page_cpc の「分析」タブ(tab2)のロジックを分離した専用エントリ関数。
