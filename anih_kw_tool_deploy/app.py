@@ -1742,23 +1742,47 @@ def _pkw_normalize_token(_tok):
     return _PKW_NORMALIZE_MAP.get(_tok, _tok)
 
 
+# 親KW候補生成専用：品詞の細分類（part_of_speech()の2番目の要素）による
+# 追加ノイズ除去に使う除外リスト。「名詞」大分類の中でも、数詞（例:
+# 「100」「2」等の数字トークン）や非自立可能名詞（例:「こと」「もの」等、
+# 単独では具体的意味を持たない補助的な名詞）は、親KW候補としてグルーピング
+# する上で意味のある単位にならないため除外する。既存の大分類フィルタ
+# （_pos0 != "名詞"）に追加するだけの拡張であり、大分類フィルタ自体は
+# 変更しない。値が一致しない（未知の細分類・取得できない等）場合は
+# 何もフィルタしない（安全側＝除外しない）。
+_PKW_EXCLUDED_POS_SUB = {"数詞", "非自立可能"}
+
+
 def _pkw_extract_parent_kw_tokens_normalized(_term, _fallback_tokenize):
     """親KW候補生成専用のトークン抽出（表記正規化・不要語除外強化版、
     親KW分析専用の新規追加関数）。
 
     既存の _pkw_get_sudachi_tokenizer（既存ヘルパー・無改修）を再利用し、
-    Sudachi形態素解析（既存の名詞抽出方針を維持）→ 表記正規化
-    （_pkw_normalize_token）→ 不要語除外（_PKW_PARENT_STOPWORDS。今回の
+    Sudachi形態素解析（既存の名詞抽出方針を維持）→ 品詞細分類による
+    追加ノイズ除去（_PKW_EXCLUDED_POS_SUB。数詞・非自立可能名詞を除外）
+    → 表記正規化（Sudachiのnormalized_form()を優先し、取得できない場合は
+    surface()にフォールバック。その後さらに _pkw_normalize_token による
+    独自の表記ゆれ辞書を適用）→ 不要語除外（_PKW_PARENT_STOPWORDS。今回の
     拡張分を含む）→ の順で親KW候補用トークンを生成する。既存の
     _pkw_extract_parent_kw_tokens・_pkw_tokenize_smart・_pkw_tokenize
     （いずれも既存の親KW分析専用関数・自作の簡易分かち書き本体）には
     一切手を加えていない。
 
-    Sudachiが利用できない場合、正規化・不要語除外は一切行わず、既存の
-    _fallback_tokenize（= 既存の _pkw_tokenize）の結果をそのまま返す
-    （既存動作を完全維持）。フィルタ後に1トークンも残らなかった場合や、
-    解析中に例外が発生した場合も、同様に _fallback_tokenize の結果へ
-    フォールバックする。
+    【normalized_form()について】Sudachiの形態素は surface()（入力文中の
+    そのままの表記）と normalized_form()（辞書上の正規化表記。ひらがな・
+    カタカナの表記ゆれや異体字等を辞書ベースで自動的に統一したもの）の
+    両方を持つ。従来は surface() のみを使い、表記ゆれの吸収は
+    _PKW_NORMALIZE_MAP（手動登録・3件のみ）に依存していたため、辞書に
+    無い組み合わせの表記ゆれは吸収できなかった。normalized_form() を
+    先に適用することで、Sudachi辞書がカバーする表記ゆれ（手動登録して
+    いないものを含む）を自動的に吸収できるようにする。normalized_form()
+    が空文字・取得不可の場合は既存通り surface() にフォールバックする。
+
+    Sudachiが利用できない場合、品詞細分類フィルタ・表記正規化・不要語
+    除外は一切行わず、既存の _fallback_tokenize（= 既存の _pkw_tokenize）
+    の結果をそのまま返す（既存動作を完全維持）。フィルタ後に1トークンも
+    残らなかった場合や、解析中に例外が発生した場合も、同様に
+    _fallback_tokenize の結果へフォールバックする。
     """
     _tokenizer = _pkw_get_sudachi_tokenizer()
     if _tokenizer is None:
@@ -1779,7 +1803,14 @@ def _pkw_extract_parent_kw_tokens_normalized(_term, _fallback_tokenize):
             _pos0 = _pos[0] if _pos else ""
             if _pos0 != "名詞":
                 continue
-            _normalized = _pkw_normalize_token(_surface)
+            _pos1 = _pos[1] if _pos and len(_pos) > 1 else ""
+            if _pos1 in _PKW_EXCLUDED_POS_SUB:
+                continue
+            try:
+                _base = _m.normalized_form() or _surface
+            except Exception:
+                _base = _surface
+            _normalized = _pkw_normalize_token(_base)
             if _normalized in _PKW_PARENT_STOPWORDS:
                 continue
             _toks.append(_normalized)
@@ -1970,14 +2001,31 @@ def _anls_render_parent_kw_page() -> None:
     st.caption(f"判定内訳： 🟥危険 {_n_danger}件 / 🟨要確認 {_n_check}件 / 🟩安全 {_n_safe}件")
 
     with st.expander("判定基準・限界について", expanded=False):
+        # 【表示テキストのみの変更】従来この「限界」の一文は、Sudachiの
+        # 導入有無に関わらず常に同じ固定文言を表示していたため、Sudachiが
+        # 実際に稼働している環境では実態と異なる内容になっていた。ここでは
+        # 既存の _pkw_get_sudachi_tokenizer()（無改修・既存ヘルパー）を
+        # 呼び出して現在の稼働状況を判定し、表示文言のみを実態に合わせて
+        # 出し分ける。判定ロジック・スコアリング・グルーピング処理・
+        # 分かち書き処理そのものには一切手を加えていない。
+        if _pkw_get_sudachi_tokenizer() is not None:
+            _limit_text = (
+                "限界：形態素解析器「Sudachi」による分割を使用しています。"
+                "辞書に登録されていない造語・独自の商品名表記などは、"
+                "意図通りに分割されない場合があります。"
+            )
+        else:
+            _limit_text = (
+                "限界：形態素解析器（Sudachi等）が現在利用できない環境のため、"
+                "独自の簡易分かち書き（語彙辞書＋最長一致）で代替しており、"
+                "分割精度は本格的な形態素解析に劣ります。"
+            )
         st.text(
             "安全：親KWの兄弟検索語に実売(売上>0)のある語が1件もない\n"
             "要確認：実売のある兄弟語はあるが件数・売上比率とも小さい\n"
             "危険：実売のある兄弟語が複数、または売上構成比20%以上"
             "（親KW単位の除外で巻き添えが大きい）\n\n"
-            "限界：形態素解析器（MeCab/Janome等）が利用できない環境のため、"
-            "独自の簡易分かち書き（語彙辞書＋最長一致）で代替しており、"
-            "分割精度は本格的な形態素解析に劣ります。"
+            f"{_limit_text}"
         )
 
 
