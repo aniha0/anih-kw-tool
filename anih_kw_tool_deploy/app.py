@@ -4380,15 +4380,16 @@ def page_cpc():
         df_c.index = df_c.index + 1
         df_disp = df_c[df_c["cpc_delta"] != 0].copy()
         df_disp.index = range(1, len(df_disp) + 1)
-        _disp9_cols = [c for c in ["campaign_theme","ad_group","keyword","impressions","clicks","cost","sales","orders","ROAS","CVR"] if c in df_disp.columns]
+        _disp9_cols = [c for c in ["campaign_theme","ad_group","keyword","impressions","clicks","cost","sales","orders","ROAS","CVR","cpc_rank","cpc_delta"] if c in df_disp.columns]
         _rn9 = {"campaign_theme":"キャンペーン","ad_group":"広告グループ","keyword":"キーワード",
                 "impressions":"インプレッション","clicks":"クリック","cost":"広告費","sales":"売上",
-                "orders":"注文数","ROAS":"ROAS","CVR":"CVR"}
+                "orders":"注文数","ROAS":"ROAS","CVR":"CVR","cpc_rank":"判定ランク","cpc_delta":"調整額"}
         _d = df_disp[_disp9_cols].rename(columns=_rn9).copy()
         if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
         if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
         if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].apply(lambda x: f"{x:.2f}")
         if "CVR"    in _d.columns: _d["CVR"]    = _d["CVR"].apply(lambda x: f"{x:.1f}%")
+        if "調整額" in _d.columns: _d["調整額"] = _d["調整額"].apply(lambda x: f"{x:+,.0f}円")
         # ③ KW一覧（実行対象抽出のみ）。表示条件は以下2つを厳密AND評価する：
         # ①cpc_delta が数値としてnon-zero（NaN/文字列は数値0として扱い除外）
         # ②cpc_rank が判定保留・未確定・空ではない（確定済み状態のみ許可）
@@ -4418,8 +4419,8 @@ def page_cpc():
                 st.info("調整対象のキーワードはありません（すべて変更不要または判定保留）。")
             else:
                 def _cr9(row):
-                    c = _RC.get(row.get("ランク", ""), "")
-                    return [f"color:{c};font-weight:700" if col == "ランク" else "" for col in row.index]
+                    c = _RC.get(row.get("判定ランク", ""), "")
+                    return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
                 _d.index = range(1, len(_d) + 1)
                 st.dataframe(_d.style.apply(_cr9, axis=1), use_container_width=True, height=460)
         st.markdown("---")
@@ -5388,18 +5389,20 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
     # ① 一覧テーブルは変更幅≠0（CPC上げ・CPC下げ）のみ表示
     df_disp = df_c[df_c["cpc_delta"] != 0].copy()
     df_disp.index = range(1, len(df_disp) + 1)
-    _disp9_cols = [c for c in ["campaign_theme","ad_group", id_col, "impressions","clicks","cost","sales","orders","ROAS","CVR"] if c in df_disp.columns]
+    _disp9_cols = [c for c in ["campaign_theme","ad_group", id_col, "impressions","clicks","cost","sales","orders","ROAS","CVR","cpc_rank","cpc_delta"] if c in df_disp.columns]
     _rn9 = {"campaign_theme":"キャンペーン","ad_group":"広告グループ", id_col:("ASIN" if id_col == "asin" else "キーワード"),
             "impressions":"インプレッション","clicks":"クリック",
-            "cost":"広告費","sales":"売上","orders":"注文数","ROAS":"ROAS","CVR":"CVR"}
+            "cost":"広告費","sales":"売上","orders":"注文数","ROAS":"ROAS","CVR":"CVR",
+            "cpc_rank":"判定ランク","cpc_delta":"調整額"}
     _d = df_disp[_disp9_cols].rename(columns=_rn9).copy()
     if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
     if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
     if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].apply(lambda x: f"{x:.2f}")
     if "CVR"    in _d.columns: _d["CVR"]    = _d["CVR"].apply(lambda x: f"{x:.1f}%")
+    if "調整額" in _d.columns: _d["調整額"] = _d["調整額"].apply(lambda x: f"{x:+,.0f}円")
     def _cr(row):
-        c = _RC.get(row.get("ランク", ""), "")
-        return [f"color:{c};font-weight:700" if col == "ランク" else "" for col in row.index]
+        c = _RC.get(row.get("判定ランク", ""), "")
+        return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
     if df_disp.empty:
         st.info("変更幅が発生するASINはありません（全件 現状維持 または 判断保留）。")
     else:
