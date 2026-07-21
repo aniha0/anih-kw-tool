@@ -9,6 +9,7 @@ import datetime as _anls_dt
 import pathlib as _anls_plib
 import json as _anls_json
 import random as _anls_random  # 【新規追加】CPC変更履歴イベントのID生成専用。既存コードは未使用。
+import html as _anls_html  # 【新規追加】CPC変更履歴の記録行表示（1行省略表示）専用。既存コードは未使用。
 
 
 # ===================================================
@@ -2550,6 +2551,19 @@ def _anls_save_cpc_asin_history(df_disp, fname: str):
 # 既存の_anls_load/_anls_save（無改変）だけで読み書きする。
 # ===================================================
 
+def _cpc_change_nowrap_cell(text) -> None:
+    """CPC変更を記録セクションの行表示専用ヘルパー（表示専用・新規追加）。
+    KW一覧（st.dataframe）と見た目を揃えるため、長いキャンペーン名・広告グループ名が
+    複数行に折り返されて縦に間延びしないよう、1行省略表示（はみ出しは...、
+    全文はホバーで確認可）にする。保存処理・判定ロジックには一切関与しない。"""
+    _t = _anls_html.escape(str(text))
+    st.markdown(
+        f'<div title="{_t}" style="white-space:nowrap;overflow:hidden;'
+        f'text-overflow:ellipsis;padding-top:0.4rem;">{_t}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def _cpc_change_gen_id() -> str:
     """CPC変更履歴イベント用の一意ID。YYYYMMDDHHMMSS+ランダム4桁で、
     同一秒内に複数件記録しても重複しない。既存のid生成方式（他所のstrftimeのみ）
@@ -2578,25 +2592,6 @@ def _cpc_change_current_period():
     except Exception:
         pass
     return None, None
-
-
-def _cpc_change_render_preview(row) -> None:
-    """CPC変更履歴の記録プレビュー表示（新規追加・表示専用）。「記録対象を選択」で
-    選ばれた行について、実際に保存されるのと同じ値（現在CPC→推奨CPC・広告費・
-    売上・ROAS・実績期間）をその場に表示するだけで、保存処理・判定ロジック・
-    既存のdf_disp計算には一切関与しない。"""
-    _before = float(row.get("avg_cpc", 0) or 0)
-    _after = float(row.get("rec_cpc", 0) or 0)
-    st.markdown(f"**現在CPC** {_before:.0f}円 → **推奨CPC** {_after:.0f}円")
-    _pc1, _pc2, _pc3 = st.columns(3)
-    _pc1.metric("広告費", f"¥{float(row.get('cost', 0) or 0):,.0f}")
-    _pc2.metric("売上", f"¥{float(row.get('sales', 0) or 0):,.0f}")
-    _pc3.metric("ROAS", f"{float(row.get('ROAS', 0) or 0):.2f}")
-    _p_start, _p_end = _cpc_change_current_period()
-    if _p_start and _p_end:
-        st.caption(f"📅 実績期間：{_p_start}〜{_p_end}（この内容を記録すると「変更前」として保存されます）")
-    else:
-        st.caption("実績期間は取得できませんでした（「期間」列が無いCSVの可能性があります）。")
 
 
 def _cpc_change_save_event(fname: str, campaign_name, ad_group, target_val, id_col: str,
@@ -4435,7 +4430,7 @@ def page_cpc():
             df_disp_visible["調整履歴"] = df_disp_visible["_cpc_ck"].apply(_cpc_hist_str_kw)
         else:
             df_disp_visible["調整履歴"] = "―"
-        _disp9_cols = [c for c in ["campaign_theme","ad_group","keyword","impressions","clicks","cost","sales","orders","ROAS","CVR","cpc_rank","cpc_delta","調整履歴"] if c in df_disp_visible.columns]
+        _disp9_cols = [c for c in ["campaign_theme","ad_group","keyword","impressions","clicks","cost","sales","orders","ROAS","cpc_rank","cpc_delta","調整履歴"] if c in df_disp_visible.columns]
         _rn9 = {"campaign_theme":"キャンペーン","ad_group":"広告グループ","keyword":"キーワード",
                 "impressions":"インプレッション","clicks":"クリック","cost":"広告費","sales":"売上",
                 "orders":"注文数","ROAS":"ROAS","CVR":"CVR","cpc_rank":"判定ランク","cpc_delta":"調整額"}
@@ -4509,16 +4504,19 @@ def page_cpc():
         if df_disp_visible.empty:
             st.caption("記録対象（変更幅が発生している行）がありません。")
         else:
-            _rec_hdr = st.columns([3, 3, 3, 2, 2, 2])
-            for _h, _lbl in zip(_rec_hdr, ["キャンペーン", "広告グループ", "キーワード", "現在CPC", "推奨CPC", ""]):
+            _rec_hdr = st.columns([3, 3, 3, 2, 2])
+            for _h, _lbl in zip(_rec_hdr, ["キャンペーン", "広告グループ", "キーワード", "CPC調整金額", ""]):
                 _h.markdown(f"**{_lbl}**")
             for _ridx, _rrow in df_disp_visible.iterrows():
-                _rc1, _rc2, _rc3, _rc4, _rc5, _rc6 = st.columns([3, 3, 3, 2, 2, 2])
-                _rc1.write(str(_rrow.get("campaign_name", "")))
-                _rc2.write(str(_rrow.get("ad_group", "")))
-                _rc3.write(str(_rrow.get("keyword", "")))
-                _rc4.write(f"{float(_rrow.get('avg_cpc', 0) or 0):.0f}円")
-                _rc5.write(f"{float(_rrow.get('rec_cpc', 0) or 0):.0f}円")
+                _rc1, _rc2, _rc3, _rc4, _rc6 = st.columns([3, 3, 3, 2, 2])
+                with _rc1:
+                    _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""))
+                with _rc2:
+                    _cpc_change_nowrap_cell(_rrow.get("ad_group", ""))
+                with _rc3:
+                    _cpc_change_nowrap_cell(_rrow.get("keyword", ""))
+                with _rc4:
+                    _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円")
                 _rbtn_key = f"_cpc_change_kw_rowbtn_{_rrow.get('_cpc_ck','')}_{_ridx}"
                 if _rc6.button("✅ 記録", key=_rbtn_key):
                     _cpc_change_save_event(
@@ -5443,6 +5441,30 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
         df_c = dc_pt.copy()
     else:
         df_c = dc_pt[dc_pt["campaign_theme"] == cpc_camp].copy()
+    # ── 【新規追加】行ごとのCPC変更記録ボタン用の準備（change_log_fname指定時のみ）──
+    # target_key（既存の_cpc_change_save_event等と同一方式）を追加列として付与する
+    # だけで、既存のcpc_rank/cpc_delta等の判定ロジック・既存列には一切触れない。
+    # change_log_fnameが指定されない既存呼び出し（後方互換）には一切影響しない。
+    _cpc_hide_state_key = f"_cpc_change_hidden_pt_keys_{sel_key}"
+    _cpc_hide_sig_key = f"_cpc_change_hidden_pt_sig_{sel_key}"
+    _cpc_hidden_keys = set()
+    if change_log_fname:
+        if not df_c.empty and {"campaign_name", "ad_group", id_col}.issubset(df_c.columns):
+            df_c["_cpc_ck"] = df_c.apply(
+                lambda r: f"{norm(str(r.get('campaign_name','') or ''))}|"
+                          f"{norm(str(r.get('ad_group','') or ''))}|"
+                          f"{norm(str(r.get(id_col,'') or ''))}",
+                axis=1,
+            )
+        try:
+            _sig_cols = [c for c in ["campaign_name", "ad_group", id_col, "cost", "sales", "orders", "avg_cpc"] if c in dc_pt.columns]
+            _cur_sig = str(int(pd.util.hash_pandas_object(dc_pt[_sig_cols], index=False).sum())) if _sig_cols and not dc_pt.empty else "empty"
+        except Exception:
+            _cur_sig = str(len(dc_pt))
+        if st.session_state.get(_cpc_hide_sig_key) != _cur_sig:
+            st.session_state[_cpc_hide_sig_key] = _cur_sig
+            st.session_state[_cpc_hide_state_key] = set()
+        _cpc_hidden_keys = st.session_state.setdefault(_cpc_hide_state_key, set())
     cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
     st.markdown("---")
     kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
@@ -5490,12 +5512,38 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
     # ① 一覧テーブルは変更幅≠0（CPC上げ・CPC下げ）のみ表示
     df_disp = df_c[df_c["cpc_delta"] != 0].copy()
     df_disp.index = range(1, len(df_disp) + 1)
-    _disp9_cols = [c for c in ["campaign_theme","ad_group", id_col, "impressions","clicks","cost","sales","orders","ROAS","CVR","cpc_rank","cpc_delta"] if c in df_disp.columns]
+    # 【新規追加】change_log_fname指定時のみ、オンスクリーン表示専用の複製
+    # (df_disp_visible)に、記録済み(未確認・非表示中)行の除外と「調整履歴」列を
+    # 追加する。df_disp自体はダウンロード・履歴保存(hist_fname)で使うため無改変。
+    if change_log_fname and "_cpc_ck" in df_disp.columns:
+        df_disp_visible = df_disp[~df_disp["_cpc_ck"].isin(_cpc_hidden_keys)].copy()
+        _cpc_hist_events_pt = _anls_load(change_log_fname)
+        _cpc_hist_by_key_pt = {}
+        for _e in _cpc_hist_events_pt:
+            _cpc_hist_by_key_pt.setdefault(_e.get("target_key", ""), []).append(_e)
+        def _cpc_hist_str_pt(_ck):
+            _recs = _cpc_hist_by_key_pt.get(_ck, [])
+            if not _recs:
+                return "―"
+            _parts = []
+            for _e in sorted(_recs, key=lambda x: x.get("changed_at", "")):
+                try:
+                    _dtp = _anls_dt.datetime.fromisoformat(_e.get("changed_at", ""))
+                    _dtxt = f"{_dtp.month}/{_dtp.day}"
+                except Exception:
+                    _dtxt = "?"
+                _delta = float(_e.get("after_cpc", 0) or 0) - float(_e.get("before_cpc", 0) or 0)
+                _parts.append(f"{_dtxt}:{_delta:+.0f}円")
+            return "、".join(_parts)
+        df_disp_visible["調整履歴"] = df_disp_visible["_cpc_ck"].apply(_cpc_hist_str_pt)
+    else:
+        df_disp_visible = df_disp.copy()
+    _disp9_cols = [c for c in ["campaign_theme","ad_group", id_col, "impressions","clicks","cost","sales","orders","ROAS","cpc_rank","cpc_delta","調整履歴"] if c in df_disp_visible.columns]
     _rn9 = {"campaign_theme":"キャンペーン","ad_group":"広告グループ", id_col:("ASIN" if id_col == "asin" else "キーワード"),
             "impressions":"インプレッション","clicks":"クリック",
             "cost":"広告費","sales":"売上","orders":"注文数","ROAS":"ROAS","CVR":"CVR",
             "cpc_rank":"判定ランク","cpc_delta":"調整額"}
-    _d = df_disp[_disp9_cols].rename(columns=_rn9).copy()
+    _d = df_disp_visible[_disp9_cols].rename(columns=_rn9).copy()
     if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
     if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
     if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].apply(lambda x: f"{x:.2f}")
@@ -5504,7 +5552,7 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
     def _cr(row):
         c = _RC.get(row.get("判定ランク", ""), "")
         return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
-    if df_disp.empty:
+    if df_disp_visible.empty:
         st.info("変更幅が発生するASINはありません（全件 現状維持 または 判断保留）。")
     else:
         st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
@@ -5520,34 +5568,42 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
         _dl_csv = _dl_src[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
         st.download_button(f"📥 {_dl_fname}", data=_dl_csv,
             file_name=_dl_fname, mime="text/csv")
-    # ── 【新規追加】CPC変更履歴の記録ボタン ──────────────────────
-    # 新規JSON(change_log_fname)・新規関数(_cpc_change_save_event)のみを使う
-    # 完全新規の追記。change_log_fnameが指定されない既存呼び出し（後方互換）では
+    # ── 【変更】CPC変更履歴の記録ボタン：選択式→行ごとのボタン式（キーワード版と統一）──
+    # 保存に使う新規JSON(change_log_fname)・新規関数(_cpc_change_save_event)は
+    # 無改変のまま流用。change_log_fnameが指定されない既存呼び出し（後方互換）では
     # このブロック自体が描画されないため、既存の判定ロジック・既存の表示・既存の
     # hist_fname保存(_anls_save_cpc_asin_history)には一切影響しない。
     if change_log_fname:
         st.markdown("---")
         st.markdown("#### 📝 CPC変更を記録")
-        st.caption("推奨CPCを実際にAmazon広告側で適用した場合、ここで記録すると30日後に自動で比較できます。")
-        if df_disp.empty:
+        st.caption("推奨CPCを実際にAmazon広告側で適用したら、行の「✅ 記録」を押してください。押すとその行は一覧から消え、次回CSV再分析で「調整履歴」付きで復活します。")
+        if df_disp_visible.empty:
             st.caption("記録対象（変更幅が発生している行）がありません。")
         else:
-            _cpc_rec_labels = [
-                f"{r.get('campaign_name','')}｜{r.get('ad_group','')}｜{r.get(id_col,'')}"
-                for _, r in df_disp.iterrows()
-            ]
-            _cpc_rec_sel = st.selectbox("記録対象を選択", _cpc_rec_labels, key=f"_cpc_change_pt_target_sel_{sel_key}")
-            _cpc_rec_idx = _cpc_rec_labels.index(_cpc_rec_sel)
-            _cpc_rec_row = df_disp.iloc[_cpc_rec_idx]
-            _cpc_change_render_preview(_cpc_rec_row)
-            if st.button("✅ この内容でCPC変更を記録", key=f"_cpc_change_pt_record_btn_{sel_key}"):
-                _cpc_change_save_event(
-                    change_log_fname,
-                    _cpc_rec_row.get("campaign_name"), _cpc_rec_row.get("ad_group"),
-                    _cpc_rec_row.get(id_col), id_col,
-                    _cpc_rec_row.get("avg_cpc"), _cpc_rec_row.get("rec_cpc"), _cpc_rec_row,
-                )
-                st.success("CPC変更を記録しました。30日後、履歴ページで自動比較されます。")
+            _id_label = "ASIN" if id_col == "asin" else "キーワード"
+            _rec_hdr = st.columns([3, 3, 3, 2, 2])
+            for _h, _lbl in zip(_rec_hdr, ["キャンペーン", "広告グループ", _id_label, "CPC調整金額", ""]):
+                _h.markdown(f"**{_lbl}**")
+            for _ridx, _rrow in df_disp_visible.iterrows():
+                _rc1, _rc2, _rc3, _rc4, _rc6 = st.columns([3, 3, 3, 2, 2])
+                with _rc1:
+                    _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""))
+                with _rc2:
+                    _cpc_change_nowrap_cell(_rrow.get("ad_group", ""))
+                with _rc3:
+                    _cpc_change_nowrap_cell(_rrow.get(id_col, ""))
+                with _rc4:
+                    _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円")
+                _rbtn_key = f"_cpc_change_pt_rowbtn_{sel_key}_{_rrow.get('_cpc_ck','')}_{_ridx}"
+                if _rc6.button("✅ 記録", key=_rbtn_key):
+                    _cpc_change_save_event(
+                        change_log_fname,
+                        _rrow.get("campaign_name"), _rrow.get("ad_group"),
+                        _rrow.get(id_col), id_col,
+                        _rrow.get("avg_cpc"), _rrow.get("rec_cpc"), _rrow,
+                    )
+                    st.session_state[_cpc_hide_state_key].add(_rrow.get("_cpc_ck", ""))
+                    st.rerun()
 
 
 def page_cpc_product():
