@@ -2709,6 +2709,10 @@ def _cpc_change_fill_after_comparisons(fname: str, id_col: str) -> None:
         return
 
     # ③ 保持済みDataFrame群に対して、比較待ちイベント全件を突合する。
+    # 【対象日に一番近い窓を優先】対象日を含むCSVが複数ある場合（7日おきの
+    # スライド運用では期間が重なるため頻発する）、保有順（たまたまアップロード
+    # された順）ではなく、各候補の「期間終了日」が対象日に一番近いものを選ぶ。
+    # 判定条件・集計式は変更前と同一で、複数候補がある場合の選び方だけを変更。
     _changed = False
     for _ev in _pending:
         try:
@@ -2716,6 +2720,7 @@ def _cpc_change_fill_after_comparisons(fname: str, id_col: str) -> None:
         except Exception:
             continue
         _target_date = (_changed_at + _anls_dt.timedelta(days=30)).date()
+        _candidates = []
         for _pcsv in _parsed_csvs:
             if not (_pcsv["p_start"] <= _target_date <= _pcsv["p_end"]):
                 continue
@@ -2723,21 +2728,24 @@ def _cpc_change_fill_after_comparisons(fname: str, id_col: str) -> None:
             _match = _df_raw[_df_raw["_cpcchg_tkey"] == _ev.get("target_key", "")]
             if _match.empty:
                 continue
-            _sc, _oc, _od, _clk, _imp = _pcsv["sc"], _pcsv["oc"], _pcsv["od"], _pcsv["clk"], _pcsv["imp"]
-            _cost = float(tonum(_match[_oc]).sum())
-            _sales = float(tonum(_match[_sc]).sum())
-            _orders = float(tonum(_match[_od]).sum()) if _od else 0.0
-            _clicks = float(tonum(_match[_clk]).sum()) if _clk else 0.0
-            _imps = float(tonum(_match[_imp]).sum()) if _imp else 0.0
-            _roas = round(_sales / _cost, 2) if _cost > 0 else 0.0
-            _cvr = round(_orders / _clicks * 100, 2) if _clicks > 0 else 0.0
-            _ev["compare_to"] = {
-                "period_start": _pcsv["p_start"].isoformat(), "period_end": _pcsv["p_end"].isoformat(),
-                "cost": _cost, "sales": _sales, "orders": _orders, "ROAS": _roas,
-                "impressions": _imps, "clicks": _clicks, "CVR": _cvr,
-            }
-            _changed = True
-            break
+            _candidates.append((_pcsv, _match))
+        if not _candidates:
+            continue
+        _pcsv, _match = min(_candidates, key=lambda pair: abs((pair[0]["p_end"] - _target_date).days))
+        _sc, _oc, _od, _clk, _imp = _pcsv["sc"], _pcsv["oc"], _pcsv["od"], _pcsv["clk"], _pcsv["imp"]
+        _cost = float(tonum(_match[_oc]).sum())
+        _sales = float(tonum(_match[_sc]).sum())
+        _orders = float(tonum(_match[_od]).sum()) if _od else 0.0
+        _clicks = float(tonum(_match[_clk]).sum()) if _clk else 0.0
+        _imps = float(tonum(_match[_imp]).sum()) if _imp else 0.0
+        _roas = round(_sales / _cost, 2) if _cost > 0 else 0.0
+        _cvr = round(_orders / _clicks * 100, 2) if _clicks > 0 else 0.0
+        _ev["compare_to"] = {
+            "period_start": _pcsv["p_start"].isoformat(), "period_end": _pcsv["p_end"].isoformat(),
+            "cost": _cost, "sales": _sales, "orders": _orders, "ROAS": _roas,
+            "impressions": _imps, "clicks": _clicks, "CVR": _cvr,
+        }
+        _changed = True
     if _changed:
         _anls_save(fname, _events)
 
