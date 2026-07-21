@@ -4662,6 +4662,10 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
         return f"{int(v):,}" if v is not None else "―"
     def _fmt_roas(v):
         return f"{v:.2f}" if v is not None else "―"
+    def _fmt_num(v):
+        return f"{v:,.0f}" if v is not None else "―"
+    def _fmt_cvr(v):
+        return f"{v:.1f}%" if v is not None else "―"
 
     # CSVは対象キーワードによらず共通なので、1度だけパース・期間抽出し、
     # 各CSVの「行 → _target_key」対応表として保持する（対象単位ループでの
@@ -4707,7 +4711,7 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
             ), axis=1,
         )
         _csv_infos.append({
-            "df": _df_t, "sc": sc, "oc": oc_, "od_col": _od_col,
+            "df": _df_t, "sc": sc, "oc": oc_, "od_col": _od_col, "clk": clk, "imp": imp,
             "period_label": _period_str, "period_end": _period_end,
         })
 
@@ -4729,9 +4733,13 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
             _sales = float(tonum(_sub[_info["sc"]]).sum())
             _orders = float(tonum(_sub[_info["od_col"]]).sum()) if _info["od_col"] else None
             _roas = round(_sales / _cost, 2) if _cost > 0 else 0.0
+            _clicks = float(tonum(_sub[_info["clk"]]).sum()) if _info["clk"] else None
+            _imps = float(tonum(_sub[_info["imp"]]).sum()) if _info["imp"] else None
+            _cvr = round(_orders / _clicks * 100, 2) if (_clicks and _orders is not None) else None
             _weekly.append({
                 "period_label": _info["period_label"], "cost": _cost,
                 "sales": _sales, "orders": _orders, "roas": _roas,
+                "clicks": _clicks, "impressions": _imps, "cvr": _cvr,
             })
         return _weekly
 
@@ -4784,6 +4792,9 @@ def _anls_render_analysis_page(_kwl_target: pd.DataFrame, anls_hist_fname: str =
             ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
             ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
             ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
+            ["インプレッション"] + [_fmt_num(w["impressions"]) if w else "―" for w in _weekly],
+            ["クリック"] + [_fmt_num(w["clicks"]) if w else "―" for w in _weekly],
+            ["CVR"]    + [_fmt_cvr(w["cvr"]) if w else "―" for w in _weekly],
         ],
         columns=["期間"] + _col_labels,
     )
@@ -4899,6 +4910,10 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
         return f"{int(v):,}" if v is not None else "―"
     def _fmt_roas(v):
         return f"{v:.2f}" if v is not None else "―"
+    def _fmt_num(v):
+        return f"{v:,.0f}" if v is not None else "―"
+    def _fmt_cvr(v):
+        return f"{v:.1f}%" if v is not None else "―"
 
     _csv_infos = []
     for _af_file in _bucket_held.values():
@@ -4938,7 +4953,7 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
             ), axis=1,
         )
         _csv_infos.append({
-            "df": _df_t, "sc": sc, "oc": oc_, "od_col": _od_col,
+            "df": _df_t, "sc": sc, "oc": oc_, "od_col": _od_col, "clk": clk, "imp": imp,
             "period_label": _period_str, "period_end": _period_end,
         })
 
@@ -4960,9 +4975,13 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
             _sales = float(tonum(_sub[_info["sc"]]).sum())
             _orders = float(tonum(_sub[_info["od_col"]]).sum()) if _info["od_col"] else None
             _roas = round(_sales / _cost, 2) if _cost > 0 else 0.0
+            _clicks = float(tonum(_sub[_info["clk"]]).sum()) if _info["clk"] else None
+            _imps = float(tonum(_sub[_info["imp"]]).sum()) if _info["imp"] else None
+            _cvr = round(_orders / _clicks * 100, 2) if (_clicks and _orders is not None) else None
             _weekly.append({
                 "period_label": _info["period_label"], "cost": _cost,
                 "sales": _sales, "orders": _orders, "roas": _roas,
+                "clicks": _clicks, "impressions": _imps, "cvr": _cvr,
             })
         return _weekly
 
@@ -5009,6 +5028,9 @@ def _anls_render_analysis_page_product(dc_pt: pd.DataFrame = None) -> None:
             ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
             ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
             ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
+            ["インプレッション"] + [_fmt_num(w["impressions"]) if w else "―" for w in _weekly],
+            ["クリック"] + [_fmt_num(w["clicks"]) if w else "―" for w in _weekly],
+            ["CVR"]    + [_fmt_cvr(w["cvr"]) if w else "―" for w in _weekly],
         ],
         columns=["期間"] + _col_labels,
     )
@@ -5105,6 +5127,10 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
         return f"{int(v):,}" if v is not None else "―"
     def _fmt_roas(v):
         return f"{v:.2f}" if v is not None else "―"
+    def _fmt_num(v):
+        return f"{v:,.0f}" if v is not None else "―"
+    def _fmt_cvr(v):
+        return f"{v:.1f}%" if v is not None else "―"
 
     _csv_infos = []
     for _af_file in _bucket_held.values():
@@ -5144,7 +5170,7 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
             ), axis=1,
         )
         _csv_infos.append({
-            "df": _df_t, "sc": sc, "oc": oc_, "od_col": _od_col,
+            "df": _df_t, "sc": sc, "oc": oc_, "od_col": _od_col, "clk": clk, "imp": imp,
             "period_label": _period_str, "period_end": _period_end,
         })
 
@@ -5166,9 +5192,13 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
             _sales = float(tonum(_sub[_info["sc"]]).sum())
             _orders = float(tonum(_sub[_info["od_col"]]).sum()) if _info["od_col"] else None
             _roas = round(_sales / _cost, 2) if _cost > 0 else 0.0
+            _clicks = float(tonum(_sub[_info["clk"]]).sum()) if _info["clk"] else None
+            _imps = float(tonum(_sub[_info["imp"]]).sum()) if _info["imp"] else None
+            _cvr = round(_orders / _clicks * 100, 2) if (_clicks and _orders is not None) else None
             _weekly.append({
                 "period_label": _info["period_label"], "cost": _cost,
                 "sales": _sales, "orders": _orders, "roas": _roas,
+                "clicks": _clicks, "impressions": _imps, "cvr": _cvr,
             })
         return _weekly
 
@@ -5215,6 +5245,9 @@ def _anls_render_analysis_page_video(dc_pt: pd.DataFrame = None) -> None:
             ["売上"]   + [_fmt_yen(w["sales"]) if w else "―" for w in _weekly],
             ["注文数"] + [_fmt_orders(w["orders"]) if w else "―" for w in _weekly],
             ["ROAS"]   + [_fmt_roas(w["roas"]) if w else "―" for w in _weekly],
+            ["インプレッション"] + [_fmt_num(w["impressions"]) if w else "―" for w in _weekly],
+            ["クリック"] + [_fmt_num(w["clicks"]) if w else "―" for w in _weekly],
+            ["CVR"]    + [_fmt_cvr(w["cvr"]) if w else "―" for w in _weekly],
         ],
         columns=["期間"] + _col_labels,
     )
