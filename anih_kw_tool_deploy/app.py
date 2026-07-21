@@ -2633,6 +2633,15 @@ def _cpc_change_save_event(fname: str, campaign_name, ad_group, target_val, id_c
     _anls_save(fname, _existing)
 
 
+def _cpc_change_delete_event(fname: str, event_id: str) -> None:
+    """CPC変更履歴イベントを1件削除する（新規追加）。既存の_anls_load/_anls_save
+    （無改変）のみを使い、id一致レコードを除外して保存し直すだけ。他のレコード・
+    他のJSON・既存の保存/比較ロジックには一切影響しない。"""
+    _existing = _anls_load(fname)
+    _filtered = [e for e in _existing if e.get("id") != event_id]
+    _anls_save(fname, _filtered)
+
+
 def _cpc_change_fill_after_comparisons(fname: str, id_col: str) -> None:
     """CPC変更履歴の30日後比較（compare_to）を埋める独立処理。compare_to未確定の
     イベントについて、既存の比較CSVバケット(csv_bucket_7d/30d/other、既存の
@@ -2763,7 +2772,7 @@ def page_cpc_change_history():
     _all_events = []
     for _fname, _label, _id_col in _targets:
         for _ev in _anls_load(_fname):
-            _all_events.append((_ev, _label, _id_col))
+            _all_events.append((_ev, _label, _id_col, _fname))
     if not _all_events:
         st.info("記録されたCPC変更履歴はまだありません。各CPC調整画面の「📝 CPC変更を記録」から追加できます。")
         return
@@ -2777,7 +2786,7 @@ def page_cpc_change_history():
     with _fc3:
         _sel_kw = st.text_input("検索（キーワード/ASIN）", key="_cpc_change_hist_search")
     _filtered = []
-    for _ev, _label, _id_col in _all_events:
+    for _ev, _label, _id_col, _fname in _all_events:
         if _sel_cat != "全て" and _label != _sel_cat:
             continue
         _st_now = "比較完了" if _ev.get("compare_to") else "比較待ち"
@@ -2786,7 +2795,7 @@ def page_cpc_change_history():
         _tv = str(_ev.get("keyword", _ev.get("asin", "")))
         if _sel_kw and _sel_kw.strip() not in _tv:
             continue
-        _filtered.append((_ev, _label, _id_col))
+        _filtered.append((_ev, _label, _id_col, _fname))
     _filtered.sort(key=lambda x: str(x[0].get("changed_at", "")), reverse=True)
     st.caption(f"該当件数：{len(_filtered)}件")
 
@@ -2795,7 +2804,7 @@ def page_cpc_change_history():
     def _fmt_roas(v): return f"{float(v or 0):.2f}"
     def _fmt_pct(v): return f"{float(v or 0):.1f}%"
 
-    for _ev, _label, _id_col in _filtered[:50]:
+    for _ev, _label, _id_col, _fname in _filtered[:50]:
         _tv = _ev.get("keyword", _ev.get("asin", "―"))
         _st_now = "🟢 比較完了" if _ev.get("compare_to") else "🟡 比較待ち"
         _changed_disp = str(_ev.get("changed_at", ""))[:16].replace("T", " ")
@@ -2831,6 +2840,17 @@ def page_cpc_change_history():
             st.markdown(f"**変更理由**：{_ev.get('reason') or '（未入力）'}")
             st.markdown(f"**メモ**：{_ev.get('memo') or '（未入力）'}")
             st.markdown(f"**評価**：{_ev.get('evaluation') or '（未入力）'}")
+            st.markdown("---")
+            # 【新規追加】1件ごとの削除ボタン。誤操作防止のため、確認チェックを
+            # 入れてからのみ削除できる。既存の保存/比較ロジック・他のレコードには
+            # 一切影響しない。
+            _del_confirm_key = f"_cpc_change_hist_del_confirm_{_ev.get('id','')}"
+            _confirm = st.checkbox("この記録を削除する", key=_del_confirm_key)
+            if _confirm:
+                if st.button("🗑 この記録を削除", key=f"_cpc_change_hist_del_btn_{_ev.get('id','')}"):
+                    _cpc_change_delete_event(_fname, _ev.get("id", ""))
+                    st.success("削除しました。")
+                    st.rerun()
 
 
 def _anls_save_kw_add_history(df_disp):
