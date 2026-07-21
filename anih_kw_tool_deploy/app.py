@@ -2580,6 +2580,25 @@ def _cpc_change_current_period():
     return None, None
 
 
+def _cpc_change_render_preview(row) -> None:
+    """CPC変更履歴の記録プレビュー表示（新規追加・表示専用）。「記録対象を選択」で
+    選ばれた行について、実際に保存されるのと同じ値（現在CPC→推奨CPC・広告費・
+    売上・ROAS・実績期間）をその場に表示するだけで、保存処理・判定ロジック・
+    既存のdf_disp計算には一切関与しない。"""
+    _before = float(row.get("avg_cpc", 0) or 0)
+    _after = float(row.get("rec_cpc", 0) or 0)
+    st.markdown(f"**現在CPC** {_before:.0f}円 → **推奨CPC** {_after:.0f}円")
+    _pc1, _pc2, _pc3 = st.columns(3)
+    _pc1.metric("広告費", f"¥{float(row.get('cost', 0) or 0):,.0f}")
+    _pc2.metric("売上", f"¥{float(row.get('sales', 0) or 0):,.0f}")
+    _pc3.metric("ROAS", f"{float(row.get('ROAS', 0) or 0):.2f}")
+    _p_start, _p_end = _cpc_change_current_period()
+    if _p_start and _p_end:
+        st.caption(f"📅 実績期間：{_p_start}〜{_p_end}（この内容を記録すると「変更前」として保存されます）")
+    else:
+        st.caption("実績期間は取得できませんでした（「期間」列が無いCSVの可能性があります）。")
+
+
 def _cpc_change_save_event(fname: str, campaign_name, ad_group, target_val, id_col: str,
                             before_cpc, after_cpc, row) -> None:
     """CPC変更イベントを1件、新規JSON(fname)へ追記保存する。1レコード＝1イベント
@@ -4422,9 +4441,10 @@ def page_cpc():
                 for _, r in df_disp.iterrows()
             ]
             _cpc_rec_sel = st.selectbox("記録対象を選択", _cpc_rec_labels, key="_cpc_change_kw_target_sel")
+            _cpc_rec_idx = _cpc_rec_labels.index(_cpc_rec_sel)
+            _cpc_rec_row = df_disp.iloc[_cpc_rec_idx]
+            _cpc_change_render_preview(_cpc_rec_row)
             if st.button("✅ この内容でCPC変更を記録", key="_cpc_change_kw_record_btn"):
-                _cpc_rec_idx = _cpc_rec_labels.index(_cpc_rec_sel)
-                _cpc_rec_row = df_disp.iloc[_cpc_rec_idx]
                 _cpc_change_save_event(
                     "cpc_kw_change_events.json",
                     _cpc_rec_row.get("campaign_name"), _cpc_rec_row.get("ad_group"),
@@ -5405,9 +5425,10 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
                 for _, r in df_disp.iterrows()
             ]
             _cpc_rec_sel = st.selectbox("記録対象を選択", _cpc_rec_labels, key=f"_cpc_change_pt_target_sel_{sel_key}")
+            _cpc_rec_idx = _cpc_rec_labels.index(_cpc_rec_sel)
+            _cpc_rec_row = df_disp.iloc[_cpc_rec_idx]
+            _cpc_change_render_preview(_cpc_rec_row)
             if st.button("✅ この内容でCPC変更を記録", key=f"_cpc_change_pt_record_btn_{sel_key}"):
-                _cpc_rec_idx = _cpc_rec_labels.index(_cpc_rec_sel)
-                _cpc_rec_row = df_disp.iloc[_cpc_rec_idx]
                 _cpc_change_save_event(
                     change_log_fname,
                     _cpc_rec_row.get("campaign_name"), _cpc_rec_row.get("ad_group"),
