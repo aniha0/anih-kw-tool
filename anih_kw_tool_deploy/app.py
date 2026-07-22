@@ -2551,15 +2551,18 @@ def _anls_save_cpc_asin_history(df_disp, fname: str):
 # 既存の_anls_load/_anls_save（無改変）だけで読み書きする。
 # ===================================================
 
-def _cpc_change_nowrap_cell(text) -> None:
+def _cpc_change_nowrap_cell(text, highlighted: bool = False) -> None:
     """CPC変更を記録セクションの行表示専用ヘルパー（表示専用・新規追加）。
     KW一覧（st.dataframe）と見た目を揃えるため、長いキャンペーン名・広告グループ名が
     複数行に折り返されて縦に間延びしないよう、1行省略表示（はみ出しは...、
-    全文はホバーで確認可）にする。保存処理・判定ロジックには一切関与しない。"""
+    全文はホバーで確認可）にする。保存処理・判定ロジックには一切関与しない。
+    highlighted=Trueの場合、チェック済み行であることを示す薄い背景色を付ける
+    （既存の判定ランクの色分けとは別の、選択状態のみを示す表示専用の追加）。"""
     _t = _anls_html.escape(str(text))
+    _bg = "background:#EBF8FF;border-radius:4px;" if highlighted else ""
     st.markdown(
         f'<div title="{_t}" style="white-space:nowrap;overflow:hidden;'
-        f'text-overflow:ellipsis;padding-top:0.4rem;">{_t}</div>',
+        f'text-overflow:ellipsis;padding:0.4rem 0.5rem;{_bg}">{_t}</div>',
         unsafe_allow_html=True,
     )
 
@@ -4536,16 +4539,19 @@ def page_cpc():
                 _rc0, _rc1, _rc2, _rc3, _rc4 = st.columns([1, 3, 3, 3, 2])
                 _cb_key = f"_cpc_change_kw_cb_{_rrow.get('_cpc_ck','')}_{_ridx}"
                 _cb_rows.append((_cb_key, _rrow))
+                # 【新規追加】チェック済み行を薄い背景色で示すための判定のみ。
+                # チェックボックス自体の値・保存ロジックには影響しない、表示専用の分岐。
+                _is_checked = st.session_state.get(_cb_key, False)
                 with _rc0:
                     st.checkbox("記録対象", key=_cb_key, label_visibility="collapsed")
                 with _rc1:
-                    _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""))
+                    _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""), highlighted=_is_checked)
                 with _rc2:
-                    _cpc_change_nowrap_cell(_rrow.get("ad_group", ""))
+                    _cpc_change_nowrap_cell(_rrow.get("ad_group", ""), highlighted=_is_checked)
                 with _rc3:
-                    _cpc_change_nowrap_cell(_rrow.get("keyword", ""))
+                    _cpc_change_nowrap_cell(_rrow.get("keyword", ""), highlighted=_is_checked)
                 with _rc4:
-                    _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円")
+                    _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円", highlighted=_is_checked)
             _n_sel = sum(1 for _k, _ in _cb_rows if st.session_state.get(_k, False))
             if st.button(f"✅ 選択した{_n_sel}件を記録", key="_cpc_change_kw_bulk_record_btn", disabled=(_n_sel == 0)):
                 for _k, _rrow in _cb_rows:
@@ -5626,16 +5632,19 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
                 _rc0, _rc1, _rc2, _rc3, _rc4 = st.columns([1, 3, 3, 3, 2])
                 _cb_key = f"_cpc_change_pt_cb_{sel_key}_{_rrow.get('_cpc_ck','')}_{_ridx}"
                 _cb_rows.append((_cb_key, _rrow))
+                # 【新規追加】チェック済み行を薄い背景色で示すための判定のみ。
+                # チェックボックス自体の値・保存ロジックには影響しない、表示専用の分岐。
+                _is_checked = st.session_state.get(_cb_key, False)
                 with _rc0:
                     st.checkbox("記録対象", key=_cb_key, label_visibility="collapsed")
                 with _rc1:
-                    _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""))
+                    _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""), highlighted=_is_checked)
                 with _rc2:
-                    _cpc_change_nowrap_cell(_rrow.get("ad_group", ""))
+                    _cpc_change_nowrap_cell(_rrow.get("ad_group", ""), highlighted=_is_checked)
                 with _rc3:
-                    _cpc_change_nowrap_cell(_rrow.get(id_col, ""))
+                    _cpc_change_nowrap_cell(_rrow.get(id_col, ""), highlighted=_is_checked)
                 with _rc4:
-                    _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円")
+                    _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円", highlighted=_is_checked)
             _n_sel = sum(1 for _k, _ in _cb_rows if st.session_state.get(_k, False))
             if st.button(f"✅ 選択した{_n_sel}件を記録", key=f"_cpc_change_pt_bulk_record_btn_{sel_key}", disabled=(_n_sel == 0)):
                 for _k, _rrow in _cb_rows:
