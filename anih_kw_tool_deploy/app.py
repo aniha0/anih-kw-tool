@@ -4522,49 +4522,52 @@ def page_cpc():
         # 既存のdf_disp計算・既存のCPC調整表示・既存のhistory保存
         # (_anls_save_cpc_change_history)には一切影響しない。
         st.markdown("---")
-        st.markdown("#### 📝 CPC変更を記録")
-        st.caption("推奨CPCを実際にAmazon広告側で適用したキーワードにチェックを入れ、下の「選択した◯件を記録」を押してください。押すとその行は一覧から消え、次回CSV再分析で「調整履歴」付きで復活します。")
-        if df_disp_visible.empty:
-            st.caption("記録対象（変更幅が発生している行）がありません。")
-        else:
-            # 【変更】行ごとの記録ボタン→チェックボックス＋一括記録ボタン方式に変更。
-            # 保存に使う_cpc_change_save_event・非表示セット(_cpc_hide_state_key)は
-            # 無改変のまま流用。チェック状態はst.checkboxのkeyでst.session_stateに
-            # 保持されるだけの新規追加で、他の処理には一切影響しない。
-            _rec_hdr = st.columns([1, 3, 3, 3, 2])
-            for _h, _lbl in zip(_rec_hdr, ["", "キャンペーン", "広告グループ", "キーワード", "CPC調整金額"]):
-                _h.markdown(f"**{_lbl}**")
-            _cb_rows = []
-            for _ridx, _rrow in df_disp_visible.iterrows():
-                _rc0, _rc1, _rc2, _rc3, _rc4 = st.columns([1, 3, 3, 3, 2])
-                _cb_key = f"_cpc_change_kw_cb_{_rrow.get('_cpc_ck','')}_{_ridx}"
-                _cb_rows.append((_cb_key, _rrow))
-                # 【新規追加】チェック済み行を薄い背景色で示すための判定のみ。
-                # チェックボックス自体の値・保存ロジックには影響しない、表示専用の分岐。
-                _is_checked = st.session_state.get(_cb_key, False)
-                with _rc0:
-                    st.checkbox("記録対象", key=_cb_key, label_visibility="collapsed")
-                with _rc1:
-                    _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""), highlighted=_is_checked)
-                with _rc2:
-                    _cpc_change_nowrap_cell(_rrow.get("ad_group", ""), highlighted=_is_checked)
-                with _rc3:
-                    _cpc_change_nowrap_cell(_rrow.get("keyword", ""), highlighted=_is_checked)
-                with _rc4:
-                    _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円", highlighted=_is_checked)
-            _n_sel = sum(1 for _k, _ in _cb_rows if st.session_state.get(_k, False))
-            if st.button(f"✅ 選択した{_n_sel}件を記録", key="_cpc_change_kw_bulk_record_btn", disabled=(_n_sel == 0)):
-                for _k, _rrow in _cb_rows:
-                    if st.session_state.get(_k, False):
-                        _cpc_change_save_event(
-                            "cpc_kw_change_events.json",
-                            _rrow.get("campaign_name"), _rrow.get("ad_group"),
-                            _rrow.get("keyword"), "keyword",
-                            _rrow.get("avg_cpc"), _rrow.get("rec_cpc"), _rrow,
-                        )
-                        st.session_state[_cpc_hide_state_key].add(_rrow.get("_cpc_ck", ""))
-                        st.session_state[_k] = False
-                st.rerun()
+        # 【変更】セクション全体をst.expanderで開閉式にする（デフォルト閉じた状態）。
+        # 中身のロジック（チェックボックス・一括記録ボタン・保存処理）は無改変で、
+        # そのまま1段階インデントを深くしただけ。
+        with st.expander("📝 CPC変更を記録", expanded=False):
+            st.caption("推奨CPCを実際にAmazon広告側で適用したキーワードにチェックを入れ、下の「選択した◯件を記録」を押してください。押すとその行は一覧から消え、次回CSV再分析で「調整履歴」付きで復活します。")
+            if df_disp_visible.empty:
+                st.caption("記録対象（変更幅が発生している行）がありません。")
+            else:
+                # 【変更】行ごとの記録ボタン→チェックボックス＋一括記録ボタン方式に変更。
+                # 保存に使う_cpc_change_save_event・非表示セット(_cpc_hide_state_key)は
+                # 無改変のまま流用。チェック状態はst.checkboxのkeyでst.session_stateに
+                # 保持されるだけの新規追加で、他の処理には一切影響しない。
+                _rec_hdr = st.columns([1, 3, 3, 3, 2])
+                for _h, _lbl in zip(_rec_hdr, ["", "キャンペーン", "広告グループ", "キーワード", "CPC調整金額"]):
+                    _h.markdown(f"**{_lbl}**")
+                _cb_rows = []
+                for _ridx, _rrow in df_disp_visible.iterrows():
+                    _rc0, _rc1, _rc2, _rc3, _rc4 = st.columns([1, 3, 3, 3, 2])
+                    _cb_key = f"_cpc_change_kw_cb_{_rrow.get('_cpc_ck','')}_{_ridx}"
+                    _cb_rows.append((_cb_key, _rrow))
+                    # 【新規追加】チェック済み行を薄い背景色で示すための判定のみ。
+                    # チェックボックス自体の値・保存ロジックには影響しない、表示専用の分岐。
+                    _is_checked = st.session_state.get(_cb_key, False)
+                    with _rc0:
+                        st.checkbox("記録対象", key=_cb_key, label_visibility="collapsed")
+                    with _rc1:
+                        _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""), highlighted=_is_checked)
+                    with _rc2:
+                        _cpc_change_nowrap_cell(_rrow.get("ad_group", ""), highlighted=_is_checked)
+                    with _rc3:
+                        _cpc_change_nowrap_cell(_rrow.get("keyword", ""), highlighted=_is_checked)
+                    with _rc4:
+                        _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円", highlighted=_is_checked)
+                _n_sel = sum(1 for _k, _ in _cb_rows if st.session_state.get(_k, False))
+                if st.button(f"✅ 選択した{_n_sel}件を記録", key="_cpc_change_kw_bulk_record_btn", disabled=(_n_sel == 0)):
+                    for _k, _rrow in _cb_rows:
+                        if st.session_state.get(_k, False):
+                            _cpc_change_save_event(
+                                "cpc_kw_change_events.json",
+                                _rrow.get("campaign_name"), _rrow.get("ad_group"),
+                                _rrow.get("keyword"), "keyword",
+                                _rrow.get("avg_cpc"), _rrow.get("rec_cpc"), _rrow,
+                            )
+                            st.session_state[_cpc_hide_state_key].add(_rrow.get("_cpc_ck", ""))
+                            st.session_state[_k] = False
+                    st.rerun()
     with _t_tab2:
         # ── 分析ページ（新規・表示専用） ──────────────────────────
         # 【重要】tab1で既に確定済みの_kwl_target（KW一覧・実行対象。並び順・
@@ -5613,51 +5616,54 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
     # hist_fname保存(_anls_save_cpc_asin_history)には一切影響しない。
     if change_log_fname:
         st.markdown("---")
-        st.markdown("#### 📝 CPC変更を記録")
-        st.caption("推奨CPCを実際にAmazon広告側で適用した対象にチェックを入れ、下の「選択した◯件を記録」を押してください。押すとその行は一覧から消え、次回CSV再分析で「調整履歴」付きで復活します。")
-        if df_disp_visible.empty:
-            st.caption("記録対象（変更幅が発生している行）がありません。")
-        else:
-            # 【変更】行ごとの記録ボタン→チェックボックス＋一括記録ボタン方式に変更
-            # （キーワード版と統一）。保存に使う_cpc_change_save_event・非表示セット
-            # (_cpc_hide_state_key)は無改変のまま流用。チェック状態はst.checkboxの
-            # keyでst.session_stateに保持されるだけの新規追加で、他の処理には
-            # 一切影響しない。
-            _id_label = "ASIN" if id_col == "asin" else "キーワード"
-            _rec_hdr = st.columns([1, 3, 3, 3, 2])
-            for _h, _lbl in zip(_rec_hdr, ["", "キャンペーン", "広告グループ", _id_label, "CPC調整金額"]):
-                _h.markdown(f"**{_lbl}**")
-            _cb_rows = []
-            for _ridx, _rrow in df_disp_visible.iterrows():
-                _rc0, _rc1, _rc2, _rc3, _rc4 = st.columns([1, 3, 3, 3, 2])
-                _cb_key = f"_cpc_change_pt_cb_{sel_key}_{_rrow.get('_cpc_ck','')}_{_ridx}"
-                _cb_rows.append((_cb_key, _rrow))
-                # 【新規追加】チェック済み行を薄い背景色で示すための判定のみ。
-                # チェックボックス自体の値・保存ロジックには影響しない、表示専用の分岐。
-                _is_checked = st.session_state.get(_cb_key, False)
-                with _rc0:
-                    st.checkbox("記録対象", key=_cb_key, label_visibility="collapsed")
-                with _rc1:
-                    _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""), highlighted=_is_checked)
-                with _rc2:
-                    _cpc_change_nowrap_cell(_rrow.get("ad_group", ""), highlighted=_is_checked)
-                with _rc3:
-                    _cpc_change_nowrap_cell(_rrow.get(id_col, ""), highlighted=_is_checked)
-                with _rc4:
-                    _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円", highlighted=_is_checked)
-            _n_sel = sum(1 for _k, _ in _cb_rows if st.session_state.get(_k, False))
-            if st.button(f"✅ 選択した{_n_sel}件を記録", key=f"_cpc_change_pt_bulk_record_btn_{sel_key}", disabled=(_n_sel == 0)):
-                for _k, _rrow in _cb_rows:
-                    if st.session_state.get(_k, False):
-                        _cpc_change_save_event(
-                            change_log_fname,
-                            _rrow.get("campaign_name"), _rrow.get("ad_group"),
-                            _rrow.get(id_col), id_col,
-                            _rrow.get("avg_cpc"), _rrow.get("rec_cpc"), _rrow,
-                        )
-                        st.session_state[_cpc_hide_state_key].add(_rrow.get("_cpc_ck", ""))
-                        st.session_state[_k] = False
-                st.rerun()
+        # 【変更】セクション全体をst.expanderで開閉式にする（デフォルト閉じた状態、
+        # キーワード版と統一）。中身のロジック（チェックボックス・一括記録ボタン・
+        # 保存処理）は無改変で、そのまま1段階インデントを深くしただけ。
+        with st.expander("📝 CPC変更を記録", expanded=False):
+            st.caption("推奨CPCを実際にAmazon広告側で適用した対象にチェックを入れ、下の「選択した◯件を記録」を押してください。押すとその行は一覧から消え、次回CSV再分析で「調整履歴」付きで復活します。")
+            if df_disp_visible.empty:
+                st.caption("記録対象（変更幅が発生している行）がありません。")
+            else:
+                # 【変更】行ごとの記録ボタン→チェックボックス＋一括記録ボタン方式に変更
+                # （キーワード版と統一）。保存に使う_cpc_change_save_event・非表示セット
+                # (_cpc_hide_state_key)は無改変のまま流用。チェック状態はst.checkboxの
+                # keyでst.session_stateに保持されるだけの新規追加で、他の処理には
+                # 一切影響しない。
+                _id_label = "ASIN" if id_col == "asin" else "キーワード"
+                _rec_hdr = st.columns([1, 3, 3, 3, 2])
+                for _h, _lbl in zip(_rec_hdr, ["", "キャンペーン", "広告グループ", _id_label, "CPC調整金額"]):
+                    _h.markdown(f"**{_lbl}**")
+                _cb_rows = []
+                for _ridx, _rrow in df_disp_visible.iterrows():
+                    _rc0, _rc1, _rc2, _rc3, _rc4 = st.columns([1, 3, 3, 3, 2])
+                    _cb_key = f"_cpc_change_pt_cb_{sel_key}_{_rrow.get('_cpc_ck','')}_{_ridx}"
+                    _cb_rows.append((_cb_key, _rrow))
+                    # 【新規追加】チェック済み行を薄い背景色で示すための判定のみ。
+                    # チェックボックス自体の値・保存ロジックには影響しない、表示専用の分岐。
+                    _is_checked = st.session_state.get(_cb_key, False)
+                    with _rc0:
+                        st.checkbox("記録対象", key=_cb_key, label_visibility="collapsed")
+                    with _rc1:
+                        _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""), highlighted=_is_checked)
+                    with _rc2:
+                        _cpc_change_nowrap_cell(_rrow.get("ad_group", ""), highlighted=_is_checked)
+                    with _rc3:
+                        _cpc_change_nowrap_cell(_rrow.get(id_col, ""), highlighted=_is_checked)
+                    with _rc4:
+                        _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円", highlighted=_is_checked)
+                _n_sel = sum(1 for _k, _ in _cb_rows if st.session_state.get(_k, False))
+                if st.button(f"✅ 選択した{_n_sel}件を記録", key=f"_cpc_change_pt_bulk_record_btn_{sel_key}", disabled=(_n_sel == 0)):
+                    for _k, _rrow in _cb_rows:
+                        if st.session_state.get(_k, False):
+                            _cpc_change_save_event(
+                                change_log_fname,
+                                _rrow.get("campaign_name"), _rrow.get("ad_group"),
+                                _rrow.get(id_col), id_col,
+                                _rrow.get("avg_cpc"), _rrow.get("rec_cpc"), _rrow,
+                            )
+                            st.session_state[_cpc_hide_state_key].add(_rrow.get("_cpc_ck", ""))
+                            st.session_state[_k] = False
+                    st.rerun()
 
 
 def page_cpc_product():
