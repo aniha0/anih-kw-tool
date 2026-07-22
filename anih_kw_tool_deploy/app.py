@@ -4339,6 +4339,139 @@ def _cpc_apply_display_order(df_c: pd.DataFrame, rank_order: list) -> pd.DataFra
     return df_c
 
 
+def _render_cpc_common_section(
+    df_c, id_col: str, change_log_fname: str,
+    cpc_hide_state_key: str, cpc_hidden_keys: set,
+    show_today_target_cards: bool, _RC: dict,
+    cb_key_prefix: str, bulk_btn_key: str, record_subject_label: str,
+    hist_col_fallback: bool,
+    render_list_fn, csv_export_fn,
+):
+    """4画面のCPC調整ページ（キーワード／商品／動画／SB動画KWターゲ）で重複していた
+    描画処理のうち、_cpc_ck生成後の部分（ランクサマリー・本日調整対象カード・
+    一覧表示の呼び出し・CSVダウンロードの呼び出し・CPC変更を記録セクション）だけを
+    共通化した新規関数。target_keyの生成式・_cpc_change_save_event・
+    _cpc_change_delete_event・_cpc_change_fill_after_comparisons・各画面固有の
+    タブ構成／分析タブ／page_cpc()の「KW一覧（実行対象抽出）」ロジックには
+    一切触れず、render_list_fn／csv_export_fnという2つのコールバック経由で
+    呼び出し元の既存差分（一覧表示の空判定メッセージ・CSV出力本数・
+    ファイル名・履歴保存関数）をそのまま実行する。
+    """
+    kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
+    bg_map = {
+        "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
+        "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
+    }
+    cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
+    kc_ = st.columns(len(kpi_rks))
+    for _col, rk in zip(kc_, kpi_rks):
+        _col.markdown(f'''<div class="kpi-card" style="background:{bg_map.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
+            <div class="kpi-label">{rk}</div>
+            <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{cnt[rk]}</div>
+            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+    if cnt["判断保留"] > 0:
+        st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
+    if show_today_target_cards:
+        _n_up   = int((df_c["cpc_delta"] > 0).sum())
+        _n_down = int((df_c["cpc_delta"] < 0).sum())
+        _n_adj  = _n_up + _n_down
+        st.markdown("---")
+        st.caption("📅 本日調整対象")
+        _bc1, _bc2, _bc3 = st.columns(3)
+        _bc1.markdown(f'''<div class="kpi-card" style="background:#E6FFFA;border-top:3px solid #276749;">
+            <div class="kpi-label">🔺 CPC上げ</div>
+            <div class="kpi-value" style="color:#276749;font-size:1.5rem;">{_n_up}</div>
+            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+        _bc2.markdown(f'''<div class="kpi-card" style="background:#FFF5F5;border-top:3px solid #C53030;">
+            <div class="kpi-label">🔻 CPC下げ</div>
+            <div class="kpi-value" style="color:#C53030;font-size:1.5rem;">{_n_down}</div>
+            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+        _bc3.markdown(f'''<div class="kpi-card" style="background:#EBF8FF;border-top:3px solid #2B6CB0;">
+            <div class="kpi-label">📊 変更対象合計</div>
+            <div class="kpi-value" style="color:#2B6CB0;font-size:1.5rem;">{_n_adj}</div>
+            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
+    st.markdown("---")
+    disp_cols = [c for c in ["campaign_name","ad_group",id_col,"ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
+    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ",id_col:("ASIN" if id_col == "asin" else "KWテキスト"),
+           "cost":"広告費","sales":"売上","orders":"購入数",
+           "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
+           "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
+    df_c = _cpc_apply_display_order(df_c, _RANK_ORDER)
+    df_c.index = df_c.index + 1
+    df_disp = df_c[df_c["cpc_delta"] != 0].copy()
+    df_disp.index = range(1, len(df_disp) + 1)
+    if change_log_fname and "_cpc_ck" in df_disp.columns:
+        df_disp_visible = df_disp[~df_disp["_cpc_ck"].isin(cpc_hidden_keys)].copy()
+        _cpc_hist_events = _anls_load(change_log_fname)
+        _cpc_hist_by_key = {}
+        for _e in _cpc_hist_events:
+            _cpc_hist_by_key.setdefault(_e.get("target_key", ""), []).append(_e)
+        def _cpc_hist_str(_ck):
+            _recs = _cpc_hist_by_key.get(_ck, [])
+            if not _recs:
+                return "―"
+            _parts = []
+            for _e in sorted(_recs, key=lambda x: x.get("changed_at", "")):
+                try:
+                    _dtp = _anls_dt.datetime.fromisoformat(_e.get("changed_at", ""))
+                    _dtxt = f"{_dtp.month}/{_dtp.day}"
+                except Exception:
+                    _dtxt = "?"
+                _delta = float(_e.get("after_cpc", 0) or 0) - float(_e.get("before_cpc", 0) or 0)
+                _parts.append(f"{_dtxt}:{_delta:+.0f}円")
+            return "、".join(_parts)
+        df_disp_visible["調整履歴"] = df_disp_visible["_cpc_ck"].apply(_cpc_hist_str)
+    else:
+        df_disp_visible = df_disp.copy()
+        if hist_col_fallback:
+            df_disp_visible["調整履歴"] = "―"
+    render_list_fn(df_c, df_disp_visible)
+    csv_export_fn(df_c, df_disp, disp_cols, _rn)
+    # 【既存仕様】change_log_fnameが指定されない呼び出し（後方互換）では、
+    # _render_pt_cpc_page()は元々このセクション自体を描画しない。
+    # page_cpc()（change_log_fname常に"cpc_kw_change_events.json"で真）には影響しない。
+    if change_log_fname:
+        st.markdown("---")
+        with st.expander("📝 CPC変更を記録", expanded=False):
+            st.caption("💡 いつ・いくら変更したか、あとで見返せるようにするための記録です。")
+            st.caption(f"推奨CPCを実際にAmazon広告側で適用した{record_subject_label}にチェックを入れ、下の「選択した◯件を記録」を押してください。押すとその行は一覧から消え、次回CSV再分析で「調整履歴」付きで復活します。")
+            if df_disp_visible.empty:
+                st.caption("記録対象（変更幅が発生している行）がありません。")
+            else:
+                _id_label = "ASIN" if id_col == "asin" else "キーワード"
+                _rec_hdr = st.columns([1, 3, 3, 3, 2])
+                for _h, _lbl in zip(_rec_hdr, ["", "キャンペーン", "広告グループ", _id_label, "CPC調整金額"]):
+                    _h.markdown(f"**{_lbl}**")
+                _cb_rows = []
+                for _ridx, _rrow in df_disp_visible.iterrows():
+                    _rc0, _rc1, _rc2, _rc3, _rc4 = st.columns([1, 3, 3, 3, 2])
+                    _cb_key = f"{cb_key_prefix}{_rrow.get('_cpc_ck','')}_{_ridx}"
+                    _cb_rows.append((_cb_key, _rrow))
+                    _is_checked = st.session_state.get(_cb_key, False)
+                    with _rc0:
+                        st.checkbox("記録対象", key=_cb_key, label_visibility="collapsed")
+                    with _rc1:
+                        _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""), highlighted=_is_checked)
+                    with _rc2:
+                        _cpc_change_nowrap_cell(_rrow.get("ad_group", ""), highlighted=_is_checked)
+                    with _rc3:
+                        _cpc_change_nowrap_cell(_rrow.get(id_col, ""), highlighted=_is_checked)
+                    with _rc4:
+                        _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円", highlighted=_is_checked)
+                _n_sel = sum(1 for _k, _ in _cb_rows if st.session_state.get(_k, False))
+                if st.button(f"✅ 選択した{_n_sel}件を記録", key=bulk_btn_key, disabled=(_n_sel == 0)):
+                    for _k, _rrow in _cb_rows:
+                        if st.session_state.get(_k, False):
+                            _cpc_change_save_event(
+                                change_log_fname,
+                                _rrow.get("campaign_name"), _rrow.get("ad_group"),
+                                _rrow.get(id_col), id_col,
+                                _rrow.get("avg_cpc"), _rrow.get("rec_cpc"), _rrow,
+                            )
+                            st.session_state[cpc_hide_state_key].add(_rrow.get("_cpc_ck", ""))
+                            st.session_state[_k] = False
+                    st.rerun()
+
 
 def page_cpc():
     _t_tab1, _t_tab2 = st.tabs(["CPC調整", "分析"])
@@ -4422,185 +4555,88 @@ def page_cpc():
             st.session_state[_cpc_hide_sig_key] = _cur_sig
             st.session_state[_cpc_hide_state_key] = set()
         _cpc_hidden_keys = st.session_state.setdefault(_cpc_hide_state_key, set())
-        kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
-        _bg_map_rank = {
-            "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
-            "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
-        }
-        def _render_rank_cards(_df_for_cnt):
-            _c = {r: int((_df_for_cnt["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
-            _kc = st.columns(len(kpi_rks))
-            for _col, rk in zip(_kc, kpi_rks):
-                _col.markdown(f'''<div class="kpi-card" style="background:{_bg_map_rank.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
-                    <div class="kpi-label">{rk}</div>
-                    <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{_c[rk]}</div>
-                    <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-            return _c
-        # ランクサマリー（選択商品に連動。全商品選択時はdf_c=dc_cpc.copy()となるため
-        # 従来の全体集計と完全に同じ件数になる。集計方法・色はランク判定ロジックの
-        # 変更を伴わない表示専用の再利用のみで、assign_cpc_rank等の判定条件には
-        # 一切触れない）
-        cnt = _render_rank_cards(df_c)
-        if cnt["判断保留"] > 0:
-            st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
-        st.markdown("---")
-        disp_cols = [c for c in ["campaign_name","ad_group","keyword","ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
-        _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ","keyword":"KWテキスト",
-               "cost":"広告費","sales":"売上","orders":"購入数",
-               "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
-               "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
-        df_c = _cpc_apply_display_order(df_c, _RANK_ORDER)
-        df_c.index = df_c.index + 1
-        df_disp = df_c[df_c["cpc_delta"] != 0].copy()
-        df_disp.index = range(1, len(df_disp) + 1)
-        # 【新規追加】オンスクリーン表示のみ、記録済み（未確認・非表示中）のKWを除外する。
-        # df_disp自体は既存のダウンロード・履歴保存(_anls_save_cpc_change_history)処理で
-        # 使うため無改変のまま維持し、表示専用の複製(df_disp_visible)にのみ適用する。
-        df_disp_visible = (
-            df_disp[~df_disp["_cpc_ck"].isin(_cpc_hidden_keys)].copy()
-            if "_cpc_ck" in df_disp.columns else df_disp.copy()
-        )
-        # 【新規追加】記録済みKWの「いつ・いくら調整したか」を、既存JSON
-        # (cpc_kw_change_events.json、既存の_anls_load(読み取り専用)のみ使用)から
-        # 読み込んで注記する列。同一KWで複数回記録がある場合は全件表示する。
-        _cpc_hist_events_kw = _anls_load("cpc_kw_change_events.json")
-        _cpc_hist_by_key_kw = {}
-        for _e in _cpc_hist_events_kw:
-            _cpc_hist_by_key_kw.setdefault(_e.get("target_key", ""), []).append(_e)
-        def _cpc_hist_str_kw(_ck):
-            _recs = _cpc_hist_by_key_kw.get(_ck, [])
-            if not _recs:
-                return "―"
-            _parts = []
-            for _e in sorted(_recs, key=lambda x: x.get("changed_at", "")):
-                try:
-                    _dtp = _anls_dt.datetime.fromisoformat(_e.get("changed_at", ""))
-                    _dtxt = f"{_dtp.month}/{_dtp.day}"
-                except Exception:
-                    _dtxt = "?"
-                _delta = float(_e.get("after_cpc", 0) or 0) - float(_e.get("before_cpc", 0) or 0)
-                _parts.append(f"{_dtxt}:{_delta:+.0f}円")
-            return "、".join(_parts)
-        if "_cpc_ck" in df_disp_visible.columns:
-            df_disp_visible["調整履歴"] = df_disp_visible["_cpc_ck"].apply(_cpc_hist_str_kw)
-        else:
-            df_disp_visible["調整履歴"] = "―"
-        _disp9_cols = [c for c in ["campaign_theme","ad_group","keyword","impressions","clicks","cost","sales","orders","ROAS","cpc_rank","cpc_delta","調整履歴"] if c in df_disp_visible.columns]
-        _rn9 = {"campaign_theme":"キャンペーン","ad_group":"広告グループ","keyword":"キーワード",
-                "impressions":"インプレッション","clicks":"クリック","cost":"広告費","sales":"売上",
-                "orders":"注文数","ROAS":"ROAS","CVR":"CVR","cpc_rank":"判定ランク","cpc_delta":"調整額"}
-        _d = df_disp_visible[_disp9_cols].rename(columns=_rn9).copy()
-        if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
-        if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
-        if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].apply(lambda x: f"{x:.2f}")
-        if "CVR"    in _d.columns: _d["CVR"]    = _d["CVR"].apply(lambda x: f"{x:.1f}%")
-        if "調整額" in _d.columns: _d["調整額"] = _d["調整額"].apply(lambda x: f"{x:+,.0f}円")
-        # ③ KW一覧（実行対象抽出のみ）。表示条件は以下2つを厳密AND評価する：
-        # ①cpc_delta が数値としてnon-zero（NaN/文字列は数値0として扱い除外）
-        # ②cpc_rank が判定保留・未確定・空ではない（確定済み状態のみ許可）
-        # 文字列比較は行わず、フィルタは描画前に完結させる（描画後の除外は行わない）。
-        # フィルタ結果が0件の場合も、ノイズ(±0・判定保留)を再度含める形での
-        # 「完全開示」は行わない（安全な部分開示。対象なしの場合はその旨を表示する）。
-        st.markdown("#### 📋 KW一覧（実行対象）")
-        if df_c.empty:
-            st.info("表示対象のキーワードがありません。")
-        else:
-            if "cpc_delta" in df_c.columns:
-                _cd_num = pd.to_numeric(df_c["cpc_delta"], errors="coerce").fillna(0.0)
+        # ── 【共通化】ランクサマリー・一覧表示・CSVダウンロード・CPC変更を記録
+        # セクションは、新規共通関数_render_cpc_common_sectionに集約。
+        # render_list_fn（KW一覧＝実行対象抽出を含む既存の表示ロジックをそのまま）と
+        # csv_export_fn（実行用/全件CSV＋既存の_anls_save_cpc_change_history呼び出しを
+        # そのまま）はこの場に元々あったコードを無改変で移設しただけで、
+        # target_key生成・_cpc_change_save_event・既存の判定ロジック・
+        # 既存のCSV列・既存のファイル名・既存のsession_stateキーには一切変更がない。
+        def _kw_render_list(_df_c_sorted, _df_disp_visible):
+            nonlocal _kwl_target
+            _disp9_cols = [c for c in ["campaign_theme","ad_group","keyword","impressions","clicks","cost","sales","orders","ROAS","cpc_rank","cpc_delta","調整履歴"] if c in _df_disp_visible.columns]
+            _rn9 = {"campaign_theme":"キャンペーン","ad_group":"広告グループ","keyword":"キーワード",
+                    "impressions":"インプレッション","clicks":"クリック","cost":"広告費","sales":"売上",
+                    "orders":"注文数","ROAS":"ROAS","CVR":"CVR","cpc_rank":"判定ランク","cpc_delta":"調整額"}
+            _d = _df_disp_visible[_disp9_cols].rename(columns=_rn9).copy()
+            if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
+            if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
+            if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].apply(lambda x: f"{x:.2f}")
+            if "CVR"    in _d.columns: _d["CVR"]    = _d["CVR"].apply(lambda x: f"{x:.1f}%")
+            if "調整額" in _d.columns: _d["調整額"] = _d["調整額"].apply(lambda x: f"{x:+,.0f}円")
+            # ③ KW一覧（実行対象抽出のみ）。表示条件は以下2つを厳密AND評価する：
+            # ①cpc_delta が数値としてnon-zero（NaN/文字列は数値0として扱い除外）
+            # ②cpc_rank が判定保留・未確定・空ではない（確定済み状態のみ許可）
+            # 文字列比較は行わず、フィルタは描画前に完結させる（描画後の除外は行わない）。
+            # フィルタ結果が0件の場合も、ノイズ(±0・判定保留)を再度含める形での
+            # 「完全開示」は行わない（安全な部分開示。対象なしの場合はその旨を表示する）。
+            st.markdown("#### 📋 KW一覧（実行対象）")
+            if _df_c_sorted.empty:
+                st.info("表示対象のキーワードがありません。")
             else:
-                _cd_num = pd.Series(0.0, index=df_c.index)
-            _pending_vals = {"", "none", "nan", "n/a", "na", "pending", "保留", "判断保留"}
-            def _cpc_is_pending(_v):
-                if pd.isna(_v):
-                    return True
-                return str(_v).strip().lower() in _pending_vals
-            if "cpc_rank" in df_c.columns:
-                _rank_pending = df_c["cpc_rank"].apply(_cpc_is_pending)
-            else:
-                _rank_pending = pd.Series(False, index=df_c.index)
-            _valid_mask = (_cd_num != 0) & (~_rank_pending)
-            _kwl_target = df_c[_valid_mask].copy()
-            if _kwl_target.empty:
-                st.info("調整対象のキーワードはありません（すべて変更不要または判定保留）。")
-            else:
-                # 【新規追加】オンスクリーン表示の空判定のみ、記録済み(非表示中)のKWを
-                # 除外して評価する。_kwl_target自体（分析タブへ渡す値）は無改変のまま。
-                _kwl_target_visible = (
-                    _kwl_target[~_kwl_target["_cpc_ck"].isin(_cpc_hidden_keys)]
-                    if "_cpc_ck" in _kwl_target.columns else _kwl_target
-                )
-                if _kwl_target_visible.empty:
-                    st.info("表示対象のキーワードはすべて記録済みです（次回のCSV再分析で復活します）。")
+                if "cpc_delta" in _df_c_sorted.columns:
+                    _cd_num = pd.to_numeric(_df_c_sorted["cpc_delta"], errors="coerce").fillna(0.0)
                 else:
-                    def _cr9(row):
-                        c = _RC.get(row.get("判定ランク", ""), "")
-                        return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
-                    _d.index = range(1, len(_d) + 1)
-                    st.dataframe(_d.style.apply(_cr9, axis=1), use_container_width=True, height=460)
-        st.markdown("---")
-        _c1, _c2 = st.columns(2)
-        with _c1:
-            _dl_csv_adj = df_disp[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-            _anls_save_cpc_change_history(df_disp[disp_cols].copy())
-            st.download_button(f"📥 {cpc_camp}_CPC調整_実行用.csv", data=_dl_csv_adj,
-                file_name=f"{cpc_camp}_CPC調整_実行用.csv", mime="text/csv", use_container_width=True)
-        with _c2:
-            _dl_csv_all = df_c[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-            st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
-                file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
-        # ── 【変更】CPC変更履歴の記録ボタン：選択式→行ごとのボタン式 ──────────
-        # 保存に使う新規JSON(cpc_kw_change_events.json)・新規関数
-        # (_cpc_change_save_event)は無改変のまま流用。既存の判定ロジック・
-        # 既存のdf_disp計算・既存のCPC調整表示・既存のhistory保存
-        # (_anls_save_cpc_change_history)には一切影響しない。
-        st.markdown("---")
-        # 【変更】セクション全体をst.expanderで開閉式にする（デフォルト閉じた状態）。
-        # 中身のロジック（チェックボックス・一括記録ボタン・保存処理）は無改変で、
-        # そのまま1段階インデントを深くしただけ。
-        with st.expander("📝 CPC変更を記録", expanded=False):
-            st.caption("💡 いつ・いくら変更したか、あとで見返せるようにするための記録です。")
-            st.caption("推奨CPCを実際にAmazon広告側で適用したキーワードにチェックを入れ、下の「選択した◯件を記録」を押してください。押すとその行は一覧から消え、次回CSV再分析で「調整履歴」付きで復活します。")
-            if df_disp_visible.empty:
-                st.caption("記録対象（変更幅が発生している行）がありません。")
-            else:
-                # 【変更】行ごとの記録ボタン→チェックボックス＋一括記録ボタン方式に変更。
-                # 保存に使う_cpc_change_save_event・非表示セット(_cpc_hide_state_key)は
-                # 無改変のまま流用。チェック状態はst.checkboxのkeyでst.session_stateに
-                # 保持されるだけの新規追加で、他の処理には一切影響しない。
-                _rec_hdr = st.columns([1, 3, 3, 3, 2])
-                for _h, _lbl in zip(_rec_hdr, ["", "キャンペーン", "広告グループ", "キーワード", "CPC調整金額"]):
-                    _h.markdown(f"**{_lbl}**")
-                _cb_rows = []
-                for _ridx, _rrow in df_disp_visible.iterrows():
-                    _rc0, _rc1, _rc2, _rc3, _rc4 = st.columns([1, 3, 3, 3, 2])
-                    _cb_key = f"_cpc_change_kw_cb_{_rrow.get('_cpc_ck','')}_{_ridx}"
-                    _cb_rows.append((_cb_key, _rrow))
-                    # 【新規追加】チェック済み行を薄い背景色で示すための判定のみ。
-                    # チェックボックス自体の値・保存ロジックには影響しない、表示専用の分岐。
-                    _is_checked = st.session_state.get(_cb_key, False)
-                    with _rc0:
-                        st.checkbox("記録対象", key=_cb_key, label_visibility="collapsed")
-                    with _rc1:
-                        _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""), highlighted=_is_checked)
-                    with _rc2:
-                        _cpc_change_nowrap_cell(_rrow.get("ad_group", ""), highlighted=_is_checked)
-                    with _rc3:
-                        _cpc_change_nowrap_cell(_rrow.get("keyword", ""), highlighted=_is_checked)
-                    with _rc4:
-                        _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円", highlighted=_is_checked)
-                _n_sel = sum(1 for _k, _ in _cb_rows if st.session_state.get(_k, False))
-                if st.button(f"✅ 選択した{_n_sel}件を記録", key="_cpc_change_kw_bulk_record_btn", disabled=(_n_sel == 0)):
-                    for _k, _rrow in _cb_rows:
-                        if st.session_state.get(_k, False):
-                            _cpc_change_save_event(
-                                "cpc_kw_change_events.json",
-                                _rrow.get("campaign_name"), _rrow.get("ad_group"),
-                                _rrow.get("keyword"), "keyword",
-                                _rrow.get("avg_cpc"), _rrow.get("rec_cpc"), _rrow,
-                            )
-                            st.session_state[_cpc_hide_state_key].add(_rrow.get("_cpc_ck", ""))
-                            st.session_state[_k] = False
-                    st.rerun()
+                    _cd_num = pd.Series(0.0, index=_df_c_sorted.index)
+                _pending_vals = {"", "none", "nan", "n/a", "na", "pending", "保留", "判断保留"}
+                def _cpc_is_pending(_v):
+                    if pd.isna(_v):
+                        return True
+                    return str(_v).strip().lower() in _pending_vals
+                if "cpc_rank" in _df_c_sorted.columns:
+                    _rank_pending = _df_c_sorted["cpc_rank"].apply(_cpc_is_pending)
+                else:
+                    _rank_pending = pd.Series(False, index=_df_c_sorted.index)
+                _valid_mask = (_cd_num != 0) & (~_rank_pending)
+                _kwl_target = _df_c_sorted[_valid_mask].copy()
+                if _kwl_target.empty:
+                    st.info("調整対象のキーワードはありません（すべて変更不要または判定保留）。")
+                else:
+                    # 【新規追加】オンスクリーン表示の空判定のみ、記録済み(非表示中)のKWを
+                    # 除外して評価する。_kwl_target自体（分析タブへ渡す値）は無改変のまま。
+                    _kwl_target_visible = (
+                        _kwl_target[~_kwl_target["_cpc_ck"].isin(_cpc_hidden_keys)]
+                        if "_cpc_ck" in _kwl_target.columns else _kwl_target
+                    )
+                    if _kwl_target_visible.empty:
+                        st.info("表示対象のキーワードはすべて記録済みです（次回のCSV再分析で復活します）。")
+                    else:
+                        def _cr9(row):
+                            c = _RC.get(row.get("判定ランク", ""), "")
+                            return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
+                        _d.index = range(1, len(_d) + 1)
+                        st.dataframe(_d.style.apply(_cr9, axis=1), use_container_width=True, height=460)
+
+        def _kw_csv_export(_df_c_sorted, _df_disp, _disp_cols, _rn):
+            _c1, _c2 = st.columns(2)
+            with _c1:
+                _dl_csv_adj = _df_disp[_disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+                _anls_save_cpc_change_history(_df_disp[_disp_cols].copy())
+                st.download_button(f"📥 {cpc_camp}_CPC調整_実行用.csv", data=_dl_csv_adj,
+                    file_name=f"{cpc_camp}_CPC調整_実行用.csv", mime="text/csv", use_container_width=True)
+            with _c2:
+                _dl_csv_all = _df_c_sorted[_disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+                st.download_button(f"📥 {cpc_camp}_CPC調整表.csv", data=_dl_csv_all,
+                    file_name=f"{cpc_camp}_CPC調整表.csv", mime="text/csv", use_container_width=True)
+
+        _render_cpc_common_section(
+            df_c, "keyword", "cpc_kw_change_events.json",
+            _cpc_hide_state_key, _cpc_hidden_keys,
+            False, _RC,
+            "_cpc_change_kw_cb_", "_cpc_change_kw_bulk_record_btn", "キーワード",
+            True,
+            _kw_render_list, _kw_csv_export,
+        )
     with _t_tab2:
         # ── 分析ページ（新規・表示専用） ──────────────────────────
         # 【重要】tab1で既に確定済みの_kwl_target（KW一覧・実行対象。並び順・
@@ -5539,165 +5575,54 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
             st.session_state[_cpc_hide_sig_key] = _cur_sig
             st.session_state[_cpc_hide_state_key] = set()
         _cpc_hidden_keys = st.session_state.setdefault(_cpc_hide_state_key, set())
-    cnt = {r: int((df_c["cpc_rank"] == r).sum()) for r in _RANK_ORDER}
-    st.markdown("---")
-    kpi_rks = ["SS+", "SS", "S", "A", "B", "C", "D", "即削除"]
-    kc_ = st.columns(len(kpi_rks))
-    for _col, rk in zip(kc_, kpi_rks):
-        bg_map = {
-            "SS+":"#FFFFF0","SS":"#FEFCBF","S":"#E9D8FD","A":"#C6F6D5",
-            "B":"#BEE3F8","C":"#FEEBC8","D":"#FED7D7","即削除":"#FED7D7",
-        }
-        _col.markdown(f'''<div class="kpi-card" style="background:{bg_map.get(rk,'#F4F6F8')};border-top:3px solid {_RC[rk]};">
-            <div class="kpi-label">{rk}</div>
-            <div class="kpi-value" style="color:{_RC[rk]};font-size:1.5rem;">{cnt[rk]}</div>
-            <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    if cnt["判断保留"] > 0:
-        st.caption(f"⏸ 判断保留: {cnt['判断保留']}件（広告費¥3,000未満 かつ 購入数4件未満）")
-    # ── 本日調整対象ブロック ──────────────────────────────────
-    _n_up   = int((df_c["cpc_delta"] > 0).sum())
-    _n_down = int((df_c["cpc_delta"] < 0).sum())
-    _n_adj  = _n_up + _n_down
-    st.markdown("---")
-    st.caption("📅 本日調整対象")
-    _bc1, _bc2, _bc3 = st.columns(3)
-    _bc1.markdown(f'''<div class="kpi-card" style="background:#E6FFFA;border-top:3px solid #276749;">
-        <div class="kpi-label">🔺 CPC上げ</div>
-        <div class="kpi-value" style="color:#276749;font-size:1.5rem;">{_n_up}</div>
-        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    _bc2.markdown(f'''<div class="kpi-card" style="background:#FFF5F5;border-top:3px solid #C53030;">
-        <div class="kpi-label">🔻 CPC下げ</div>
-        <div class="kpi-value" style="color:#C53030;font-size:1.5rem;">{_n_down}</div>
-        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    _bc3.markdown(f'''<div class="kpi-card" style="background:#EBF8FF;border-top:3px solid #2B6CB0;">
-        <div class="kpi-label">📊 変更対象合計</div>
-        <div class="kpi-value" style="color:#2B6CB0;font-size:1.5rem;">{_n_adj}</div>
-        <div class="kpi-sub">件</div></div>''', unsafe_allow_html=True)
-    st.markdown("---")
-    disp_cols = [c for c in ["campaign_name","ad_group",id_col,"ROAS","cost","sales","orders","avg_cpc","cpc_rank","cpc_action","cpc_delta","rec_cpc"] if c in df_c.columns]
-    _rn = {"campaign_name":"キャンペーン名","ad_group":"広告グループ",id_col:("ASIN" if id_col == "asin" else "KWテキスト"),
-           "cost":"広告費","sales":"売上","orders":"購入数",
-           "avg_cpc":"現在CPC","cpc_rank":"判定ランク","cpc_action":"推奨アクション",
-           "cpc_delta":"変更幅","rec_cpc":"推奨CPC"}
-    cat_t = pd.CategoricalDtype(categories=_RANK_ORDER, ordered=True)
-    df_c["_r"] = df_c["cpc_rank"].astype(cat_t)
-    df_c = df_c.sort_values(["_r","ROAS"], ascending=[True, False]).drop(columns=["_r"]).reset_index(drop=True)
-    df_c.index = df_c.index + 1
-    # ① 一覧テーブルは変更幅≠0（CPC上げ・CPC下げ）のみ表示
-    df_disp = df_c[df_c["cpc_delta"] != 0].copy()
-    df_disp.index = range(1, len(df_disp) + 1)
-    # 【新規追加】change_log_fname指定時のみ、オンスクリーン表示専用の複製
-    # (df_disp_visible)に、記録済み(未確認・非表示中)行の除外と「調整履歴」列を
-    # 追加する。df_disp自体はダウンロード・履歴保存(hist_fname)で使うため無改変。
-    if change_log_fname and "_cpc_ck" in df_disp.columns:
-        df_disp_visible = df_disp[~df_disp["_cpc_ck"].isin(_cpc_hidden_keys)].copy()
-        _cpc_hist_events_pt = _anls_load(change_log_fname)
-        _cpc_hist_by_key_pt = {}
-        for _e in _cpc_hist_events_pt:
-            _cpc_hist_by_key_pt.setdefault(_e.get("target_key", ""), []).append(_e)
-        def _cpc_hist_str_pt(_ck):
-            _recs = _cpc_hist_by_key_pt.get(_ck, [])
-            if not _recs:
-                return "―"
-            _parts = []
-            for _e in sorted(_recs, key=lambda x: x.get("changed_at", "")):
-                try:
-                    _dtp = _anls_dt.datetime.fromisoformat(_e.get("changed_at", ""))
-                    _dtxt = f"{_dtp.month}/{_dtp.day}"
-                except Exception:
-                    _dtxt = "?"
-                _delta = float(_e.get("after_cpc", 0) or 0) - float(_e.get("before_cpc", 0) or 0)
-                _parts.append(f"{_dtxt}:{_delta:+.0f}円")
-            return "、".join(_parts)
-        df_disp_visible["調整履歴"] = df_disp_visible["_cpc_ck"].apply(_cpc_hist_str_pt)
-    else:
-        df_disp_visible = df_disp.copy()
-    _disp9_cols = [c for c in ["campaign_theme","ad_group", id_col, "impressions","clicks","cost","sales","orders","ROAS","cpc_rank","cpc_delta","調整履歴"] if c in df_disp_visible.columns]
-    _rn9 = {"campaign_theme":"キャンペーン","ad_group":"広告グループ", id_col:("ASIN" if id_col == "asin" else "キーワード"),
-            "impressions":"インプレッション","clicks":"クリック",
-            "cost":"広告費","sales":"売上","orders":"注文数","ROAS":"ROAS","CVR":"CVR",
-            "cpc_rank":"判定ランク","cpc_delta":"調整額"}
-    _d = df_disp_visible[_disp9_cols].rename(columns=_rn9).copy()
-    if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
-    if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
-    if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].apply(lambda x: f"{x:.2f}")
-    if "CVR"    in _d.columns: _d["CVR"]    = _d["CVR"].apply(lambda x: f"{x:.1f}%")
-    if "調整額" in _d.columns: _d["調整額"] = _d["調整額"].apply(lambda x: f"{x:+,.0f}円")
-    def _cr(row):
-        c = _RC.get(row.get("判定ランク", ""), "")
-        return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
-    if df_disp_visible.empty:
-        st.info("変更幅が発生するASINはありません（全件 現状維持 または 判断保留）。")
-    else:
-        st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
-    # CSV: hist_fname指定時はHistory保存対象(df_disp)と完全同一DataFrameを出力
-    _dl_fname = f"{cpc_camp}_{page_title}_CPC調整表.csv"
-    if hist_fname:
-        _dl_csv = df_disp[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-        _anls_save_cpc_asin_history(df_disp[disp_cols].copy(), hist_fname)
-        st.download_button(f"📥 {_dl_fname}", data=_dl_csv,
-            file_name=_dl_fname, mime="text/csv")
-    else:
-        _dl_src = df_disp if csv_disp_only else df_c
-        _dl_csv = _dl_src[disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-        st.download_button(f"📥 {_dl_fname}", data=_dl_csv,
-            file_name=_dl_fname, mime="text/csv")
-    # ── 【変更】CPC変更履歴の記録ボタン：選択式→行ごとのボタン式（キーワード版と統一）──
-    # 保存に使う新規JSON(change_log_fname)・新規関数(_cpc_change_save_event)は
-    # 無改変のまま流用。change_log_fnameが指定されない既存呼び出し（後方互換）では
-    # このブロック自体が描画されないため、既存の判定ロジック・既存の表示・既存の
-    # hist_fname保存(_anls_save_cpc_asin_history)には一切影響しない。
-    if change_log_fname:
-        st.markdown("---")
-        # 【変更】セクション全体をst.expanderで開閉式にする（デフォルト閉じた状態、
-        # キーワード版と統一）。中身のロジック（チェックボックス・一括記録ボタン・
-        # 保存処理）は無改変で、そのまま1段階インデントを深くしただけ。
-        with st.expander("📝 CPC変更を記録", expanded=False):
-            st.caption("💡 いつ・いくら変更したか、あとで見返せるようにするための記録です。")
-            st.caption("推奨CPCを実際にAmazon広告側で適用した対象にチェックを入れ、下の「選択した◯件を記録」を押してください。押すとその行は一覧から消え、次回CSV再分析で「調整履歴」付きで復活します。")
-            if df_disp_visible.empty:
-                st.caption("記録対象（変更幅が発生している行）がありません。")
-            else:
-                # 【変更】行ごとの記録ボタン→チェックボックス＋一括記録ボタン方式に変更
-                # （キーワード版と統一）。保存に使う_cpc_change_save_event・非表示セット
-                # (_cpc_hide_state_key)は無改変のまま流用。チェック状態はst.checkboxの
-                # keyでst.session_stateに保持されるだけの新規追加で、他の処理には
-                # 一切影響しない。
-                _id_label = "ASIN" if id_col == "asin" else "キーワード"
-                _rec_hdr = st.columns([1, 3, 3, 3, 2])
-                for _h, _lbl in zip(_rec_hdr, ["", "キャンペーン", "広告グループ", _id_label, "CPC調整金額"]):
-                    _h.markdown(f"**{_lbl}**")
-                _cb_rows = []
-                for _ridx, _rrow in df_disp_visible.iterrows():
-                    _rc0, _rc1, _rc2, _rc3, _rc4 = st.columns([1, 3, 3, 3, 2])
-                    _cb_key = f"_cpc_change_pt_cb_{sel_key}_{_rrow.get('_cpc_ck','')}_{_ridx}"
-                    _cb_rows.append((_cb_key, _rrow))
-                    # 【新規追加】チェック済み行を薄い背景色で示すための判定のみ。
-                    # チェックボックス自体の値・保存ロジックには影響しない、表示専用の分岐。
-                    _is_checked = st.session_state.get(_cb_key, False)
-                    with _rc0:
-                        st.checkbox("記録対象", key=_cb_key, label_visibility="collapsed")
-                    with _rc1:
-                        _cpc_change_nowrap_cell(_rrow.get("campaign_name", ""), highlighted=_is_checked)
-                    with _rc2:
-                        _cpc_change_nowrap_cell(_rrow.get("ad_group", ""), highlighted=_is_checked)
-                    with _rc3:
-                        _cpc_change_nowrap_cell(_rrow.get(id_col, ""), highlighted=_is_checked)
-                    with _rc4:
-                        _cpc_change_nowrap_cell(f"{float(_rrow.get('cpc_delta', 0) or 0):+.0f}円", highlighted=_is_checked)
-                _n_sel = sum(1 for _k, _ in _cb_rows if st.session_state.get(_k, False))
-                if st.button(f"✅ 選択した{_n_sel}件を記録", key=f"_cpc_change_pt_bulk_record_btn_{sel_key}", disabled=(_n_sel == 0)):
-                    for _k, _rrow in _cb_rows:
-                        if st.session_state.get(_k, False):
-                            _cpc_change_save_event(
-                                change_log_fname,
-                                _rrow.get("campaign_name"), _rrow.get("ad_group"),
-                                _rrow.get(id_col), id_col,
-                                _rrow.get("avg_cpc"), _rrow.get("rec_cpc"), _rrow,
-                            )
-                            st.session_state[_cpc_hide_state_key].add(_rrow.get("_cpc_ck", ""))
-                            st.session_state[_k] = False
-                    st.rerun()
+    # ── 【共通化】ランクサマリー・本日調整対象カード・一覧表示・CSVダウンロード・
+    # CPC変更を記録セクションは、新規共通関数_render_cpc_common_sectionに集約。
+    # render_list_fn／csv_export_fnはこの場に元々あったコードを無改変で移設した
+    # だけで、target_key生成・_cpc_change_save_event・既存の判定ロジック・
+    # 既存のCSV列・既存のファイル名・既存のsession_stateキー・hist_fname／
+    # csv_disp_only／change_log_fnameの現行分岐には一切変更がない。
+    def _pt_render_list(_df_c_sorted, _df_disp_visible):
+        _disp9_cols = [c for c in ["campaign_theme","ad_group", id_col, "impressions","clicks","cost","sales","orders","ROAS","cpc_rank","cpc_delta","調整履歴"] if c in _df_disp_visible.columns]
+        _rn9 = {"campaign_theme":"キャンペーン","ad_group":"広告グループ", id_col:("ASIN" if id_col == "asin" else "キーワード"),
+                "impressions":"インプレッション","clicks":"クリック",
+                "cost":"広告費","sales":"売上","orders":"注文数","ROAS":"ROAS","CVR":"CVR",
+                "cpc_rank":"判定ランク","cpc_delta":"調整額"}
+        _d = _df_disp_visible[_disp9_cols].rename(columns=_rn9).copy()
+        if "広告費" in _d.columns: _d["広告費"] = _d["広告費"].apply(lambda x: f"¥{x:,.0f}")
+        if "売上"   in _d.columns: _d["売上"]   = _d["売上"].apply(lambda x: f"¥{x:,.0f}")
+        if "ROAS"   in _d.columns: _d["ROAS"]   = _d["ROAS"].apply(lambda x: f"{x:.2f}")
+        if "CVR"    in _d.columns: _d["CVR"]    = _d["CVR"].apply(lambda x: f"{x:.1f}%")
+        if "調整額" in _d.columns: _d["調整額"] = _d["調整額"].apply(lambda x: f"{x:+,.0f}円")
+        def _cr(row):
+            c = _RC.get(row.get("判定ランク", ""), "")
+            return [f"color:{c};font-weight:700" if col == "判定ランク" else "" for col in row.index]
+        if _df_disp_visible.empty:
+            st.info("変更幅が発生するASINはありません（全件 現状維持 または 判断保留）。")
+        else:
+            st.dataframe(_d.style.apply(_cr, axis=1), use_container_width=True, height=460)
+
+    def _pt_csv_export(_df_c_sorted, _df_disp, _disp_cols, _rn):
+        # CSV: hist_fname指定時はHistory保存対象(df_disp)と完全同一DataFrameを出力
+        _dl_fname = f"{cpc_camp}_{page_title}_CPC調整表.csv"
+        if hist_fname:
+            _dl_csv = _df_disp[_disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            _anls_save_cpc_asin_history(_df_disp[_disp_cols].copy(), hist_fname)
+            st.download_button(f"📥 {_dl_fname}", data=_dl_csv,
+                file_name=_dl_fname, mime="text/csv")
+        else:
+            _dl_src = _df_disp if csv_disp_only else _df_c_sorted
+            _dl_csv = _dl_src[_disp_cols].rename(columns=_rn).to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            st.download_button(f"📥 {_dl_fname}", data=_dl_csv,
+                file_name=_dl_fname, mime="text/csv")
+
+    _render_cpc_common_section(
+        df_c, id_col, change_log_fname,
+        _cpc_hide_state_key, _cpc_hidden_keys,
+        True, _RC,
+        f"_cpc_change_pt_cb_{sel_key}_", f"_cpc_change_pt_bulk_record_btn_{sel_key}", "対象",
+        False,
+        _pt_render_list, _pt_csv_export,
+    )
 
 
 def page_cpc_product():
