@@ -2645,6 +2645,26 @@ def _cpc_change_delete_event(fname: str, event_id: str) -> None:
     _anls_save(fname, _filtered)
 
 
+def _cpc_change_history_zip() -> bytes:
+    """CPC変更履歴JSON4種（存在するもののみ）を、元のファイル名・元のバイト内容の
+    まま1つのZIPへまとめて返す（新規追加・読み取り専用）。_anls_load/_anls_save は
+    一切呼び出さず、JSONの再構成・整形・変換も行わない。既存の判定ロジック・
+    CSV出力・削除・30日後比較には一切関与しない。"""
+    _fnames = [
+        "cpc_kw_change_events.json",
+        "cpc_pt_m_change_events.json",
+        "cpc_pt_v_change_events.json",
+        "cpc_pt_sbv_change_events.json",
+    ]
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for _fname in _fnames:
+            _p = _get_analysis_dir() / _fname
+            if _p.exists():
+                zf.writestr(_fname, _p.read_bytes())
+    return buf.getvalue()
+
+
 def _cpc_change_fill_after_comparisons(fname: str, id_col: str) -> None:
     """CPC変更履歴の30日後比較（compare_to）を埋める独立処理。compare_to未確定の
     イベントについて、既存の比較CSVバケット(csv_bucket_7d/30d/other、既存の
@@ -2770,6 +2790,18 @@ def page_cpc_change_history():
         ("cpc_pt_v_change_events.json", "動画", "asin"),
         ("cpc_pt_sbv_change_events.json", "SB動画KW", "keyword"),
     ]
+    # 【新規追加】バックアップ用ZIPダウンロード（読み取り専用）。_anls_saveは
+    # 呼び出さず、JSONの内容も変更しない。既存の判定・削除・30日後比較・
+    # 他ページのUIには一切影響しない、表示専用の追記。
+    if any((_get_analysis_dir() / _fname).exists() for _fname, _label, _id_col in _targets):
+        st.download_button(
+            "📦 CPC変更履歴をバックアップ（ZIP）",
+            data=_cpc_change_history_zip(),
+            file_name="cpc_change_history_backup.zip",
+            mime="application/zip",
+        )
+    else:
+        st.caption("バックアップ対象の履歴はまだありません。")
     for _fname, _label, _id_col in _targets:
         _cpc_change_fill_after_comparisons(_fname, _id_col)
     _all_events = []
