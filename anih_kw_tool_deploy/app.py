@@ -4469,7 +4469,6 @@ def _render_cpc_common_section(
                                 _rrow.get("avg_cpc"), _rrow.get("rec_cpc"), _rrow,
                             )
                             st.session_state[cpc_hide_state_key].add(_rrow.get("_cpc_ck", ""))
-                            st.session_state[_k] = False
                     st.rerun()
 
 
