@@ -4526,6 +4526,7 @@ def page_cpc():
         # 中身のロジック（チェックボックス・一括記録ボタン・保存処理）は無改変で、
         # そのまま1段階インデントを深くしただけ。
         with st.expander("📝 CPC変更を記録", expanded=False):
+            st.caption("💡 いつ・いくら変更したか、あとで見返せるようにするための記録です。")
             st.caption("推奨CPCを実際にAmazon広告側で適用したキーワードにチェックを入れ、下の「選択した◯件を記録」を押してください。押すとその行は一覧から消え、次回CSV再分析で「調整履歴」付きで復活します。")
             if df_disp_visible.empty:
                 st.caption("記録対象（変更幅が発生している行）がありません。")
@@ -5620,6 +5621,7 @@ def _render_pt_cpc_page(dc_pt, page_title: str, sel_key: str, hist_fname: str = 
         # キーワード版と統一）。中身のロジック（チェックボックス・一括記録ボタン・
         # 保存処理）は無改変で、そのまま1段階インデントを深くしただけ。
         with st.expander("📝 CPC変更を記録", expanded=False):
+            st.caption("💡 いつ・いくら変更したか、あとで見返せるようにするための記録です。")
             st.caption("推奨CPCを実際にAmazon広告側で適用した対象にチェックを入れ、下の「選択した◯件を記録」を押してください。押すとその行は一覧から消え、次回CSV再分析で「調整履歴」付きで復活します。")
             if df_disp_visible.empty:
                 st.caption("記録対象（変更幅が発生している行）がありません。")
