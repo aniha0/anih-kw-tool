@@ -2716,8 +2716,12 @@ def _cpc_change_fill_after_comparisons(fname: str, id_col: str) -> None:
 
             def _row_target(_raw_val):
                 _s = str(_raw_val or "").strip()
-                if id_col == "asin" and _s.lower().startswith("asin:"):
-                    return _s[5:]
+                if id_col == "asin":
+                    if _s.lower().startswith("asin:"):
+                        return _s[5:]
+                    _m = re.match(r'asin="([^"]+)"', _s, re.IGNORECASE)
+                    if _m:
+                        return _m.group(1)
                 return _s
 
             _df_raw["_cpcchg_tv"] = _df_raw[_tcol].apply(_row_target)
