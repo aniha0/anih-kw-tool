@@ -2633,7 +2633,8 @@ def _cpc_change_save_event(fname: str, campaign_name, ad_group, target_val, id_c
     }
     _existing = _anls_load(fname)
     _existing.append(_record)
-    _anls_save(fname, _existing)
+    if not _anls_save(fname, _existing):
+        st.error(f"⚠️ CPC変更履歴の保存に失敗しました（{fname}）。再度お試しください。")
 
 
 def _cpc_change_delete_event(fname: str, event_id: str) -> None:
@@ -2746,10 +2747,17 @@ def _cpc_change_fill_after_comparisons(fname: str, id_col: str) -> None:
             _changed_at = _anls_dt.datetime.fromisoformat(str(_ev.get("changed_at", "")))
         except Exception:
             continue
-        _target_date = (_changed_at + _anls_dt.timedelta(days=30)).date()
+        # 。30日固定マッチ》から『比較元終端より後のCSVを使う』へ変更
+        _compare_from_end = None
+        try:
+            _cf_end_str = _ev.get("compare_from", {}).get("period_end", "")
+            if _cf_end_str:
+                _compare_from_end = _anls_dt.date.fromisoformat(str(_cf_end_str))
+        except Exception:
+            pass
         _candidates = []
         for _pcsv in _parsed_csvs:
-            if not (_pcsv["p_start"] <= _target_date <= _pcsv["p_end"]):
+            if _compare_from_end and _pcsv["p_end"] <= _compare_from_end:
                 continue
             _df_raw = _pcsv["df"]
             _match = _df_raw[_df_raw["_cpcchg_tkey"] == _ev.get("target_key", "")]
@@ -2758,7 +2766,7 @@ def _cpc_change_fill_after_comparisons(fname: str, id_col: str) -> None:
             _candidates.append((_pcsv, _match))
         if not _candidates:
             continue
-        _pcsv, _match = min(_candidates, key=lambda pair: abs((pair[0]["p_end"] - _target_date).days))
+        _pcsv, _match = min(_candidates, key=lambda pair: pair[0]["p_end"])
         _sc, _oc, _od, _clk, _imp = _pcsv["sc"], _pcsv["oc"], _pcsv["od"], _pcsv["clk"], _pcsv["imp"]
         _cost = float(tonum(_match[_oc]).sum())
         _sales = float(tonum(_match[_sc]).sum())
