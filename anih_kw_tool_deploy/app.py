@@ -2747,7 +2747,7 @@ def _cpc_change_fill_after_comparisons(fname: str, id_col: str) -> None:
             _changed_at = _anls_dt.datetime.fromisoformat(str(_ev.get("changed_at", "")))
         except Exception:
             continue
-        # 。30日固定マッチ》から『比較元終端より後のCSVを使う』へ変更
+        # 30日固定マッチから比較元終端より後のCSVを使う方式へ変更
         _compare_from_end = None
         try:
             _cf_end_str = _ev.get("compare_from", {}).get("period_end", "")
@@ -4422,7 +4422,7 @@ def _render_cpc_common_section(
             for _e in sorted(_recs, key=lambda x: x.get("changed_at", "")):
                 try:
                     _dtp = _anls_dt.datetime.fromisoformat(_e.get("changed_at", ""))
-                    _dtxt = f"{_dtp.month}/{_dtp.day}"
+                    _dtxt = f"{_dtp.month}/{_dtp.day} {_dtp.hour:02d}:{_dtp.minute:02d}"
                 except Exception:
                     _dtxt = "?"
                 _delta = float(_e.get("after_cpc", 0) or 0) - float(_e.get("before_cpc", 0) or 0)
