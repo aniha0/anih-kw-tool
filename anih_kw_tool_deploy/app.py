@@ -2846,6 +2846,57 @@ def page_cpc_change_history():
     _filtered.sort(key=lambda x: str(x[0].get("changed_at", "")), reverse=True)
     st.caption(f"該当件数：{len(_filtered)}件")
 
+    # ── CPC変更履歴 CSV出力（新規追加・他ロジックには一切触れない）──
+    if _filtered:
+        import io as _cpccsv_io, csv as _cpccsv_mod
+        _cpccsv_buf = _cpccsv_io.StringIO()
+        _cpccsv_w = _cpccsv_mod.writer(_cpccsv_buf)
+        _cpccsv_w.writerow([
+            "変更日時", "対象種別", "キャンペーン", "広告グループ", "KW/ASIN",
+            "CPC変更前(¥)", "CPC変更後(¥)", "CPC変化率(%)",
+            "比較元期間", "比較先期間",
+            "広告費_前(¥)", "広告費_後(¥)",
+            "売上_前(¥)", "売上_後(¥)",
+            "注文数_前", "注文数_後",
+            "ROAS_前", "ROAS_後",
+            "インプレッション_前", "インプレッション_後",
+            "クリック_前", "クリック_後",
+            "CVR_前(%)", "CVR_後(%)",
+            "状態",
+        ])
+        for _cpccsv_ev, _cpccsv_lbl, _cpccsv_idcol, _cpccsv_fn in _filtered:
+            _cpccsv_cf = _cpccsv_ev.get("compare_from") or {}
+            _cpccsv_ct = _cpccsv_ev.get("compare_to") or {}
+            _cpccsv_p1 = (f"{_cpccsv_cf.get('period_start','')}~{_cpccsv_cf.get('period_end','')}" if _cpccsv_cf else "")
+            _cpccsv_p2 = (f"{_cpccsv_ct.get('period_start','')}~{_cpccsv_ct.get('period_end','')}" if _cpccsv_ct else "比較待ち")
+            _cpccsv_tv = _cpccsv_ev.get("keyword", _cpccsv_ev.get("asin", ""))
+            _cpccsv_w.writerow([
+                str(_cpccsv_ev.get("changed_at", ""))[:16].replace("T", " "),
+                _cpccsv_lbl,
+                _cpccsv_ev.get("campaign_name", ""),
+                _cpccsv_ev.get("ad_group", ""),
+                _cpccsv_tv,
+                _cpccsv_ev.get("before_cpc", ""),
+                _cpccsv_ev.get("after_cpc", ""),
+                _cpccsv_ev.get("change_rate", ""),
+                _cpccsv_p1, _cpccsv_p2,
+                _cpccsv_cf.get("cost", ""), _cpccsv_ct.get("cost", ""),
+                _cpccsv_cf.get("sales", ""), _cpccsv_ct.get("sales", ""),
+                _cpccsv_cf.get("orders", ""), _cpccsv_ct.get("orders", ""),
+                _cpccsv_cf.get("ROAS", ""), _cpccsv_ct.get("ROAS", ""),
+                _cpccsv_cf.get("impressions", ""), _cpccsv_ct.get("impressions", ""),
+                _cpccsv_cf.get("clicks", ""), _cpccsv_ct.get("clicks", ""),
+                _cpccsv_cf.get("CVR", ""), _cpccsv_ct.get("CVR", ""),
+                "比較完了" if _cpccsv_ct else "比較待ち",
+            ])
+        st.download_button(
+            "📥 CPC変更履歴をCSVダウンロード",
+            data=_cpccsv_buf.getvalue().encode("utf-8-sig"),
+            file_name=f"cpc_change_history_{_anls_dt.date.today().isoformat()}.csv",
+            mime="text/csv",
+            key="_cpc_change_hist_csv_dl",
+        )
+
     def _fmt_yen(v): return f"¥{float(v or 0):,.0f}"
     def _fmt_num(v): return f"{float(v or 0):,.0f}"
     def _fmt_roas(v): return f"{float(v or 0):.2f}"
