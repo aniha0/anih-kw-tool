@@ -271,6 +271,25 @@
           "orders": 75
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-10T07:36:32.776043",
+      "entries": [
+        {
+          "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ふりかけ猫】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0F9W44FVR",
+          "avg_cpc": 93,
+          "rec_cpc": 98,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 6836.0,
+          "cost": 838.25,
+          "ROAS": 8.16,
+          "orders": 4
+        }
+      ]
     }
   ]
 }
