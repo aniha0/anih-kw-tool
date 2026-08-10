@@ -200,6 +200,39 @@
     {
       "exported_at": "2026-08-10T07:30:47.531875",
       "entries": []
+    },
+    {
+      "exported_at": "2026-08-10T07:30:59.848706",
+      "entries": [
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0C1BXJ98Q",
+          "avg_cpc": 102,
+          "rec_cpc": 97,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 5400.0,
+          "cost": 3168.06,
+          "ROAS": 1.7,
+          "orders": 3
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DHGD1CG6",
+          "avg_cpc": 105,
+          "rec_cpc": 95,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 3600.0,
+          "cost": 3056.47,
+          "ROAS": 1.18,
+          "orders": 2
+        }
+      ]
     }
   ]
 }
