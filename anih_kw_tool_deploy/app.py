@@ -2814,6 +2814,30 @@ def page_cpc_change_history():
         )
     else:
         st.caption("バックアップ対象の履歴はまだありません。")
+    # 【新規追加】バックアップZIPからの復元インポート
+    # Streamlit Cloudは再起動のたびにファイルが消えるため、
+    # バックアップZIPをアップロードして復元するための機能。
+    # _anls_save（既存・無改変）のみを使用。他の処理には一切触れない。
+    with st.expander("📤 バックアップから復元（インポート）", expanded=False):
+        st.caption("アプリ再起動後に履歴が消えた場合、バックアップZIPをアップロードして復元します。")
+        _import_zip_file = st.file_uploader(
+            "バックアップZIPを選択", type=["zip"], key="_cpc_hist_import_zip"
+        )
+        if _import_zip_file is not None:
+            if st.button("✅ インポート実行", key="_cpc_hist_import_btn"):
+                try:
+                    import zipfile as _iz, io as _iio, json as _ij
+                    with _iz.ZipFile(_iio.BytesIO(_import_zip_file.read())) as _zf:
+                        _imported = 0
+                        for _zname in _zf.namelist():
+                            if _zname.endswith(".json"):
+                                _zdata = _ij.loads(_zf.read(_zname).decode("utf-8"))
+                                _anls_save(_zname, _zdata)
+                                _imported += 1
+                    st.success(f"✅ インポート完了（{_imported}ファイルを復元）")
+                    st.rerun()
+                except Exception as _ie:
+                    st.error(f"インポートエラー: {_ie}")
     for _fname, _label, _id_col in _targets:
         _cpc_change_fill_after_comparisons(_fname, _id_col)
     _all_events = []
