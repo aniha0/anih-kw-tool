@@ -378,6 +378,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260810073754_1051",
+      "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【ふりかけ猫】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B0F9W44FVR",
+      "target_key": "【ふりかけ猫】sp広告(マニュアル):商品ターゲ|【ふりかけ猫】sp広告(マニュアル):商品ターゲ|b0f9w44fvr",
+      "changed_at": "2026-08-10T07:37:54.223775",
+      "before_cpc": 93.0,
+      "after_cpc": 98.0,
+      "change_rate": 5.4,
+      "compare_from": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 838.25,
+        "sales": 6836.0,
+        "orders": 4.0,
+        "ROAS": 8.16,
+        "impressions": 614.0,
+        "clicks": 9.0,
+        "CVR": 44.4
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
