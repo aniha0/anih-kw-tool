@@ -252,6 +252,25 @@
           "orders": 4
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-10T07:34:43.962344",
+      "entries": [
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B00L4ZSQSI",
+          "avg_cpc": 295,
+          "rec_cpc": 285,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 119472.0,
+          "cost": 115203.29,
+          "ROAS": 1.04,
+          "orders": 75
+        }
+      ]
     }
   ]
 }
