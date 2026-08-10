@@ -1,0 +1,262 @@
+{
+  "records": [
+    {
+      "id": "3df82a55",
+      "campaign_name": "【除菌消臭】SB広告(動画)：KWターゲ",
+      "ad_group": "【除菌消臭】SB広告(動画)：KWターゲ",
+      "keyword": "犬 スプレー",
+      "target_key": "【除菌消臭】sb広告(動画):kwターゲ|【除菌消臭】sb広告(動画):kwターゲ|犬 スプレー",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 71.0,
+      "after_cpc": 61.0,
+      "change_rate": -14.1,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 1802.2400000000002,
+        "sales": 1362.0,
+        "orders": 1.0,
+        "ROAS": 0.76,
+        "impressions": 198.0,
+        "clicks": 26.0,
+        "CVR": 3.85
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "9eccd857",
+      "campaign_name": "【イヤー】SB広告(動画)：KWターゲ",
+      "ad_group": "【イヤー】SB広告(動画)：KWターゲ",
+      "keyword": "犬　外耳炎",
+      "target_key": "【イヤー】sb広告(動画):kwターゲ|【イヤー】sb広告(動画):kwターゲ|犬 外耳炎",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 85.0,
+      "after_cpc": 80.0,
+      "change_rate": -5.9,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 2319.1000000000004,
+        "sales": 4777.0,
+        "orders": 4.0,
+        "ROAS": 2.06,
+        "impressions": 478.0,
+        "clicks": 25.0,
+        "CVR": 16.0
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "5ed349e8",
+      "campaign_name": "【イヤー】SB広告(動画)：KWターゲ",
+      "ad_group": "【イヤー】SB広告(動画)：KWターゲ",
+      "keyword": "犬　耳クリーナー",
+      "target_key": "【イヤー】sb広告(動画):kwターゲ|【イヤー】sb広告(動画):kwターゲ|犬 耳クリーナー",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 98.0,
+      "after_cpc": 103.0,
+      "change_rate": 5.1,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 912.44,
+        "sales": 3834.0,
+        "orders": 3.0,
+        "ROAS": 4.2,
+        "impressions": 328.0,
+        "clicks": 10.0,
+        "CVR": 30.0
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "cef99717",
+      "campaign_name": "【イヤー】SB広告(動画)：KWターゲ",
+      "ad_group": "【イヤー】SB広告(動画)：KWターゲ",
+      "keyword": "猫 耳掃除",
+      "target_key": "【イヤー】sb広告(動画):kwターゲ|【イヤー】sb広告(動画):kwターゲ|猫 耳掃除",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 98.0,
+      "after_cpc": 103.0,
+      "change_rate": 5.1,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 1557.06,
+        "sales": 6122.0,
+        "orders": 5.0,
+        "ROAS": 3.93,
+        "impressions": 450.0,
+        "clicks": 15.0,
+        "CVR": 33.33
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "5dd1acc5",
+      "campaign_name": "【ダニ捕り】SB広告(動画)：KWターゲ",
+      "ad_group": "【ダニ捕り】SB広告(動画)：KWターゲ",
+      "keyword": "ダニ 取り",
+      "target_key": "【ダニ捕り】sb広告(動画):kwターゲ|【ダニ捕り】sb広告(動画):kwターゲ|ダニ 取り",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 78.0,
+      "after_cpc": 83.0,
+      "change_rate": 6.4,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 2004.25,
+        "sales": 10899.0,
+        "orders": 5.0,
+        "ROAS": 5.44,
+        "impressions": 4354.0,
+        "clicks": 26.0,
+        "CVR": 19.23
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "f564e954",
+      "campaign_name": "【ふりかけ犬】SB広告(動画)：KWターゲ",
+      "ad_group": "【ふりかけ犬】SB広告(動画)",
+      "keyword": "犬用歯ブラシ",
+      "target_key": "【ふりかけ犬】sb広告(動画):kwターゲ|【ふりかけ犬】sb広告(動画)|犬用歯ブラシ",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 84.0,
+      "after_cpc": 89.0,
+      "change_rate": 6.0,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 1756.2599999999998,
+        "sales": 8545.0,
+        "orders": 4.0,
+        "ROAS": 4.87,
+        "impressions": 323.0,
+        "clicks": 21.0,
+        "CVR": 19.05
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "ac71c9e9",
+      "campaign_name": "【液体】SB広告(動画)：KWターゲ",
+      "ad_group": "【液体】SB広告(動画)：KWターゲ",
+      "keyword": "猫 歯磨き",
+      "target_key": "【液体】sb広告(動画):kwターゲ|【液体】sb広告(動画):kwターゲ|猫 歯磨き",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 133.0,
+      "after_cpc": 138.0,
+      "change_rate": 3.8,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 4993.549999999999,
+        "sales": 24262.0,
+        "orders": 12.0,
+        "ROAS": 4.86,
+        "impressions": 526.0,
+        "clicks": 36.0,
+        "CVR": 33.33
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "af4f0cd8",
+      "campaign_name": "【液体】SB広告(動画)：KWターゲ",
+      "ad_group": "【液体】SB広告(動画)：KWターゲ",
+      "keyword": "犬 歯磨き",
+      "target_key": "【液体】sb広告(動画):kwターゲ|【液体】sb広告(動画):kwターゲ|犬 歯磨き",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 137.0,
+      "after_cpc": 142.0,
+      "change_rate": 3.6,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 8692.230000000001,
+        "sales": 47660.0,
+        "orders": 31.0,
+        "ROAS": 5.48,
+        "impressions": 1266.0,
+        "clicks": 62.0,
+        "CVR": 50.0
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "20260810074114_7093",
+      "campaign_name": "【イヤー】SB広告(動画)：KWターゲ",
+      "ad_group": "【イヤー】SB広告(動画)：KWターゲ",
+      "keyword": "犬 耳 掃除",
+      "target_key": "【イヤー】sb広告(動画):kwターゲ|【イヤー】sb広告(動画):kwターゲ|犬 耳 掃除",
+      "changed_at": "2026-08-10T07:41:14.748029",
+      "before_cpc": 102.0,
+      "after_cpc": 107.0,
+      "change_rate": 4.9,
+      "compare_from": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 1126.36,
+        "sales": 4576.0,
+        "orders": 4.0,
+        "ROAS": 4.06,
+        "impressions": 526.0,
+        "clicks": 11.0,
+        "CVR": 36.4
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    }
+  ]
+}
