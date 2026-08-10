@@ -1,0 +1,1161 @@
+{
+  "records": [
+    {
+      "id": "0a57ebea",
+      "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫　グルーミング",
+      "target_key": "【グルーミング】sp広告(マニュアル):kwターゲ|【グルーミング】sp広告(マニュアル):kwターゲ|猫 グルーミング",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 80.0,
+      "after_cpc": 70.0,
+      "change_rate": -12.5,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 1876.8400000000001,
+        "sales": 0.0,
+        "orders": 0.0,
+        "ROAS": 0.0,
+        "impressions": 212.0,
+        "clicks": 27.0,
+        "CVR": 0.0
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "8f4e7f90",
+      "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "keyword": "ブラッシングスプレー",
+      "target_key": "【グルーミング】sp広告(マニュアル):kwターゲ|【グルーミング】sp広告(マニュアル):kwターゲ|ブラッシングスプレー",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 122.0,
+      "after_cpc": 112.0,
+      "change_rate": -8.2,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 7831.5,
+        "sales": 10848.0,
+        "orders": 7.0,
+        "ROAS": 1.39,
+        "impressions": 1364.0,
+        "clicks": 65.0,
+        "CVR": 10.77
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "607a1715",
+      "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 スプレー",
+      "target_key": "【グルーミング】sp広告(マニュアル):kwターゲ|【グルーミング】sp広告(マニュアル):kwターゲ|猫 スプレー",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 102.0,
+      "after_cpc": 92.0,
+      "change_rate": -9.8,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 7819.349999999999,
+        "sales": 11096.0,
+        "orders": 8.0,
+        "ROAS": 1.42,
+        "impressions": 1591.0,
+        "clicks": 80.0,
+        "CVR": 10.0
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "94c85d07",
+      "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 フケ",
+      "target_key": "【グルーミング】sp広告(マニュアル):kwターゲ|【グルーミング】sp広告(マニュアル):kwターゲ|猫 フケ",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 121.0,
+      "after_cpc": 111.0,
+      "change_rate": -8.3,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 2897.24,
+        "sales": 4962.0,
+        "orders": 3.0,
+        "ROAS": 1.71,
+        "impressions": 410.0,
+        "clicks": 24.0,
+        "CVR": 12.5
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "219ae09f",
+      "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬　ブラッシング",
+      "target_key": "【グルーミング】sp広告(マニュアル):kwターゲ|【グルーミング】sp広告(マニュアル):kwターゲ|犬 ブラッシング",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 116.0,
+      "after_cpc": 111.0,
+      "change_rate": -4.3,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 4204.96,
+        "sales": 6324.0,
+        "orders": 4.0,
+        "ROAS": 1.5,
+        "impressions": 451.0,
+        "clicks": 36.0,
+        "CVR": 11.11
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "70d193cf",
+      "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫ドライシャンプー",
+      "target_key": "【グルーミング】sp広告(マニュアル):kwターゲ|【グルーミング】sp広告(マニュアル):kwターゲ|猫ドライシャンプー",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 126.0,
+      "after_cpc": 121.0,
+      "change_rate": -4.0,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 10039.3,
+        "sales": 24063.0,
+        "orders": 15.0,
+        "ROAS": 2.4,
+        "impressions": 1239.0,
+        "clicks": 80.0,
+        "CVR": 18.75
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "e3d884b3",
+      "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "keyword": "グルーミングスプレー",
+      "target_key": "【グルーミング】sp広告(マニュアル):kwターゲ|【グルーミング】sp広告(マニュアル):kwターゲ|グルーミングスプレー",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 129.0,
+      "after_cpc": 124.0,
+      "change_rate": -3.9,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 18599.670000000002,
+        "sales": 47834.0,
+        "orders": 30.0,
+        "ROAS": 2.57,
+        "impressions": 7938.0,
+        "clicks": 147.0,
+        "CVR": 20.41
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "40b453d9",
+      "campaign_name": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 シャンプー",
+      "target_key": "【シャンプー】sp広告(マニュアル):kwターゲ|【シャンプー】sp広告(マニュアル):kwターゲ|犬 シャンプー",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 84.0,
+      "after_cpc": 74.0,
+      "change_rate": -11.9,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 1288.5,
+        "sales": 0.0,
+        "orders": 0.0,
+        "ROAS": 0.0,
+        "impressions": 831.0,
+        "clicks": 14.0,
+        "CVR": 0.0
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "526eebaa",
+      "campaign_name": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 シャンプー",
+      "target_key": "【シャンプー】sp広告(マニュアル):kwターゲ|【シャンプー】sp広告(マニュアル):kwターゲ|猫 シャンプー",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 87.0,
+      "after_cpc": 77.0,
+      "change_rate": -11.5,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 2787.52,
+        "sales": 4433.0,
+        "orders": 3.0,
+        "ROAS": 1.59,
+        "impressions": 2209.0,
+        "clicks": 30.0,
+        "CVR": 10.0
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "8bde5342",
+      "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 消臭スプレー",
+      "target_key": "【除菌消臭】sp広告(マニュアル):kwターゲ|【除菌消臭】sp広告(マニュアル):kwターゲ|犬 消臭スプレー",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 135.0,
+      "after_cpc": 125.0,
+      "change_rate": -7.4,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 3522.61,
+        "sales": 3162.0,
+        "orders": 2.0,
+        "ROAS": 0.9,
+        "impressions": 543.0,
+        "clicks": 27.0,
+        "CVR": 7.41
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "f1146a92",
+      "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 スプレー",
+      "target_key": "【除菌消臭】sp広告(マニュアル):kwターゲ|【除菌消臭】sp広告(マニュアル):kwターゲ|犬 スプレー",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 90.0,
+      "after_cpc": 80.0,
+      "change_rate": -11.1,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 4095.8199999999997,
+        "sales": 6324.0,
+        "orders": 4.0,
+        "ROAS": 1.54,
+        "impressions": 1433.0,
+        "clicks": 44.0,
+        "CVR": 9.09
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "47347131",
+      "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 消臭",
+      "target_key": "【除菌消臭】sp広告(マニュアル):kwターゲ|【除菌消臭】sp広告(マニュアル):kwターゲ|犬 消臭",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 123.0,
+      "after_cpc": 113.0,
+      "change_rate": -8.1,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 2804.7400000000002,
+        "sales": 0.0,
+        "orders": 0.0,
+        "ROAS": 0.0,
+        "impressions": 1109.0,
+        "clicks": 22.0,
+        "CVR": 0.0
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "d377d58b",
+      "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "keyword": "keyword-group=\"商品カテゴリーに関連するキーワード\"",
+      "target_key": "【除菌消臭】sp広告(マニュアル):kwターゲ|【除菌消臭】sp広告(マニュアル):kwターゲ|keyword-group=\"商品カテゴリーに関連するキーワード\"",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 125.0,
+      "after_cpc": 115.0,
+      "change_rate": -8.0,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 2850.0,
+        "sales": 4744.0,
+        "orders": 3.0,
+        "ROAS": 1.66,
+        "impressions": 441.0,
+        "clicks": 23.0,
+        "CVR": 13.04
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "c2297610",
+      "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "keyword": "ペット 消臭",
+      "target_key": "【除菌消臭】sp広告(マニュアル):kwターゲ|【除菌消臭】sp広告(マニュアル):kwターゲ|ペット 消臭",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 119.0,
+      "after_cpc": 109.0,
+      "change_rate": -8.4,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 3902.91,
+        "sales": 5886.0,
+        "orders": 4.0,
+        "ROAS": 1.51,
+        "impressions": 882.0,
+        "clicks": 32.0,
+        "CVR": 12.5
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "5772db8a",
+      "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 消臭スプレー",
+      "target_key": "【除菌消臭】sp広告(マニュアル):kwターゲ|【除菌消臭】sp広告(マニュアル):kwターゲ|猫 消臭スプレー",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 113.0,
+      "after_cpc": 103.0,
+      "change_rate": -8.8,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 4494.85,
+        "sales": 6321.0,
+        "orders": 4.0,
+        "ROAS": 1.41,
+        "impressions": 7019.0,
+        "clicks": 41.0,
+        "CVR": 9.76
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "7a069348",
+      "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 消臭",
+      "target_key": "【除菌消臭】sp広告(マニュアル):kwターゲ|【除菌消臭】sp広告(マニュアル):kwターゲ|猫 消臭",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 130.0,
+      "after_cpc": 125.0,
+      "change_rate": -3.8,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 4493.91,
+        "sales": 6324.0,
+        "orders": 4.0,
+        "ROAS": 1.41,
+        "impressions": 1236.0,
+        "clicks": 33.0,
+        "CVR": 12.12
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "f8222bf6",
+      "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 トイレ スプレー",
+      "target_key": "【除菌消臭】sp広告(マニュアル):kwターゲ|【除菌消臭】sp広告(マニュアル):kwターゲ|犬 トイレ スプレー",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 112.0,
+      "after_cpc": 107.0,
+      "change_rate": -4.5,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 1914.0,
+        "sales": 3600.0,
+        "orders": 2.0,
+        "ROAS": 1.88,
+        "impressions": 969.0,
+        "clicks": 16.0,
+        "CVR": 12.5
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "3d989028",
+      "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫　吐き戻し",
+      "target_key": "【乳酸菌猫】sp広告(マニュアル):kwターゲ|【乳酸菌猫】sp広告(マニュアル):kwターゲ|猫 吐き戻し",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 137.0,
+      "after_cpc": 127.0,
+      "change_rate": -7.3,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 9748.08,
+        "sales": 14311.0,
+        "orders": 10.0,
+        "ROAS": 1.47,
+        "impressions": 4604.0,
+        "clicks": 74.0,
+        "CVR": 13.51
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "fd90f984",
+      "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+      "keyword": "乳酸菌 猫",
+      "target_key": "【乳酸菌猫】sp広告(マニュアル):kwターゲ|【乳酸菌猫】sp広告(マニュアル):kwターゲ|乳酸菌 猫",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 157.0,
+      "after_cpc": 147.0,
+      "change_rate": -6.4,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 7464.44,
+        "sales": 10575.0,
+        "orders": 7.0,
+        "ROAS": 1.42,
+        "impressions": 1351.0,
+        "clicks": 48.0,
+        "CVR": 14.58
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "6883990a",
+      "campaign_name": "【ジェル】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ジェル】SP広告(マニュアル)：KWTG自社",
+      "keyword": "犬 歯磨き",
+      "target_key": "【ジェル】sp広告(マニュアル):kwターゲ|【ジェル】sp広告(マニュアル):kwtg自社|犬 歯磨き",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 110.0,
+      "after_cpc": 100.0,
+      "change_rate": -9.1,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 8252.64,
+        "sales": 10878.0,
+        "orders": 7.0,
+        "ROAS": 1.32,
+        "impressions": 20210.0,
+        "clicks": 82.0,
+        "CVR": 8.54
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "f40cc741",
+      "campaign_name": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 涙やけシート",
+      "target_key": "【涙やけ】sp広告(マニュアル):kwターゲ|【涙やけ】sp広告(マニュアル):kwターゲ|犬 涙やけシート",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 169.0,
+      "after_cpc": 159.0,
+      "change_rate": -5.9,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 3780.31,
+        "sales": 6213.0,
+        "orders": 5.0,
+        "ROAS": 1.64,
+        "impressions": 207.0,
+        "clicks": 22.0,
+        "CVR": 22.73
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "0b6bc102",
+      "campaign_name": "【肉球】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【肉球】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 クリーム",
+      "target_key": "【肉球】sp広告(マニュアル):kwターゲ|【肉球】sp広告(マニュアル):kwターゲ|犬 クリーム",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 150.0,
+      "after_cpc": 140.0,
+      "change_rate": -6.7,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 5844.599999999999,
+        "sales": 7764.0,
+        "orders": 6.0,
+        "ROAS": 1.33,
+        "impressions": 4144.0,
+        "clicks": 41.0,
+        "CVR": 14.63
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "6ca64f2e",
+      "campaign_name": "【関節】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【関節】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 関節サプリ",
+      "target_key": "【関節】sp広告(マニュアル):kwターゲ|【関節】sp広告(マニュアル):kwターゲ|犬 関節サプリ",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 168.0,
+      "after_cpc": 158.0,
+      "change_rate": -6.0,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 8019.71,
+        "sales": 9037.0,
+        "orders": 6.0,
+        "ROAS": 1.13,
+        "impressions": 854.0,
+        "clicks": 48.0,
+        "CVR": 12.5
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "cce5275c",
+      "campaign_name": "【お口周り】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【お口周り】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫あごクリーナー",
+      "target_key": "【お口周り】sp広告(マニュアル):kwターゲ|【お口周り】sp広告(マニュアル):kwターゲ|猫あごクリーナー",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 141.0,
+      "after_cpc": 136.0,
+      "change_rate": -3.5,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 6125.959999999999,
+        "sales": 9956.0,
+        "orders": 8.0,
+        "ROAS": 1.63,
+        "impressions": 793.0,
+        "clicks": 45.0,
+        "CVR": 17.78
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "b3adba5e",
+      "campaign_name": "【アイケア】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【アイケア】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 白内障 サプリ",
+      "target_key": "【アイケア】sp広告(マニュアル):kwターゲ|【アイケア】sp広告(マニュアル):kwターゲ|犬 白内障 サプリ",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 146.0,
+      "after_cpc": 141.0,
+      "change_rate": -3.4,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 1990.45,
+        "sales": 3071.0,
+        "orders": 2.0,
+        "ROAS": 1.54,
+        "impressions": 262.0,
+        "clicks": 15.0,
+        "CVR": 13.33
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "ef468cbb",
+      "campaign_name": "【アイケア】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【アイケア】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬の目のサプリ",
+      "target_key": "【アイケア】sp広告(マニュアル):kwターゲ|【アイケア】sp広告(マニュアル):kwターゲ|犬の目のサプリ",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 147.0,
+      "after_cpc": 152.0,
+      "change_rate": 3.4,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 460.07,
+        "sales": 1362.0,
+        "orders": 1.0,
+        "ROAS": 2.96,
+        "impressions": 25.0,
+        "clicks": 3.0,
+        "CVR": 33.33
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "053fea8b",
+      "campaign_name": "【アイケア】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【アイケア】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 目",
+      "target_key": "【アイケア】sp広告(マニュアル):kwターゲ|【アイケア】sp広告(マニュアル):kwターゲ|犬 目",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 147.0,
+      "after_cpc": 152.0,
+      "change_rate": 3.4,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 4628.7699999999995,
+        "sales": 33444.0,
+        "orders": 14.0,
+        "ROAS": 7.23,
+        "impressions": 319.0,
+        "clicks": 31.0,
+        "CVR": 45.16
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "5516357b",
+      "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+      "keyword": "猫 口臭",
+      "target_key": "【液体】sp広告(マニュアル):kwターゲ|【液体】sp広告(マニュアル):kwtg自社|猫 口臭",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 151.0,
+      "after_cpc": 146.0,
+      "change_rate": -3.3,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 3220.19,
+        "sales": 5339.0,
+        "orders": 3.0,
+        "ROAS": 1.66,
+        "impressions": 528.0,
+        "clicks": 21.0,
+        "CVR": 14.29
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "fdcb336c",
+      "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+      "keyword": "ブレスウォーター 犬",
+      "target_key": "【液体】sp広告(マニュアル):kwターゲ|【液体】sp広告(マニュアル):kwtg自社|ブレスウォーター 犬",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 89.0,
+      "after_cpc": 94.0,
+      "change_rate": 5.6,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 1343.71,
+        "sales": 5437.0,
+        "orders": 4.0,
+        "ROAS": 4.05,
+        "impressions": 295.0,
+        "clicks": 12.0,
+        "CVR": 33.33
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "e1b93957",
+      "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+      "keyword": "犬 水",
+      "target_key": "【液体】sp広告(マニュアル):kwターゲ|【液体】sp広告(マニュアル):kwtg自社|犬 水",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 140.0,
+      "after_cpc": 145.0,
+      "change_rate": 3.6,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 8798.130000000001,
+        "sales": 34630.0,
+        "orders": 22.0,
+        "ROAS": 3.94,
+        "impressions": 4515.0,
+        "clicks": 62.0,
+        "CVR": 35.48
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "4748ec4d",
+      "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+      "keyword": "猫 歯磨き 水に混ぜる",
+      "target_key": "【液体】sp広告(マニュアル):kwターゲ|【液体】sp広告(マニュアル):kwtg自社|猫 歯磨き 水に混ぜる",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 145.0,
+      "after_cpc": 150.0,
+      "change_rate": 3.4,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 4375.57,
+        "sales": 23433.0,
+        "orders": 14.0,
+        "ROAS": 5.36,
+        "impressions": 2222.0,
+        "clicks": 31.0,
+        "CVR": 45.16
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "3dae1cee",
+      "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+      "keyword": "猫 液体歯磨き",
+      "target_key": "【液体】sp広告(マニュアル):kwターゲ|【液体】sp広告(マニュアル):kwtg自社|猫 液体歯磨き",
+      "changed_at": "2026-08-03T02:23:00",
+      "before_cpc": 154.0,
+      "after_cpc": 159.0,
+      "change_rate": 3.2,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 9037.89,
+        "sales": 64622.0,
+        "orders": 28.0,
+        "ROAS": 7.15,
+        "impressions": 1318.0,
+        "clicks": 61.0,
+        "CVR": 45.9
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "f73f6b77",
+      "campaign_name": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+      "keyword": "ダニ ペット 安全",
+      "target_key": "【ダニ捕り】sp広告(マニュアル):kwターゲ|【ダニ捕り】sp広告(マニュアル):kwターゲ|ダニ ペット 安全",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 152.0,
+      "after_cpc": 157.0,
+      "change_rate": 3.3,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 2313.53,
+        "sales": 6323.0,
+        "orders": 5.0,
+        "ROAS": 2.73,
+        "impressions": 207.0,
+        "clicks": 15.0,
+        "CVR": 33.33
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "5bcf541f",
+      "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 歯磨き ふりかけ",
+      "target_key": "【ふりかけ猫】sp広告(マニュアル):kwターゲ|【ふりかけ猫】sp広告(マニュアル):kwターゲ|猫 歯磨き ふりかけ",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 165.0,
+      "after_cpc": 170.0,
+      "change_rate": 3.0,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 4392.84,
+        "sales": 12937.0,
+        "orders": 7.0,
+        "ROAS": 2.95,
+        "impressions": 204.0,
+        "clicks": 27.0,
+        "CVR": 25.93
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "6ddf9b58",
+      "campaign_name": "【イヤー】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【イヤー】SP広告(マニュアル)：KWターゲ",
+      "keyword": "イヤーローション 犬",
+      "target_key": "【イヤー】sp広告(マニュアル):kwターゲ|【イヤー】sp広告(マニュアル):kwターゲ|イヤーローション 犬",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 78.0,
+      "after_cpc": 83.0,
+      "change_rate": 6.4,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 3167.69,
+        "sales": 13790.0,
+        "orders": 11.0,
+        "ROAS": 4.35,
+        "impressions": 685.0,
+        "clicks": 37.0,
+        "CVR": 29.73
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "fa05acbe",
+      "campaign_name": "【イヤー】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【イヤー】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 耳掃除 洗浄液",
+      "target_key": "【イヤー】sp広告(マニュアル):kwターゲ|【イヤー】sp広告(マニュアル):kwターゲ|犬 耳掃除 洗浄液",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 127.0,
+      "after_cpc": 132.0,
+      "change_rate": 3.9,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 2289.1099999999997,
+        "sales": 11099.0,
+        "orders": 9.0,
+        "ROAS": 4.85,
+        "impressions": 1016.0,
+        "clicks": 17.0,
+        "CVR": 52.94
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "6578c22a",
+      "campaign_name": "【イヤー】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【イヤー】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 耳掃除",
+      "target_key": "【イヤー】sp広告(マニュアル):kwターゲ|【イヤー】sp広告(マニュアル):kwターゲ|猫 耳掃除",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 124.0,
+      "after_cpc": 129.0,
+      "change_rate": 4.0,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 40429.579999999994,
+        "sales": 151056.0,
+        "orders": 120.0,
+        "ROAS": 3.74,
+        "impressions": 12535.0,
+        "clicks": 341.0,
+        "CVR": 35.19
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "d373d6e0",
+      "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 口臭",
+      "target_key": "【ふりかけ犬】sp広告(マニュアル):kwターゲ|【ふりかけ犬】sp広告(マニュアル):kwターゲ|犬 口臭",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 183.0,
+      "after_cpc": 188.0,
+      "change_rate": 2.7,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 16124.01,
+        "sales": 53512.0,
+        "orders": 26.0,
+        "ROAS": 3.32,
+        "impressions": 4191.0,
+        "clicks": 82.0,
+        "CVR": 31.71
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "7b8c0a19",
+      "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+      "keyword": "歯磨きふりかけ",
+      "target_key": "【ふりかけ犬】sp広告(マニュアル):kwターゲ|【ふりかけ犬】sp広告(マニュアル):kwターゲ|歯磨きふりかけ",
+      "changed_at": "2026-08-03T02:25:00",
+      "before_cpc": 203.0,
+      "after_cpc": 208.0,
+      "change_rate": 2.5,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 110882.69,
+        "sales": 410422.0,
+        "orders": 197.0,
+        "ROAS": 3.7,
+        "impressions": 37862.0,
+        "clicks": 555.0,
+        "CVR": 35.5
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "20260810071021_1642",
+      "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+      "keyword": "猫 マウスクリーナー",
+      "target_key": "【液体】sp広告(マニュアル):kwターゲ|【液体】sp広告(マニュアル):kwtg自社|猫 マウスクリーナー",
+      "changed_at": "2026-08-10T07:10:21.556570",
+      "before_cpc": 103.0,
+      "after_cpc": 108.0,
+      "change_rate": 4.9,
+      "compare_from": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 2478.15,
+        "sales": 14472.0,
+        "orders": 10.0,
+        "ROAS": 5.84,
+        "impressions": 484.0,
+        "clicks": 24.0,
+        "CVR": 41.7
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    }
+  ]
+}
