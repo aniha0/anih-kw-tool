@@ -1,0 +1,182 @@
+{
+  "records": [
+    {
+      "exported_at": "2026-08-10T03:01:46.480050",
+      "entries": [
+        {
+          "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ふりかけ猫】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0F9W44FVR",
+          "avg_cpc": 93,
+          "rec_cpc": 98,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 6836.0,
+          "cost": 838.25,
+          "ROAS": 8.16,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DRDDK2RD",
+          "avg_cpc": 127,
+          "rec_cpc": 132,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 6734.0,
+          "cost": 1141.5,
+          "ROAS": 5.9,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0C1BXJ98Q",
+          "avg_cpc": 102,
+          "rec_cpc": 97,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 5400.0,
+          "cost": 3168.06,
+          "ROAS": 1.7,
+          "orders": 3
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0F1FF6TKW",
+          "avg_cpc": 130,
+          "rec_cpc": 125,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 8089.0,
+          "cost": 5086.65,
+          "ROAS": 1.59,
+          "orders": 6
+        },
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：カテゴリターゲ",
+          "asin": "B0F5TVZTR4",
+          "avg_cpc": 100,
+          "rec_cpc": 95,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 5448.0,
+          "cost": 3495.4,
+          "ROAS": 1.56,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B07XGKLMKQ",
+          "avg_cpc": 99,
+          "rec_cpc": 89,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 9213.0,
+          "cost": 6354.39,
+          "ROAS": 1.45,
+          "orders": 6
+        },
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CJ4BDGZF",
+          "avg_cpc": 171,
+          "rec_cpc": 161,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 94760.0,
+          "cost": 71617.75,
+          "ROAS": 1.32,
+          "orders": 71
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DHGD1CG6",
+          "avg_cpc": 105,
+          "rec_cpc": 95,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 3600.0,
+          "cost": 3056.47,
+          "ROAS": 1.18,
+          "orders": 2
+        },
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B00L4ZSQSI",
+          "avg_cpc": 295,
+          "rec_cpc": 285,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 119472.0,
+          "cost": 115203.29,
+          "ROAS": 1.04,
+          "orders": 75
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DHNDVG3V",
+          "avg_cpc": 99,
+          "rec_cpc": 89,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 3071.0,
+          "cost": 3260.06,
+          "ROAS": 0.94,
+          "orders": 2
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B07P9PLX63",
+          "avg_cpc": 103,
+          "rec_cpc": 93,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 1362.0,
+          "cost": 3713.74,
+          "ROAS": 0.37,
+          "orders": 1
+        }
+      ]
+    },
+    {
+      "exported_at": "2026-08-10T07:27:40.365419",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0F1FF6TKW",
+          "avg_cpc": 130,
+          "rec_cpc": 125,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 8089.0,
+          "cost": 5086.65,
+          "ROAS": 1.59,
+          "orders": 6
+        }
+      ]
+    }
+  ]
+}
