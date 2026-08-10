@@ -1039,6 +1039,81 @@
           "orders": 4
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-10T07:22:33.071718",
+      "entries": [
+        {
+          "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 スプレー",
+          "avg_cpc": 93,
+          "rec_cpc": 88,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 6324.0,
+          "cost": 4095.82,
+          "ROAS": 1.54,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ペット 消臭",
+          "avg_cpc": 122,
+          "rec_cpc": 117,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 5886.0,
+          "cost": 3902.9100000000003,
+          "ROAS": 1.51,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫 消臭",
+          "avg_cpc": 136,
+          "rec_cpc": 126,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 6324.0,
+          "cost": 4493.91,
+          "ROAS": 1.41,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫 消臭スプレー",
+          "avg_cpc": 110,
+          "rec_cpc": 100,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 6321.0,
+          "cost": 4494.85,
+          "ROAS": 1.41,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 消臭スプレー",
+          "avg_cpc": 130,
+          "rec_cpc": 120,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 3162.0,
+          "cost": 3522.61,
+          "ROAS": 0.9,
+          "orders": 2
+        }
+      ]
     }
   ]
 }
