@@ -916,6 +916,25 @@
           "orders": 6
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-10T07:18:30.726529",
+      "entries": [
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫あごクリーナー",
+          "avg_cpc": 136,
+          "rec_cpc": 131,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 9956.0,
+          "cost": 6125.96,
+          "ROAS": 1.63,
+          "orders": 8
+        }
+      ]
     }
   ]
 }
