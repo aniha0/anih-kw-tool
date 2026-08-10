@@ -836,6 +836,25 @@
           "orders": 6
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-10T07:13:49.618248",
+      "entries": [
+        {
+          "campaign_name": "【ジェル】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ジェル】SP広告(マニュアル)：KWTG自社",
+          "keyword": "犬 歯磨き",
+          "avg_cpc": 101,
+          "rec_cpc": 91,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 10878.0,
+          "cost": 8252.64,
+          "ROAS": 1.32,
+          "orders": 7
+        }
+      ]
     }
   ]
 }
