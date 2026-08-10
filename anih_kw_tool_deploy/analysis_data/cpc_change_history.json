@@ -1118,6 +1118,25 @@
     {
       "exported_at": "2026-08-10T07:22:39.741941",
       "entries": []
+    },
+    {
+      "exported_at": "2026-08-10T07:22:47.421698",
+      "entries": [
+        {
+          "campaign_name": "【アイケア】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【アイケア】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 目",
+          "avg_cpc": 149,
+          "rec_cpc": 154,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 33444.0,
+          "cost": 4628.7699999999995,
+          "ROAS": 7.23,
+          "orders": 14
+        }
+      ]
     }
   ]
 }
