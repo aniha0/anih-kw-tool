@@ -1,0 +1,279 @@
+{
+  "records": [
+    {
+      "id": "19471049",
+      "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B0BW37GWNF",
+      "target_key": "【シャンプー】sp広告(マニュアル):商品ターゲ|【シャンプー】sp広告(マニュアル):商品ターゲ|b0bw37gwnf",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 100.0,
+      "after_cpc": 90.0,
+      "change_rate": -10.0,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "a504fb28",
+      "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B0181M4UMW",
+      "target_key": "【シャンプー】sp広告(マニュアル):商品ターゲ|【シャンプー】sp広告(マニュアル):商品ターゲ|b0181m4umw",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 94.0,
+      "after_cpc": 84.0,
+      "change_rate": -10.6,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "ad15439b",
+      "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B00IZYXFTQ",
+      "target_key": "【シャンプー】sp広告(マニュアル):商品ターゲ|【シャンプー】sp広告(マニュアル):商品ターゲ|b00izyxftq",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 101.0,
+      "after_cpc": 91.0,
+      "change_rate": -9.9,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "ceb57707",
+      "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B017YS3444",
+      "target_key": "【シャンプー】sp広告(マニュアル):商品ターゲ|【シャンプー】sp広告(マニュアル):商品ターゲ|b017ys3444",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 100.0,
+      "after_cpc": 90.0,
+      "change_rate": -10.0,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "922af37a",
+      "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B07XGKLMKQ",
+      "target_key": "【シャンプー】sp広告(マニュアル):商品ターゲ|【シャンプー】sp広告(マニュアル):商品ターゲ|b07xgklmkq",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 99.0,
+      "after_cpc": 89.0,
+      "change_rate": -10.1,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "b42eae96",
+      "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B095W1QW6J",
+      "target_key": "【シャンプー】sp広告(マニュアル):商品ターゲ|【シャンプー】sp広告(マニュアル):商品ターゲ|b095w1qw6j",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 103.0,
+      "after_cpc": 98.0,
+      "change_rate": -4.9,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "de3959ac",
+      "campaign_name": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B0DJ8B3F7R",
+      "target_key": "【ダニ捕り】sp広告(マニュアル):商品ターゲ|【ダニ捕り】sp広告(マニュアル):商品ターゲ|b0dj8b3f7r",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 129.0,
+      "after_cpc": 119.0,
+      "change_rate": -7.8,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 4152.5599999999995,
+        "sales": 2288.0,
+        "orders": 2.0,
+        "ROAS": 0.55,
+        "impressions": 1758.0,
+        "clicks": 36.0,
+        "CVR": 5.56
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "fd3f1ee2",
+      "campaign_name": "【お口周り】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【お口周り】SP広告(マニュアル)：カテゴリターゲ",
+      "asin": "B0F5TVZTR4",
+      "target_key": "【お口周り】sp広告(マニュアル):商品ターゲ|【お口周り】sp広告(マニュアル):カテゴリターゲ|b0f5tvztr4",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 98.0,
+      "after_cpc": 93.0,
+      "change_rate": -5.1,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 90.0,
+        "sales": 0.0,
+        "orders": 0.0,
+        "ROAS": 0.0,
+        "impressions": 110.0,
+        "clicks": 1.0,
+        "CVR": 0.0
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "ea3f679c",
+      "campaign_name": "【除菌消臭】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【除菌消臭】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B09SHTT6XY",
+      "target_key": "【除菌消臭】sp広告(マニュアル):商品ターゲ|【除菌消臭】sp広告(マニュアル):商品ターゲ|b09shtt6xy",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 107.0,
+      "after_cpc": 102.0,
+      "change_rate": -4.7,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "38070614",
+      "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B0DW8NGJQC",
+      "target_key": "【液体】sp広告(マニュアル):商品ターゲ|【液体】sp広告(マニュアル):商品ターゲ|b0dw8ngjqc",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 149.0,
+      "after_cpc": 154.0,
+      "change_rate": 3.4,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 5521.38,
+        "sales": 20635.0,
+        "orders": 12.0,
+        "ROAS": 3.74,
+        "impressions": 796.0,
+        "clicks": 38.0,
+        "CVR": 31.58
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "7387d027",
+      "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B0DF71W1SK",
+      "target_key": "【液体】sp広告(マニュアル):商品ターゲ|【液体】sp広告(マニュアル):商品ターゲ|b0df71w1sk",
+      "changed_at": "2026-08-03T02:26:00",
+      "before_cpc": 147.0,
+      "after_cpc": 152.0,
+      "change_rate": 3.4,
+      "compare_from": {
+        "period_start": "2026-06-26",
+        "period_end": "2026-07-26"
+      },
+      "compare_to": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 8353.87,
+        "sales": 23070.0,
+        "orders": 16.0,
+        "ROAS": 2.76,
+        "impressions": 972.0,
+        "clicks": 58.0,
+        "CVR": 27.59
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "20260810072915_1743",
+      "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B0F1FF6TKW",
+      "target_key": "【液体】sp広告(マニュアル):商品ターゲ|【液体】sp広告(マニュアル):商品ターゲ|b0f1ff6tkw",
+      "changed_at": "2026-08-10T07:29:15.946145",
+      "before_cpc": 130.0,
+      "after_cpc": 125.0,
+      "change_rate": -3.8,
+      "compare_from": {
+        "period_start": "2026-07-09",
+        "period_end": "2026-08-09",
+        "cost": 5086.65,
+        "sales": 8089.0,
+        "orders": 6.0,
+        "ROAS": 1.59,
+        "impressions": 2267.0,
+        "clicks": 39.0,
+        "CVR": 15.4
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    }
+  ]
+}
