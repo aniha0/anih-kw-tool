@@ -10,6 +10,9 @@ import pathlib as _anls_plib
 import json as _anls_json
 import random as _anls_random  # 【新規追加】CPC変更履歴イベントのID生成専用。既存コードは未使用。
 import html as _anls_html  # 【新規追加】CPC変更履歴の記録行表示（1行省略表示）専用。既存コードは未使用。
+import base64 as _gh_b64      # 【新規追加】GitHub API経由でJSONを永続化するためのBase64エンコード専用。
+import urllib.request as _gh_urllib  # 【新規追加】GitHub API呼び出し専用（標準ライブラリ）。
+import urllib.error as _gh_urlerr    # 【新規追加】GitHub API HTTPエラー処理用。
 
 
 # ===================================================
@@ -2136,17 +2139,123 @@ def _get_analysis_dir() -> _anls_plib.Path:
     return d
 
 
-def _anls_load(fname: str) -> list:
-    p = _get_analysis_dir() / fname
-    if not p.exists():
-        return []
+# ─── GitHub永続化ヘルパー（新規追加・既存コードへの影響なし）───────────────
+# Streamlit CloudはEphemeral FSのため再起動でanalysis_data/が消える。
+# GITHUB_TOKENをStreamlit Secretsに設定することで、
+# _anls_save時にGitHubリポジトリへもコミットし、再起動後は
+# _anls_load時にGitHubから自動復元する。
+# トークン未設定の場合は従来通りローカルファイルのみで動作する。
+
+_GH_OWNER  = "aniha0"
+_GH_REPO   = "anih-kw-tool"
+_GH_BRANCH = "main"
+_GH_DATA_PATH = "anih_kw_tool_deploy/analysis_data"
+
+
+def _gh_token() -> str:
+    """Streamlit SecretsからGitHubトークンを取得。未設定時は空文字。"""
     try:
-        return _anls_json.loads(p.read_text(encoding="utf-8")).get("records", [])
+        return st.secrets.get("GITHUB_TOKEN", "")
     except Exception:
-        return []
+        return ""
+
+
+def _gh_api(method: str, path: str, payload: dict | None = None) -> dict | None:
+    """GitHub Contents API を呼び出す。失敗時はNoneを返す（例外を外に出さない）。"""
+    token = _gh_token()
+    if not token:
+        return None
+    url = f"https://api.github.com/repos/{_GH_OWNER}/{_GH_REPO}/contents/{path}"
+    body = (_anls_json.dumps(payload).encode("utf-8") if payload else None)
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "Content-Type": "application/json",
+    }
+    req = _gh_urllib.Request(url, data=body, headers=headers, method=method)
+    try:
+        with _gh_urllib.urlopen(req, timeout=15) as resp:
+            return _anls_json.loads(resp.read().decode("utf-8"))
+    except _gh_urlerr.HTTPError as e:
+        if e.code == 404:
+            return None      # ファイル未存在は正常ケース（初回書き込み時）
+        return None
+    except Exception:
+        return None
+
+
+def _gh_read(fname: str) -> tuple[list, str]:
+    """GitHubからJSONファイルを読み込む。(records, sha) を返す。"""
+    data = _gh_api("GET", f"{_GH_DATA_PATH}/{fname}")
+    if not data:
+        return [], ""
+    try:
+        raw = _gh_b64.b64decode(data["content"]).decode("utf-8")
+        records = _anls_json.loads(raw).get("records", [])
+        return records, data.get("sha", "")
+    except Exception:
+        return [], ""
+
+
+def _gh_write(fname: str, records: list) -> bool:
+    """GitHubにJSONファイルをコミットする。SHAはセッションキャッシュを使用。"""
+    if not _gh_token():
+        return False
+    sha_key = f"_gh_sha_{fname}"
+    sha = st.session_state.get(sha_key, "")
+    # SHAが未キャッシュならGETで取得
+    if not sha:
+        data = _gh_api("GET", f"{_GH_DATA_PATH}/{fname}")
+        if data:
+            sha = data.get("sha", "")
+    body_str = _anls_json.dumps({"records": records}, ensure_ascii=False, indent=2)
+    encoded  = _gh_b64.b64encode(body_str.encode("utf-8")).decode("utf-8")
+    payload  = {
+        "message": f"auto: update {fname}",
+        "content": encoded,
+        "branch":  _GH_BRANCH,
+    }
+    if sha:
+        payload["sha"] = sha
+    result = _gh_api("PUT", f"{_GH_DATA_PATH}/{fname}", payload)
+    if result:
+        new_sha = (result.get("content") or {}).get("sha", "")
+        if new_sha:
+            st.session_state[sha_key] = new_sha
+        return True
+    return False
+# ─── GitHub永続化ヘルパーここまで ───────────────────────────────────────────
+
+
+def _anls_load(fname: str) -> list:
+    """JSONファイルを読み込む。ローカルに存在しない場合はGitHubから自動復元する。"""
+    p = _get_analysis_dir() / fname
+    if p.exists():
+        try:
+            return _anls_json.loads(p.read_text(encoding="utf-8")).get("records", [])
+        except Exception:
+            pass
+    # ローカルになければGitHubから復元を試みる
+    if _gh_token():
+        records, sha = _gh_read(fname)
+        if sha:
+            st.session_state[f"_gh_sha_{fname}"] = sha
+        if records:
+            try:
+                _tmp = p.with_name(p.name + ".tmp")
+                _tmp.write_text(
+                    _anls_json.dumps({"records": records}, ensure_ascii=False, indent=2),
+                    encoding="utf-8"
+                )
+                _tmp.replace(p)
+            except Exception:
+                pass
+        return records
+    return []
 
 
 def _anls_save(fname: str, records: list) -> bool:
+    """JSONファイルをローカルに保存し、GitHubにも同期する（GITHUB_TOKEN設定時）。"""
     p = _get_analysis_dir() / fname
     _tmp_p = p.with_name(p.name + ".tmp")
     _tmp_p.write_text(
@@ -2161,6 +2270,8 @@ def _anls_save(fname: str, records: list) -> bool:
     if _readback is None or len(_readback) != len(records):
         st.error(f"⚠️ History保存の検証に失敗しました（{fname}）。保存内容を確認してください。")
         return False
+    # GitHubへコミット（失敗してもローカル保存は成功扱い）
+    _gh_write(fname, records)
     return True
 
 
