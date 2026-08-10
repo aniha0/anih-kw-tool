@@ -177,6 +177,25 @@
           "orders": 6
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-10T07:29:21.845687",
+      "entries": [
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CJ4BDGZF",
+          "avg_cpc": 171,
+          "rec_cpc": 161,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 94760.0,
+          "cost": 71617.75,
+          "ROAS": 1.32,
+          "orders": 71
+        }
+      ]
     }
   ]
 }
