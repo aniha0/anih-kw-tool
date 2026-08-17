@@ -2530,6 +2530,39 @@
           "orders": 3
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T03:24:55.131299",
+      "entries": [
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：KWターゲ",
+          "keyword": "イヤーローション 犬",
+          "avg_cpc": 82,
+          "rec_cpc": 87,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 13790.0,
+          "cost": 3208.64,
+          "ROAS": 4.3,
+          "orders": 11
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 耳 薬",
+          "avg_cpc": 91,
+          "rec_cpc": 86,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 6142.0,
+          "cost": 4002.14,
+          "ROAS": 1.53,
+          "orders": 5
+        }
+      ]
     }
   ]
 }
