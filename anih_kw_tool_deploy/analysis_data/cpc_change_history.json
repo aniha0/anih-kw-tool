@@ -2563,6 +2563,39 @@
           "orders": 5
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T03:26:10.867826",
+      "entries": [
+        {
+          "campaign_name": "【ジェル】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ジェル】SP広告(マニュアル)：KWTG自社",
+          "keyword": "犬はみがき粉ジェル",
+          "avg_cpc": 154,
+          "rec_cpc": 159,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 7200.0,
+          "cost": 1537.52,
+          "ROAS": 4.68,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【ジェル】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ジェル】SP広告(マニュアル)：KWTG自社",
+          "keyword": "犬 歯磨き",
+          "avg_cpc": 96,
+          "rec_cpc": 86,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 5400.0,
+          "cost": 5946.67,
+          "ROAS": 0.91,
+          "orders": 3
+        }
+      ]
     }
   ]
 }
