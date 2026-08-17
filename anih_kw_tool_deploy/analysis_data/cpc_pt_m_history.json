@@ -440,6 +440,25 @@
           "orders": 89
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T03:41:41.171757",
+      "entries": [
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：カテゴリターゲ",
+          "asin": "B0C5NQZJPD",
+          "avg_cpc": 123,
+          "rec_cpc": 113,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 4049.0,
+          "cost": 3191.75,
+          "ROAS": 1.27,
+          "orders": 3
+        }
+      ]
     }
   ]
 }
