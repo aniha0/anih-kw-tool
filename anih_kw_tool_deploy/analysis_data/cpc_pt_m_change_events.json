@@ -404,6 +404,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260817034250_6587",
+      "campaign_name": "【お口周り】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【お口周り】SP広告(マニュアル)：カテゴリターゲ",
+      "asin": "B0C5NQZJPD",
+      "target_key": "【お口周り】sp広告(マニュアル):商品ターゲ|【お口周り】sp広告(マニュアル):カテゴリターゲ|b0c5nqzjpd",
+      "changed_at": "2026-08-17T03:42:50.980792",
+      "before_cpc": 123.0,
+      "after_cpc": 113.0,
+      "change_rate": -8.1,
+      "compare_from": {
+        "period_start": "2026-07-16",
+        "period_end": "2026-08-16",
+        "cost": 3191.75,
+        "sales": 4049.0,
+        "orders": 3.0,
+        "ROAS": 1.27,
+        "impressions": 1210.0,
+        "clicks": 26.0,
+        "CVR": 11.5
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
