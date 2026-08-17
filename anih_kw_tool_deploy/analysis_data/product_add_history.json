@@ -519,6 +519,31 @@
           "ROAS": 3.05
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T02:49:20.495059",
+      "entries": [
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DHN462G4",
+          "orders": 3,
+          "clicks": 7,
+          "cost": 634.96,
+          "sales": 4743.0,
+          "ROAS": 7.47
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0C1BXJ98Q",
+          "orders": 4,
+          "clicks": 27,
+          "cost": 2806.06,
+          "sales": 7200.0,
+          "ROAS": 2.57
+        }
+      ]
     }
   ]
 }
