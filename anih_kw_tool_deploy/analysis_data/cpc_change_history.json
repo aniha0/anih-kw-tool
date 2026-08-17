@@ -2737,6 +2737,39 @@
           "orders": 4
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T03:32:18.946749",
+      "entries": [
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ペット ダニ",
+          "avg_cpc": 146,
+          "rec_cpc": 136,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 10760.0,
+          "cost": 7427.419999999999,
+          "ROAS": 1.45,
+          "orders": 8
+        },
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ダニ退治",
+          "avg_cpc": 151,
+          "rec_cpc": 141,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 4035.0,
+          "cost": 3011.46,
+          "ROAS": 1.34,
+          "orders": 3
+        }
+      ]
     }
   ]
 }
