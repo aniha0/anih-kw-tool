@@ -309,6 +309,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260817034842_7501",
+      "campaign_name": "【乳酸菌猫】SB広告(動画)：KWターゲ",
+      "ad_group": "【乳酸菌猫】SB広告(動画)：KWターゲ",
+      "keyword": "乳酸菌 猫",
+      "target_key": "【乳酸菌猫】sb広告(動画):kwターゲ|【乳酸菌猫】sb広告(動画):kwターゲ|乳酸菌 猫",
+      "changed_at": "2026-08-17T03:48:42.601830",
+      "before_cpc": 131.0,
+      "after_cpc": 121.0,
+      "change_rate": -7.6,
+      "compare_from": {
+        "period_start": "2026-07-16",
+        "period_end": "2026-08-16",
+        "cost": 3417.2599999999998,
+        "sales": 4433.0,
+        "orders": 3.0,
+        "ROAS": 1.3,
+        "impressions": 545.0,
+        "clicks": 26.0,
+        "CVR": 11.5
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
