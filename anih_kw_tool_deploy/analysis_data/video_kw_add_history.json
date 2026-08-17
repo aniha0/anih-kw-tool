@@ -235,6 +235,56 @@
           "ROAS": 3.6
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T03:00:25.751635",
+      "entries": [
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬口周りクリーナー",
+          "orders": 4,
+          "clicks": 6,
+          "cost": 430.5,
+          "sales": 5381.0,
+          "ROAS": 12.5
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬しせきとり 歯石除去",
+          "orders": 3,
+          "clicks": 5,
+          "cost": 777.25,
+          "sales": 4427.0,
+          "ROAS": 5.7
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "猫 あこにきび",
+          "orders": 3,
+          "clicks": 7,
+          "cost": 995.94,
+          "sales": 4035.0,
+          "ROAS": 4.05
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬なみだやけくりーなー",
+          "orders": 5,
+          "clicks": 13,
+          "cost": 1864.82,
+          "sales": 6725.0,
+          "ROAS": 3.61
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "肉球クリーム 猫",
+          "orders": 5,
+          "clicks": 15,
+          "cost": 2181.94,
+          "sales": 6660.0,
+          "ROAS": 3.05
+        }
+      ]
     }
   ]
 }
