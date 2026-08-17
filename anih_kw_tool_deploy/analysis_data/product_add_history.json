@@ -544,6 +544,21 @@
           "ROAS": 2.57
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T02:50:31.471002",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DRDDK2RD",
+          "orders": 4,
+          "clicks": 13,
+          "cost": 1553.58,
+          "sales": 6734.0,
+          "ROAS": 4.33
+        }
+      ]
     }
   ]
 }
