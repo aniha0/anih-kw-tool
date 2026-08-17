@@ -478,6 +478,25 @@
           "orders": 88
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T03:43:19.246888",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DRDDK2RD",
+          "avg_cpc": 120,
+          "rec_cpc": 125,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 6734.0,
+          "cost": 1553.58,
+          "ROAS": 4.33,
+          "orders": 4
+        }
+      ]
     }
   ]
 }
