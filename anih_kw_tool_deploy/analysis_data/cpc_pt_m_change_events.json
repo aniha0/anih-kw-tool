@@ -456,6 +456,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260817034601_9106",
+      "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【乳酸菌猫】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B07G38XB26",
+      "target_key": "【乳酸菌猫】sp広告(マニュアル):商品ターゲ|【乳酸菌猫】sp広告(マニュアル):商品ターゲ|b07g38xb26",
+      "changed_at": "2026-08-17T03:46:01.843273",
+      "before_cpc": 147.0,
+      "after_cpc": 142.0,
+      "change_rate": -3.4,
+      "compare_from": {
+        "period_start": "2026-07-16",
+        "period_end": "2026-08-16",
+        "cost": 33893.78,
+        "sales": 58002.0,
+        "orders": 37.0,
+        "ROAS": 1.71,
+        "impressions": 5934.0,
+        "clicks": 231.0,
+        "CVR": 16.0
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
