@@ -25,6 +25,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260817035149_9136",
+      "campaign_name": "【ジェル】SB広告(動画)：商品ターゲ",
+      "ad_group": "【ジェル】SB広告(動画)：商品ターゲ",
+      "asin": "B0F1FF6TKW",
+      "target_key": "【ジェル】sb広告(動画):商品ターゲ|【ジェル】sb広告(動画):商品ターゲ|b0f1ff6tkw",
+      "changed_at": "2026-08-17T03:51:49.966884",
+      "before_cpc": 111.0,
+      "after_cpc": 116.0,
+      "change_rate": 4.5,
+      "compare_from": {
+        "period_start": "2026-07-16",
+        "period_end": "2026-08-16",
+        "cost": 2555.36,
+        "sales": 13560.0,
+        "orders": 7.0,
+        "ROAS": 5.31,
+        "impressions": 413.0,
+        "clicks": 23.0,
+        "CVR": 30.4
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
