@@ -1,0 +1,30 @@
+{
+  "records": [
+    {
+      "id": "20260817035148_0691",
+      "campaign_name": "【ダニ捕り】SB広告(動画)：商品ターゲ",
+      "ad_group": "【ダニ捕り】SB広告(動画)：商品ターゲ",
+      "asin": "B0DJ8B3F7R",
+      "target_key": "【ダニ捕り】sb広告(動画):商品ターゲ|【ダニ捕り】sb広告(動画):商品ターゲ|b0dj8b3f7r",
+      "changed_at": "2026-08-17T03:51:48.766255",
+      "before_cpc": 99.0,
+      "after_cpc": 104.0,
+      "change_rate": 5.1,
+      "compare_from": {
+        "period_start": "2026-07-16",
+        "period_end": "2026-08-16",
+        "cost": 1084.45,
+        "sales": 6725.0,
+        "orders": 4.0,
+        "ROAS": 6.2,
+        "impressions": 488.0,
+        "clicks": 11.0,
+        "CVR": 36.4
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    }
+  ]
+}
