@@ -1260,6 +1260,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260817032239_4247",
+      "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+      "keyword": "リデンタ",
+      "target_key": "【液体】sp広告(マニュアル):kwターゲ|【液体】sp広告(マニュアル):kwtg自社|リデンタ",
+      "changed_at": "2026-08-17T03:22:39.992513",
+      "before_cpc": 119.0,
+      "after_cpc": 124.0,
+      "change_rate": 4.2,
+      "compare_from": {
+        "period_start": "2026-07-16",
+        "period_end": "2026-08-16",
+        "cost": 2252.56,
+        "sales": 9921.0,
+        "orders": 6.0,
+        "ROAS": 4.4,
+        "impressions": 1190.0,
+        "clicks": 19.0,
+        "CVR": 31.6
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
