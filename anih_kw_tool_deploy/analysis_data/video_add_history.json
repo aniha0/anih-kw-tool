@@ -104,6 +104,31 @@
           "ROAS": 5.31
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T03:05:28.835916",
+      "entries": [
+        {
+          "campaign_name": "【ふりかけ犬】SB広告(動画)：商品ターゲ",
+          "ad_group": "【ふりかけ犬】SB広告(動画)：商品ターゲ",
+          "asin": "B0C28FZK8J",
+          "orders": 3,
+          "clicks": 10,
+          "cost": 1021.8299999999999,
+          "sales": 6681.0,
+          "ROAS": 6.54
+        },
+        {
+          "campaign_name": "【ふりかけ犬】SB広告(動画)：商品ターゲ",
+          "ad_group": "【ふりかけ犬】SB広告(動画)：商品ターゲ",
+          "asin": "B0DNF32ZNN",
+          "orders": 3,
+          "clicks": 16,
+          "cost": 1710.38,
+          "sales": 5709.0,
+          "ROAS": 3.34
+        }
+      ]
     }
   ]
 }
