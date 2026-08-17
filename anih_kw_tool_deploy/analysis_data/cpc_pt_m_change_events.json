@@ -430,6 +430,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260817034411_5145",
+      "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B0DRDDK2RD",
+      "target_key": "【液体】sp広告(マニュアル):商品ターゲ|【液体】sp広告(マニュアル):商品ターゲ|b0drddk2rd",
+      "changed_at": "2026-08-17T03:44:11.583218",
+      "before_cpc": 120.0,
+      "after_cpc": 125.0,
+      "change_rate": 4.2,
+      "compare_from": {
+        "period_start": "2026-07-16",
+        "period_end": "2026-08-16",
+        "cost": 1553.58,
+        "sales": 6734.0,
+        "orders": 4.0,
+        "ROAS": 4.33,
+        "impressions": 490.0,
+        "clicks": 13.0,
+        "CVR": 30.8
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
