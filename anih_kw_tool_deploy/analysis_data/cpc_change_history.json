@@ -2704,6 +2704,39 @@
           "orders": 3
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T03:32:11.646435",
+      "entries": [
+        {
+          "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫　吐き戻し",
+          "avg_cpc": 122,
+          "rec_cpc": 112,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 10575.0,
+          "cost": 7704.15,
+          "ROAS": 1.37,
+          "orders": 7
+        },
+        {
+          "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+          "keyword": "乳酸菌 猫",
+          "avg_cpc": 155,
+          "rec_cpc": 145,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 6489.0,
+          "cost": 5438.85,
+          "ROAS": 1.19,
+          "orders": 4
+        }
+      ]
     }
   ]
 }
