@@ -139,6 +139,38 @@
           "ROAS": 2.43
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T02:56:26.270411",
+      "entries": [
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "涙やけ 猫",
+          "orders": 3,
+          "clicks": 6,
+          "cost": 869.29,
+          "sales": 5380.0,
+          "ROAS": 6.19
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "目やにクリーナー",
+          "orders": 4,
+          "clicks": 6,
+          "cost": 951.89,
+          "sales": 5380.0,
+          "ROAS": 5.65
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "犬用涙やけクリーナー",
+          "orders": 5,
+          "clicks": 12,
+          "cost": 2067.09,
+          "sales": 6725.0,
+          "ROAS": 3.25
+        }
+      ]
     }
   ]
 }
