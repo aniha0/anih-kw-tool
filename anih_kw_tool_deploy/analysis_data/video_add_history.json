@@ -74,6 +74,21 @@
           "ROAS": 3.34
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T03:03:26.740152",
+      "entries": [
+        {
+          "campaign_name": "【イヤー】SB広告(動画)：商品ターゲ",
+          "ad_group": "【イヤー】SB広告(動画)：商品ターゲ",
+          "asin": "B08BJ9SWTG",
+          "orders": 4,
+          "clicks": 14,
+          "cost": 1299.63,
+          "sales": 5180.0,
+          "ROAS": 3.99
+        }
+      ]
     }
   ]
 }
