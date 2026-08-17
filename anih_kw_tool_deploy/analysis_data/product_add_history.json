@@ -589,6 +589,51 @@
           "ROAS": 3.17
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T02:54:20.101410",
+      "entries": [
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0B1DP8XGH",
+          "orders": 3,
+          "clicks": 17,
+          "cost": 1564.3799999999999,
+          "sales": 4433.0,
+          "ROAS": 2.83
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CTMPNMFZ",
+          "orders": 4,
+          "clicks": 22,
+          "cost": 2071.9,
+          "sales": 5795.0,
+          "ROAS": 2.8
+        },
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：カテゴリターゲ",
+          "asin": "B0F5TVZTR4",
+          "orders": 4,
+          "clicks": 25,
+          "cost": 2601.65,
+          "sales": 5448.0,
+          "ROAS": 2.09
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B001BAFQKC",
+          "orders": 12,
+          "clicks": 84,
+          "cost": 8545.89,
+          "sales": 17167.0,
+          "ROAS": 2.01
+        }
+      ]
     }
   ]
 }
