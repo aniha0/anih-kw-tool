@@ -2511,6 +2511,25 @@
           "orders": 3
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T03:23:22.454785",
+      "entries": [
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "keyword": "涙やけシート",
+          "avg_cpc": 160,
+          "rec_cpc": 150,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 4035.0,
+          "cost": 3368.17,
+          "ROAS": 1.2,
+          "orders": 3
+        }
+      ]
     }
   ]
 }
