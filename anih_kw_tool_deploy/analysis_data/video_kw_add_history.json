@@ -203,6 +203,38 @@
           "ROAS": 2.84
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T02:59:13.632716",
+      "entries": [
+        {
+          "ad_group": "【ジェル】SP広告(オート)",
+          "keyword": "犬用はみがき粉",
+          "orders": 6,
+          "clicks": 10,
+          "cost": 1903.39,
+          "sales": 8503.0,
+          "ROAS": 4.47
+        },
+        {
+          "ad_group": "【ジェル】SP広告(オート)",
+          "keyword": "犬はみがき粉ジェル 歯石除去",
+          "orders": 3,
+          "clicks": 10,
+          "cost": 1580.73,
+          "sales": 5712.0,
+          "ROAS": 3.61
+        },
+        {
+          "ad_group": "【ジェル】SP広告(オート)",
+          "keyword": "歯磨き 犬",
+          "orders": 5,
+          "clicks": 20,
+          "cost": 2712.5,
+          "sales": 9753.0,
+          "ROAS": 3.6
+        }
+      ]
     }
   ]
 }
