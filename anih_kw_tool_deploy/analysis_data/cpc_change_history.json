@@ -2770,6 +2770,25 @@
           "orders": 3
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T03:34:10.842499",
+      "entries": [
+        {
+          "campaign_name": "【肉球】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【肉球】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 クリーム",
+          "avg_cpc": 146,
+          "rec_cpc": 151,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 5299.0,
+          "cost": 1020.6600000000001,
+          "ROAS": 5.19,
+          "orders": 4
+        }
+      ]
     }
   ]
 }
