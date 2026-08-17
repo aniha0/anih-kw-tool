@@ -419,6 +419,38 @@
           "ROAS": 3.25
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-17T02:05:34.495487",
+      "entries": [
+        {
+          "ad_group": "【イヤー】SP広告(オート)",
+          "keyword": "耳 クリーナー 犬",
+          "orders": 7,
+          "clicks": 14,
+          "cost": 1740.09,
+          "sales": 9215.0,
+          "ROAS": 5.3
+        },
+        {
+          "ad_group": "【イヤー】SP広告(オート)",
+          "keyword": "耳掃除 猫",
+          "orders": 7,
+          "clicks": 15,
+          "cost": 1916.06,
+          "sales": 9215.0,
+          "ROAS": 4.81
+        },
+        {
+          "ad_group": "【イヤー】SP広告(オート)",
+          "keyword": "犬用 イヤークリーナー",
+          "orders": 4,
+          "clicks": 16,
+          "cost": 1830.94,
+          "sales": 5199.0,
+          "ROAS": 2.84
+        }
+      ]
     }
   ]
 }
