@@ -1234,6 +1234,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260817032238_7021",
+      "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+      "keyword": "ペット 口臭",
+      "target_key": "【液体】sp広告(マニュアル):kwターゲ|【液体】sp広告(マニュアル):kwtg自社|ペット 口臭",
+      "changed_at": "2026-08-17T03:22:38.538676",
+      "before_cpc": 157.0,
+      "after_cpc": 162.0,
+      "change_rate": 3.2,
+      "compare_from": {
+        "period_start": "2026-07-16",
+        "period_end": "2026-08-16",
+        "cost": 1254.0,
+        "sales": 6318.0,
+        "orders": 4.0,
+        "ROAS": 5.04,
+        "impressions": 64.0,
+        "clicks": 8.0,
+        "CVR": 50.0
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
