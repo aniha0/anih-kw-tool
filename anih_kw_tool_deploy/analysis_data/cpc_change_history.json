@@ -3765,6 +3765,25 @@
           "orders": 3
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T02:55:36.055606",
+      "entries": [
+        {
+          "campaign_name": "【乳酸菌犬】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【乳酸菌犬】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬乳酸菌",
+          "avg_cpc": 156,
+          "rec_cpc": 146,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 0.0,
+          "cost": 3436.9,
+          "ROAS": 0.0,
+          "orders": 0
+        }
+      ]
     }
   ]
 }
