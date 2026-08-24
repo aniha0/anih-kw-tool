@@ -1468,6 +1468,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260824023214_2553",
+      "campaign_name": "【イヤー】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【イヤー】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 耳 薬",
+      "target_key": "【イヤー】sp広告(マニュアル):kwターゲ|【イヤー】sp広告(マニュアル):kwターゲ|犬 耳 薬",
+      "changed_at": "2026-08-24T02:32:14.304767",
+      "before_cpc": 94.0,
+      "after_cpc": 89.0,
+      "change_rate": -5.3,
+      "compare_from": {
+        "period_start": "2026-07-23",
+        "period_end": "2026-08-23",
+        "cost": 3180.07,
+        "sales": 4797.0,
+        "orders": 4.0,
+        "ROAS": 1.51,
+        "impressions": 2880.0,
+        "clicks": 34.0,
+        "CVR": 11.8
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
