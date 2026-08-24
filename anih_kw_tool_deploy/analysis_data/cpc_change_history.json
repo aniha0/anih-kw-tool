@@ -3642,6 +3642,25 @@
           "orders": 3
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T02:43:49.200623",
+      "entries": [
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ペット ダニ",
+          "avg_cpc": 146,
+          "rec_cpc": 136,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 8070.0,
+          "cost": 6407.78,
+          "ROAS": 1.26,
+          "orders": 6
+        }
+      ]
     }
   ]
 }
