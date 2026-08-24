@@ -3713,6 +3713,25 @@
           "orders": 4
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T02:49:47.544411",
+      "entries": [
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ペット",
+          "avg_cpc": 126,
+          "rec_cpc": 116,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 6489.0,
+          "cost": 8158.32,
+          "ROAS": 0.8,
+          "orders": 4
+        }
+      ]
     }
   ]
 }
