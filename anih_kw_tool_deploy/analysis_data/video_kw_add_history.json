@@ -481,6 +481,38 @@
           "ROAS": 2.75
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T02:02:12.298589",
+      "entries": [
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬口周りクリーナー",
+          "orders": 3,
+          "clicks": 11,
+          "cost": 790.29,
+          "sales": 4035.0,
+          "ROAS": 5.11
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬なみだやけくりーなー",
+          "orders": 5,
+          "clicks": 14,
+          "cost": 1989.95,
+          "sales": 6725.0,
+          "ROAS": 3.38
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬 顔拭きシート",
+          "orders": 3,
+          "clicks": 9,
+          "cost": 1531.2,
+          "sales": 4035.0,
+          "ROAS": 2.64
+        }
+      ]
     }
   ]
 }
