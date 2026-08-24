@@ -1416,6 +1416,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260824023035_0931",
+      "campaign_name": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 目やに",
+      "target_key": "【涙やけ】sp広告(マニュアル):kwターゲ|【涙やけ】sp広告(マニュアル):kwターゲ|猫 目やに",
+      "changed_at": "2026-08-24T02:30:35.407785",
+      "before_cpc": 166.0,
+      "after_cpc": 161.0,
+      "change_rate": -3.0,
+      "compare_from": {
+        "period_start": "2026-07-23",
+        "period_end": "2026-08-23",
+        "cost": 22030.88,
+        "sales": 39007.0,
+        "orders": 29.0,
+        "ROAS": 1.77,
+        "impressions": 1316.0,
+        "clicks": 133.0,
+        "CVR": 21.8
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
