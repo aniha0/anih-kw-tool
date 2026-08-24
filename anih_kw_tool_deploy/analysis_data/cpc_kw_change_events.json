@@ -1520,6 +1520,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260824023926_8212",
+      "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 ドライシャンプー",
+      "target_key": "【グルーミング】sp広告(マニュアル):kwターゲ|【グルーミング】sp広告(マニュアル):kwターゲ|犬 ドライシャンプー",
+      "changed_at": "2026-08-24T02:39:26.428781",
+      "before_cpc": 117.0,
+      "after_cpc": 107.0,
+      "change_rate": -8.5,
+      "compare_from": {
+        "period_start": "2026-07-23",
+        "period_end": "2026-08-23",
+        "cost": 8626.490000000002,
+        "sales": 10800.0,
+        "orders": 5.0,
+        "ROAS": 1.25,
+        "impressions": 1768.0,
+        "clicks": 74.0,
+        "CVR": 6.8
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
