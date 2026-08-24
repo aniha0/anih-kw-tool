@@ -3458,6 +3458,25 @@
           "orders": 2
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T02:30:46.964398",
+      "entries": [
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 耳 薬",
+          "avg_cpc": 94,
+          "rec_cpc": 89,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 4797.0,
+          "cost": 3180.07,
+          "ROAS": 1.51,
+          "orders": 4
+        }
+      ]
     }
   ]
 }
