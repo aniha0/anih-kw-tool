@@ -512,6 +512,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260824025916_4160",
+      "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B003CT3NGY",
+      "target_key": "【グルーミング】sp広告(マニュアル):商品ターゲ|【グルーミング】sp広告(マニュアル):商品ターゲ|b003ct3ngy",
+      "changed_at": "2026-08-24T02:59:16.457425",
+      "before_cpc": 97.0,
+      "after_cpc": 102.0,
+      "change_rate": 5.2,
+      "compare_from": {
+        "period_start": "2026-07-23",
+        "period_end": "2026-08-23",
+        "cost": 1355.15,
+        "sales": 6291.0,
+        "orders": 4.0,
+        "ROAS": 4.64,
+        "impressions": 204.0,
+        "clicks": 14.0,
+        "CVR": 28.6
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
