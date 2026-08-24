@@ -1806,6 +1806,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260824025337_1728",
+      "campaign_name": "【関節】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【関節】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 関節 サプリ",
+      "target_key": "【関節】sp広告(マニュアル):kwターゲ|【関節】sp広告(マニュアル):kwターゲ|猫 関節 サプリ",
+      "changed_at": "2026-08-24T02:53:37.562572",
+      "before_cpc": 161.0,
+      "after_cpc": 151.0,
+      "change_rate": -6.2,
+      "compare_from": {
+        "period_start": "2026-07-23",
+        "period_end": "2026-08-23",
+        "cost": 3217.1800000000003,
+        "sales": 4086.0,
+        "orders": 3.0,
+        "ROAS": 1.27,
+        "impressions": 157.0,
+        "clicks": 20.0,
+        "CVR": 15.0
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
