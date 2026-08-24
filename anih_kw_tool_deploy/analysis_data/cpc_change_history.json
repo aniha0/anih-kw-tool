@@ -3496,6 +3496,25 @@
           "orders": 5
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T02:34:45.327892",
+      "entries": [
+        {
+          "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 デンタルケア",
+          "avg_cpc": 177,
+          "rec_cpc": 182,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 24198.0,
+          "cost": 5314.6900000000005,
+          "ROAS": 4.55,
+          "orders": 10
+        }
+      ]
     }
   ]
 }
