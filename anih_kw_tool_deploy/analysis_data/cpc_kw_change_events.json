@@ -1442,6 +1442,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260824023036_7889",
+      "campaign_name": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+      "keyword": "涙やけシート",
+      "target_key": "【涙やけ】sp広告(マニュアル):kwターゲ|【涙やけ】sp広告(マニュアル):kwターゲ|涙やけシート",
+      "changed_at": "2026-08-24T02:30:36.436993",
+      "before_cpc": 167.0,
+      "after_cpc": 157.0,
+      "change_rate": -6.0,
+      "compare_from": {
+        "period_start": "2026-07-23",
+        "period_end": "2026-08-23",
+        "cost": 3168.17,
+        "sales": 2690.0,
+        "orders": 2.0,
+        "ROAS": 0.85,
+        "impressions": 123.0,
+        "clicks": 19.0,
+        "CVR": 10.5
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
