@@ -3661,6 +3661,39 @@
           "orders": 6
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T02:45:37.206922",
+      "entries": [
+        {
+          "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫歯磨き粉",
+          "avg_cpc": 177,
+          "rec_cpc": 182,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 15944.0,
+          "cost": 1774.0,
+          "ROAS": 8.99,
+          "orders": 7
+        },
+        {
+          "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫 ふりかけ",
+          "avg_cpc": 162,
+          "rec_cpc": 157,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 12418.0,
+          "cost": 8287.119999999999,
+          "ROAS": 1.5,
+          "orders": 7
+        }
+      ]
     }
   ]
 }
