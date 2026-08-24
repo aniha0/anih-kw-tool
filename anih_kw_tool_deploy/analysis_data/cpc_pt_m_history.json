@@ -497,6 +497,81 @@
           "orders": 4
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T02:57:30.889468",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DRDDK2RD",
+          "avg_cpc": 131,
+          "rec_cpc": 136,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 9893.0,
+          "cost": 2099.58,
+          "ROAS": 4.71,
+          "orders": 6
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B003CT3NGY",
+          "avg_cpc": 97,
+          "rec_cpc": 102,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 6291.0,
+          "cost": 1355.15,
+          "ROAS": 4.64,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【乳酸菌猫】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B07G38XB26",
+          "avg_cpc": 147,
+          "rec_cpc": 142,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 61420.0,
+          "cost": 35412.07,
+          "ROAS": 1.73,
+          "orders": 39
+        },
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CJ4BDGZF",
+          "avg_cpc": 166,
+          "rec_cpc": 156,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 120293.0,
+          "cost": 94485.35,
+          "ROAS": 1.27,
+          "orders": 90
+        },
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B00L4ZSQSI",
+          "avg_cpc": 284,
+          "rec_cpc": 274,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 151351.0,
+          "cost": 150192.67,
+          "ROAS": 1.01,
+          "orders": 96
+        }
+      ]
     }
   ]
 }
