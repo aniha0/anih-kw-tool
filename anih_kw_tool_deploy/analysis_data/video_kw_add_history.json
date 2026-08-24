@@ -299,6 +299,110 @@
           "ROAS": 2.43
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T01:57:26.551624",
+      "entries": [
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "涙やけ 猫",
+          "orders": 4,
+          "clicks": 8,
+          "cost": 1157.55,
+          "sales": 6725.0,
+          "ROAS": 5.81
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "目やにクリーナー",
+          "orders": 3,
+          "clicks": 5,
+          "cost": 771.89,
+          "sales": 4035.0,
+          "ROAS": 5.23
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬口周りクリーナー",
+          "orders": 3,
+          "clicks": 11,
+          "cost": 790.29,
+          "sales": 4035.0,
+          "ROAS": 5.11
+        },
+        {
+          "ad_group": "【イヤー】SP広告(オート)",
+          "keyword": "耳 クリーナー 犬",
+          "orders": 6,
+          "clicks": 13,
+          "cost": 1624.18,
+          "sales": 7870.0,
+          "ROAS": 4.85
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬なみだやけくりーなー",
+          "orders": 5,
+          "clicks": 14,
+          "cost": 1989.95,
+          "sales": 6725.0,
+          "ROAS": 3.38
+        },
+        {
+          "ad_group": "【イヤー】SP広告(オート)",
+          "keyword": "耳掃除 猫",
+          "orders": 4,
+          "clicks": 13,
+          "cost": 1611.56,
+          "sales": 5179.0,
+          "ROAS": 3.21
+        },
+        {
+          "ad_group": "【ジェル】SP広告(オート)",
+          "keyword": "犬はみがき粉ジェル 歯石除去",
+          "orders": 4,
+          "clicks": 17,
+          "cost": 2731.0499999999997,
+          "sales": 7512.0,
+          "ROAS": 2.75
+        },
+        {
+          "ad_group": "【イヤー】SP広告(オート)",
+          "keyword": "犬用 イヤークリーナー",
+          "orders": 7,
+          "clicks": 26,
+          "cost": 3072.81,
+          "sales": 8229.0,
+          "ROAS": 2.68
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬 顔拭きシート",
+          "orders": 3,
+          "clicks": 9,
+          "cost": 1531.2,
+          "sales": 4035.0,
+          "ROAS": 2.64
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "ホウ酸水溶液 犬",
+          "orders": 5,
+          "clicks": 45,
+          "cost": 5140.27,
+          "sales": 12105.0,
+          "ROAS": 2.35
+        },
+        {
+          "ad_group": "【肉球S】SP広告(オート)",
+          "keyword": "犬 にくきゅう 保湿クリーム",
+          "orders": 9,
+          "clicks": 37,
+          "cost": 5784.85,
+          "sales": 11800.0,
+          "ROAS": 2.04
+        }
+      ]
     }
   ]
 }
