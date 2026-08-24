@@ -3425,6 +3425,39 @@
           "orders": 1
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T02:27:54.074420",
+      "entries": [
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫 目やに",
+          "avg_cpc": 166,
+          "rec_cpc": 161,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 39007.0,
+          "cost": 22030.88,
+          "ROAS": 1.77,
+          "orders": 29
+        },
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "keyword": "涙やけシート",
+          "avg_cpc": 167,
+          "rec_cpc": 157,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 2690.0,
+          "cost": 3168.17,
+          "ROAS": 0.85,
+          "orders": 2
+        }
+      ]
     }
   ]
 }
