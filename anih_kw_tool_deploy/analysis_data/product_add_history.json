@@ -849,6 +849,81 @@
           "ROAS": 2.07
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T01:44:12.290510",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DRDDK2RD",
+          "orders": 6,
+          "clicks": 16,
+          "cost": 2099.58,
+          "sales": 9893.0,
+          "ROAS": 4.71
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B09HBG4R7Q",
+          "orders": 8,
+          "clicks": 21,
+          "cost": 3186.45,
+          "sales": 12195.0,
+          "ROAS": 3.83
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B08B6LZJ3C",
+          "orders": 5,
+          "clicks": 15,
+          "cost": 2239.5,
+          "sales": 8054.0,
+          "ROAS": 3.6
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DF71W1SK",
+          "orders": 32,
+          "clicks": 116,
+          "cost": 16483.79,
+          "sales": 50365.0,
+          "ROAS": 3.06
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DW8NGJQC",
+          "orders": 8,
+          "clicks": 38,
+          "cost": 5112.58,
+          "sales": 13122.0,
+          "ROAS": 2.57
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DLG4C46Z",
+          "orders": 12,
+          "clicks": 56,
+          "cost": 7837.6,
+          "sales": 18064.0,
+          "ROAS": 2.3
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0F1FF6TKW",
+          "orders": 5,
+          "clicks": 35,
+          "cost": 4308.18,
+          "sales": 8921.0,
+          "ROAS": 2.07
+        }
+      ]
     }
   ]
 }
