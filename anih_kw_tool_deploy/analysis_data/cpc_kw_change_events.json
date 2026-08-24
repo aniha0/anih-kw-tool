@@ -1754,6 +1754,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260824024903_0199",
+      "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+      "keyword": "ペット 消臭スプレー",
+      "target_key": "【除菌消臭】sp広告(マニュアル):kwターゲ|【除菌消臭】sp広告(マニュアル):kwターゲ|ペット 消臭スプレー",
+      "changed_at": "2026-08-24T02:49:03.574141",
+      "before_cpc": 118.0,
+      "after_cpc": 123.0,
+      "change_rate": 4.2,
+      "compare_from": {
+        "period_start": "2026-07-23",
+        "period_end": "2026-08-23",
+        "cost": 1890.0,
+        "sales": 8545.0,
+        "orders": 4.0,
+        "ROAS": 4.52,
+        "impressions": 1343.0,
+        "clicks": 16.0,
+        "CVR": 25.0
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
