@@ -1858,6 +1858,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260824025721_0686",
+      "campaign_name": "【乳酸菌犬】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【乳酸菌犬】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬乳酸菌",
+      "target_key": "【乳酸菌犬】sp広告(マニュアル):kwターゲ|【乳酸菌犬】sp広告(マニュアル):kwターゲ|犬乳酸菌",
+      "changed_at": "2026-08-24T02:57:21.843079",
+      "before_cpc": 156.0,
+      "after_cpc": 146.0,
+      "change_rate": -6.4,
+      "compare_from": {
+        "period_start": "2026-07-23",
+        "period_end": "2026-08-23",
+        "cost": 3436.9,
+        "sales": 0.0,
+        "orders": 0.0,
+        "ROAS": 0.0,
+        "impressions": 226.0,
+        "clicks": 22.0,
+        "CVR": 0.0
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
