@@ -1364,6 +1364,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260824022737_2890",
+      "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+      "keyword": "犬 口臭ケア 水に混ぜる",
+      "target_key": "【液体】sp広告(マニュアル):kwターゲ|【液体】sp広告(マニュアル):kwtg自社|犬 口臭ケア 水に混ぜる",
+      "changed_at": "2026-08-24T02:27:37.556029",
+      "before_cpc": 171.0,
+      "after_cpc": 176.0,
+      "change_rate": 2.9,
+      "compare_from": {
+        "period_start": "2026-07-23",
+        "period_end": "2026-08-23",
+        "cost": 6153.65,
+        "sales": 26063.0,
+        "orders": 14.0,
+        "ROAS": 4.24,
+        "impressions": 813.0,
+        "clicks": 36.0,
+        "CVR": 38.9
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
