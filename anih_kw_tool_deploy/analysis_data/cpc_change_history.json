@@ -3732,6 +3732,39 @@
           "orders": 4
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T02:52:26.354158",
+      "entries": [
+        {
+          "campaign_name": "【関節】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【関節】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 関節サプリ",
+          "avg_cpc": 170,
+          "rec_cpc": 165,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 9037.0,
+          "cost": 5618.91,
+          "ROAS": 1.61,
+          "orders": 6
+        },
+        {
+          "campaign_name": "【関節】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【関節】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫 関節 サプリ",
+          "avg_cpc": 161,
+          "rec_cpc": 151,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 4086.0,
+          "cost": 3217.1800000000003,
+          "ROAS": 1.27,
+          "orders": 3
+        }
+      ]
     }
   ]
 }
