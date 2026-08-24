@@ -1780,6 +1780,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260824025206_3229",
+      "campaign_name": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+      "keyword": "ペット",
+      "target_key": "【シャンプー】sp広告(マニュアル):kwターゲ|【シャンプー】sp広告(マニュアル):kwターゲ|ペット",
+      "changed_at": "2026-08-24T02:52:06.870224",
+      "before_cpc": 126.0,
+      "after_cpc": 116.0,
+      "change_rate": -7.9,
+      "compare_from": {
+        "period_start": "2026-07-23",
+        "period_end": "2026-08-23",
+        "cost": 8158.32,
+        "sales": 6489.0,
+        "orders": 4.0,
+        "ROAS": 0.8,
+        "impressions": 4217.0,
+        "clicks": 65.0,
+        "CVR": 6.2
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
