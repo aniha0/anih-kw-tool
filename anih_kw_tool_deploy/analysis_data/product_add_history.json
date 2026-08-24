@@ -634,6 +634,221 @@
           "ROAS": 2.01
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T01:44:02.089067",
+      "entries": [
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DHN462G4",
+          "orders": 3,
+          "clicks": 7,
+          "cost": 634.96,
+          "sales": 4743.0,
+          "ROAS": 7.47
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DRDDK2RD",
+          "orders": 6,
+          "clicks": 16,
+          "cost": 2099.58,
+          "sales": 9893.0,
+          "ROAS": 4.71
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B003CT3NGY",
+          "orders": 4,
+          "clicks": 14,
+          "cost": 1355.15,
+          "sales": 6291.0,
+          "ROAS": 4.64
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0B1DP8XGH",
+          "orders": 3,
+          "clicks": 13,
+          "cost": 1109.38,
+          "sales": 4433.0,
+          "ROAS": 4.0
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B09HBG4R7Q",
+          "orders": 8,
+          "clicks": 21,
+          "cost": 3186.45,
+          "sales": 12195.0,
+          "ROAS": 3.83
+        },
+        {
+          "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ふりかけ猫】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0F9W44FVR",
+          "orders": 4,
+          "clicks": 14,
+          "cost": 1891.75,
+          "sales": 6836.0,
+          "ROAS": 3.61
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B08B6LZJ3C",
+          "orders": 5,
+          "clicks": 15,
+          "cost": 2239.5,
+          "sales": 8054.0,
+          "ROAS": 3.6
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CTMPNMFZ",
+          "orders": 5,
+          "clicks": 22,
+          "cost": 2120.65,
+          "sales": 7504.0,
+          "ROAS": 3.54
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CNLFT7XF",
+          "orders": 504,
+          "clicks": 1667,
+          "cost": 204135.15,
+          "sales": 635350.0,
+          "ROAS": 3.11
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DF71W1SK",
+          "orders": 32,
+          "clicks": 116,
+          "cost": 16483.79,
+          "sales": 50365.0,
+          "ROAS": 3.06
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0C1BXJ98Q",
+          "orders": 4,
+          "clicks": 23,
+          "cost": 2351.06,
+          "sales": 7200.0,
+          "ROAS": 3.06
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B001F2N8KG",
+          "orders": 14,
+          "clicks": 46,
+          "cost": 5732.84,
+          "sales": 17161.0,
+          "ROAS": 2.99
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B08BJ9SWTG",
+          "orders": 30,
+          "clicks": 98,
+          "cost": 12287.75,
+          "sales": 36063.0,
+          "ROAS": 2.93
+        },
+        {
+          "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ふりかけ犬】SP広告(マニュアル)：商品",
+          "asin": "B0CYP43QKN",
+          "orders": 31,
+          "clicks": 125,
+          "cost": 19254.760000000002,
+          "sales": 54698.0,
+          "ROAS": 2.84
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DW8NGJQC",
+          "orders": 8,
+          "clicks": 38,
+          "cost": 5112.58,
+          "sales": 13122.0,
+          "ROAS": 2.57
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B095W1QW6J",
+          "orders": 6,
+          "clicks": 36,
+          "cost": 3507.34,
+          "sales": 8631.0,
+          "ROAS": 2.46
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DLG4C46Z",
+          "orders": 12,
+          "clicks": 56,
+          "cost": 7837.6,
+          "sales": 18064.0,
+          "ROAS": 2.3
+        },
+        {
+          "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【乳酸菌猫】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DV96J6VD",
+          "orders": 34,
+          "clicks": 216,
+          "cost": 23771.629999999997,
+          "sales": 51884.0,
+          "ROAS": 2.18
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B001BAFQKC",
+          "orders": 11,
+          "clicks": 72,
+          "cost": 7229.64,
+          "sales": 15458.0,
+          "ROAS": 2.14
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0F5TVZTR4",
+          "orders": 4,
+          "clicks": 25,
+          "cost": 2625.4,
+          "sales": 5448.0,
+          "ROAS": 2.08
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0F1FF6TKW",
+          "orders": 5,
+          "clicks": 35,
+          "cost": 4308.18,
+          "sales": 8921.0,
+          "ROAS": 2.07
+        }
+      ]
     }
   ]
 }
