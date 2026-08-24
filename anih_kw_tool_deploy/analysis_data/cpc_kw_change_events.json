@@ -1494,6 +1494,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260824023612_2311",
+      "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 デンタルケア",
+      "target_key": "【ふりかけ犬】sp広告(マニュアル):kwターゲ|【ふりかけ犬】sp広告(マニュアル):kwターゲ|犬 デンタルケア",
+      "changed_at": "2026-08-24T02:36:12.664534",
+      "before_cpc": 177.0,
+      "after_cpc": 182.0,
+      "change_rate": 2.8,
+      "compare_from": {
+        "period_start": "2026-07-23",
+        "period_end": "2026-08-23",
+        "cost": 5314.6900000000005,
+        "sales": 24198.0,
+        "orders": 10.0,
+        "ROAS": 4.55,
+        "impressions": 448.0,
+        "clicks": 30.0,
+        "CVR": 33.3
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
