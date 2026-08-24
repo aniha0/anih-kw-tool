@@ -3694,6 +3694,25 @@
           "orders": 7
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T02:47:41.550271",
+      "entries": [
+        {
+          "campaign_name": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【除菌消臭】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ペット 消臭スプレー",
+          "avg_cpc": 118,
+          "rec_cpc": 123,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 8545.0,
+          "cost": 1890.0,
+          "ROAS": 4.52,
+          "orders": 4
+        }
+      ]
     }
   ]
 }
