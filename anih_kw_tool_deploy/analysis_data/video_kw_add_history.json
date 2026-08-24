@@ -403,6 +403,38 @@
           "ROAS": 2.04
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-24T01:57:46.847001",
+      "entries": [
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "涙やけ 猫",
+          "orders": 4,
+          "clicks": 8,
+          "cost": 1157.55,
+          "sales": 6725.0,
+          "ROAS": 5.81
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "目やにクリーナー",
+          "orders": 3,
+          "clicks": 5,
+          "cost": 771.89,
+          "sales": 4035.0,
+          "ROAS": 5.23
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "ホウ酸水溶液 犬",
+          "orders": 5,
+          "clicks": 45,
+          "cost": 5140.27,
+          "sales": 12105.0,
+          "ROAS": 2.35
+        }
+      ]
     }
   ]
 }
