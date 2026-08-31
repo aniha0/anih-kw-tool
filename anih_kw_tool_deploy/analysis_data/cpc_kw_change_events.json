@@ -2016,6 +2016,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260831031448_7550",
+      "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+      "keyword": "グルーミングスプレー 犬",
+      "target_key": "【グルーミング】sp広告(マニュアル):kwターゲ|【グルーミング】sp広告(マニュアル):kwターゲ|グルーミングスプレー 犬",
+      "changed_at": "2026-08-31T03:14:48.195694",
+      "before_cpc": 121.0,
+      "after_cpc": 111.0,
+      "change_rate": -8.3,
+      "compare_from": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 4348.6,
+        "sales": 3600.0,
+        "orders": 2.0,
+        "ROAS": 0.83,
+        "impressions": 2801.0,
+        "clicks": 36.0,
+        "CVR": 5.6
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
