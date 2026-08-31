@@ -401,6 +401,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260831033519_9830",
+      "campaign_name": "【イヤー】SB広告(動画)：KWターゲ",
+      "ad_group": "【イヤー】SB広告(動画)：KWターゲ",
+      "keyword": "ノルバサン",
+      "target_key": "【イヤー】sb広告(動画):kwターゲ|【イヤー】sb広告(動画):kwターゲ|ノルバサン",
+      "changed_at": "2026-08-31T03:35:19.754150",
+      "before_cpc": 94.0,
+      "after_cpc": 99.0,
+      "change_rate": 5.3,
+      "compare_from": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 848.19,
+        "sales": 4978.0,
+        "orders": 4.0,
+        "ROAS": 5.87,
+        "impressions": 142.0,
+        "clicks": 9.0,
+        "CVR": 44.4
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
