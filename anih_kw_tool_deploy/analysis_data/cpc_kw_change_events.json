@@ -2198,6 +2198,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260831032539_3191",
+      "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 歯",
+      "target_key": "【ふりかけ猫】sp広告(マニュアル):kwターゲ|【ふりかけ猫】sp広告(マニュアル):kwターゲ|猫 歯",
+      "changed_at": "2026-08-31T03:25:39.572621",
+      "before_cpc": 161.0,
+      "after_cpc": 156.0,
+      "change_rate": -3.1,
+      "compare_from": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 3703.7799999999997,
+        "sales": 5582.0,
+        "orders": 3.0,
+        "ROAS": 1.51,
+        "impressions": 150.0,
+        "clicks": 23.0,
+        "CVR": 13.0
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
