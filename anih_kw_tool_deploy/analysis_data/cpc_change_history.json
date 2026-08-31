@@ -4289,6 +4289,25 @@
           "orders": 5
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T03:13:14.345164",
+      "entries": [
+        {
+          "campaign_name": "【ジェル】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ジェル】SP広告(マニュアル)：KWTG自社",
+          "keyword": "犬はみがき粉ジェル",
+          "avg_cpc": 142,
+          "rec_cpc": 147,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 15015.0,
+          "cost": 3404.37,
+          "ROAS": 4.41,
+          "orders": 10
+        }
+      ]
     }
   ]
 }
