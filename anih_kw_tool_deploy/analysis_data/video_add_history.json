@@ -364,6 +364,21 @@
           "ROAS": 2.6
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T02:54:49.610817",
+      "entries": [
+        {
+          "campaign_name": "【ジェル】SB広告(動画)：商品ターゲ",
+          "ad_group": "【ジェル】SB広告(動画)：商品ターゲ",
+          "asin": "B0F1FF6TKW",
+          "orders": 11,
+          "clicks": 38,
+          "cost": 4457.77,
+          "sales": 15130.0,
+          "ROAS": 3.39
+        }
+      ]
     }
   ]
 }
