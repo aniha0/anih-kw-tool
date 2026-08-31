@@ -4534,6 +4534,39 @@
           "orders": 3
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T03:26:21.643136",
+      "entries": [
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬のシャンプー",
+          "avg_cpc": 105,
+          "rec_cpc": 110,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 6126.0,
+          "cost": 1052.77,
+          "ROAS": 5.82,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ペット",
+          "avg_cpc": 121,
+          "rec_cpc": 111,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 8198.0,
+          "cost": 8014.58,
+          "ROAS": 1.02,
+          "orders": 5
+        }
+      ]
     }
   ]
 }
