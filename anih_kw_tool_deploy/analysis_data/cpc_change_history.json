@@ -4270,6 +4270,25 @@
           "orders": 4
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T03:11:56.673871",
+      "entries": [
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬　涙",
+          "avg_cpc": 136,
+          "rec_cpc": 131,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 6726.0,
+          "cost": 3944.46,
+          "ROAS": 1.71,
+          "orders": 5
+        }
+      ]
     }
   ]
 }
