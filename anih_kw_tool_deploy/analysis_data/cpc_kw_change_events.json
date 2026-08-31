@@ -1990,6 +1990,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260831031145_3144",
+      "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+      "keyword": "猫 歯ブラシ",
+      "target_key": "【液体】sp広告(マニュアル):kwターゲ|【液体】sp広告(マニュアル):kwtg自社|猫 歯ブラシ",
+      "changed_at": "2026-08-31T03:11:45.792108",
+      "before_cpc": 115.0,
+      "after_cpc": 120.0,
+      "change_rate": 4.3,
+      "compare_from": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 692.5,
+        "sales": 6227.0,
+        "orders": 4.0,
+        "ROAS": 8.99,
+        "impressions": 113.0,
+        "clicks": 6.0,
+        "CVR": 66.7
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
