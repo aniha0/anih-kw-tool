@@ -424,6 +424,21 @@
           "ROAS": 3.2
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T03:00:26.583482",
+      "entries": [
+        {
+          "campaign_name": "【肉球】SB広告(動画)：商品ターゲ",
+          "ad_group": "【肉球】SB広告(動画)：商品ターゲ",
+          "asin": "B0CR2ZX8SH",
+          "orders": 3,
+          "clicks": 6,
+          "cost": 696.64,
+          "sales": 3982.0,
+          "ROAS": 5.72
+        }
+      ]
     }
   ]
 }
