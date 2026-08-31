@@ -4153,6 +4153,123 @@
           "orders": 2
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T03:09:45.290788",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "猫 液体歯磨き",
+          "avg_cpc": 144,
+          "rec_cpc": 149,
+          "cpc_delta": 5,
+          "cpc_rank": "SS+",
+          "cpc_action": "CPC上げ",
+          "sales": 45588.0,
+          "cost": 9041.55,
+          "ROAS": 5.04,
+          "orders": 25
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "ライオン　ペット",
+          "avg_cpc": 125,
+          "rec_cpc": 130,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 9157.0,
+          "cost": 375.0,
+          "ROAS": 24.42,
+          "orders": 6
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "猫 歯ブラシ",
+          "avg_cpc": 115,
+          "rec_cpc": 120,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 6227.0,
+          "cost": 692.5,
+          "ROAS": 8.99,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "ペット 口臭",
+          "avg_cpc": 162,
+          "rec_cpc": 167,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 10345.0,
+          "cost": 1942.1,
+          "ROAS": 5.33,
+          "orders": 6
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "ブレスウォーター 犬",
+          "avg_cpc": 148,
+          "rec_cpc": 153,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 10837.0,
+          "cost": 2067.2,
+          "ROAS": 5.24,
+          "orders": 7
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "猫 マウスクリーナー",
+          "avg_cpc": 101,
+          "rec_cpc": 106,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 14713.0,
+          "cost": 3118.73,
+          "ROAS": 4.72,
+          "orders": 8
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "犬 マウスクリーナー",
+          "avg_cpc": 132,
+          "rec_cpc": 137,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 34813.0,
+          "cost": 7537.71,
+          "ROAS": 4.62,
+          "orders": 19
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "犬 歯石除去",
+          "avg_cpc": 151,
+          "rec_cpc": 146,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 5787.0,
+          "cost": 3324.0,
+          "ROAS": 1.74,
+          "orders": 4
+        }
+      ]
     }
   ]
 }
