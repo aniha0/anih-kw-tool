@@ -1384,6 +1384,41 @@
           "ROAS": 2.2
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T02:24:21.013982",
+      "entries": [
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B08BJ9SWTG",
+          "orders": 35,
+          "clicks": 87,
+          "cost": 11306.359999999999,
+          "sales": 41044.0,
+          "ROAS": 3.63
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CNLFT7XF",
+          "orders": 437,
+          "clicks": 1398,
+          "cost": 171948.66999999998,
+          "sales": 549988.0,
+          "ROAS": 3.2
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B001F2N8KG",
+          "orders": 10,
+          "clicks": 38,
+          "cost": 4987.46,
+          "sales": 11842.0,
+          "ROAS": 2.37
+        }
+      ]
     }
   ]
 }
