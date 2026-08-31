@@ -620,6 +620,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260831033330_2138",
+      "campaign_name": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B0BCK9CRJC",
+      "target_key": "【涙やけ】sp広告(マニュアル):商品ターゲ|【涙やけ】sp広告(マニュアル):商品ターゲ|b0bck9crjc",
+      "changed_at": "2026-08-31T03:33:30.185024",
+      "before_cpc": 126.0,
+      "after_cpc": 116.0,
+      "change_rate": -7.9,
+      "compare_from": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 3035.37,
+        "sales": 2690.0,
+        "orders": 2.0,
+        "ROAS": 0.89,
+        "impressions": 723.0,
+        "clicks": 24.0,
+        "CVR": 8.3
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
