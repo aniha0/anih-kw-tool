@@ -804,6 +804,29 @@
           "ROAS": 2.13
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T02:44:20.058842",
+      "entries": [
+        {
+          "ad_group": "【ふりかけ犬】SP広告(オート)",
+          "keyword": "犬でんたるけあふりかけ",
+          "orders": 3,
+          "clicks": 6,
+          "cost": 892.5,
+          "sales": 6163.0,
+          "ROAS": 6.91
+        },
+        {
+          "ad_group": "【ふりかけ犬】SP広告(オート)",
+          "keyword": "犬 おやつ",
+          "orders": 5,
+          "clicks": 11,
+          "cost": 1737.7,
+          "sales": 9063.0,
+          "ROAS": 5.22
+        }
+      ]
     }
   ]
 }
