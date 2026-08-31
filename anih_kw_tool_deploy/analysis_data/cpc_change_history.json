@@ -4468,6 +4468,25 @@
           "orders": 6
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T03:20:04.517284",
+      "entries": [
+        {
+          "campaign_name": "【肉球】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【肉球】SP広告(マニュアル)：KWターゲ",
+          "keyword": "肉球クリーム",
+          "avg_cpc": 128,
+          "rec_cpc": 123,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 4845.0,
+          "cost": 2944.28,
+          "ROAS": 1.65,
+          "orders": 4
+        }
+      ]
     }
   ]
 }
