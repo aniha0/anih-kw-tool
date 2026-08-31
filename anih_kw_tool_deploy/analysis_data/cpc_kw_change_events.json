@@ -2042,6 +2042,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260831031653_3952",
+      "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 腸活",
+      "target_key": "【乳酸菌猫】sp広告(マニュアル):kwターゲ|【乳酸菌猫】sp広告(マニュアル):kwターゲ|猫 腸活",
+      "changed_at": "2026-08-31T03:16:53.982368",
+      "before_cpc": 140.0,
+      "after_cpc": 145.0,
+      "change_rate": 3.6,
+      "compare_from": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 1543.9099999999999,
+        "sales": 6489.0,
+        "orders": 4.0,
+        "ROAS": 4.2,
+        "impressions": 238.0,
+        "clicks": 11.0,
+        "CVR": 36.4
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
