@@ -409,6 +409,21 @@
           "ROAS": 3.02
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T02:59:16.773783",
+      "entries": [
+        {
+          "campaign_name": "【ダニ捕り】SB広告(動画)：商品ターゲ",
+          "ad_group": "【ダニ捕り】SB広告(動画)：商品ターゲ",
+          "asin": "B0DJ8B3F7R",
+          "orders": 3,
+          "clicks": 14,
+          "cost": 1196.83,
+          "sales": 3834.0,
+          "ROAS": 3.2
+        }
+      ]
     }
   ]
 }
