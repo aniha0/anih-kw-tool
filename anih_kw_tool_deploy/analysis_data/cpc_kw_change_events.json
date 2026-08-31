@@ -1440,7 +1440,17 @@
         "clicks": 62.0,
         "CVR": 32.3
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 7537.71,
+        "sales": 34813.0,
+        "orders": 19.0,
+        "ROAS": 4.62,
+        "impressions": 1333.0,
+        "clicks": 57.0,
+        "CVR": 33.33
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1466,7 +1476,17 @@
         "clicks": 36.0,
         "CVR": 38.9
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 7041.23,
+        "sales": 27413.0,
+        "orders": 15.0,
+        "ROAS": 3.89,
+        "impressions": 2039.0,
+        "clicks": 46.0,
+        "CVR": 32.61
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1492,7 +1512,17 @@
         "clicks": 31.0,
         "CVR": 16.1
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 3324.0,
+        "sales": 5787.0,
+        "orders": 4.0,
+        "ROAS": 1.74,
+        "impressions": 936.0,
+        "clicks": 22.0,
+        "CVR": 18.18
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1518,7 +1548,17 @@
         "clicks": 133.0,
         "CVR": 21.8
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 21573.720000000005,
+        "sales": 39007.0,
+        "orders": 27.0,
+        "ROAS": 1.81,
+        "impressions": 1200.0,
+        "clicks": 130.0,
+        "CVR": 20.77
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1544,7 +1584,17 @@
         "clicks": 19.0,
         "CVR": 10.5
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 1820.88,
+        "sales": 2690.0,
+        "orders": 2.0,
+        "ROAS": 1.48,
+        "impressions": 80.0,
+        "clicks": 11.0,
+        "CVR": 18.18
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1570,7 +1620,17 @@
         "clicks": 34.0,
         "CVR": 11.8
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 2066.3900000000003,
+        "sales": 2288.0,
+        "orders": 2.0,
+        "ROAS": 1.11,
+        "impressions": 1874.0,
+        "clicks": 22.0,
+        "CVR": 9.09
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1596,7 +1656,17 @@
         "clicks": 30.0,
         "CVR": 33.3
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 6037.77,
+        "sales": 20198.0,
+        "orders": 8.0,
+        "ROAS": 3.35,
+        "impressions": 467.0,
+        "clicks": 34.0,
+        "CVR": 23.53
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1622,7 +1692,17 @@
         "clicks": 74.0,
         "CVR": 6.8
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 6235.99,
+        "sales": 9000.0,
+        "orders": 4.0,
+        "ROAS": 1.44,
+        "impressions": 1245.0,
+        "clicks": 54.0,
+        "CVR": 7.41
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1648,7 +1728,17 @@
         "clicks": 32.0,
         "CVR": 6.2
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 1889.3400000000001,
+        "sales": 1800.0,
+        "orders": 1.0,
+        "ROAS": 0.95,
+        "impressions": 253.0,
+        "clicks": 15.0,
+        "CVR": 6.67
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1674,7 +1764,17 @@
         "clicks": 35.0,
         "CVR": 0.0
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 2512.74,
+        "sales": 0.0,
+        "orders": 0.0,
+        "ROAS": 0.0,
+        "impressions": 316.0,
+        "clicks": 23.0,
+        "CVR": 0.0
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1700,7 +1800,17 @@
         "clicks": 48.0,
         "CVR": 16.7
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 3927.61,
+        "sales": 8070.0,
+        "orders": 6.0,
+        "ROAS": 2.05,
+        "impressions": 387.0,
+        "clicks": 29.0,
+        "CVR": 20.69
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1726,7 +1836,17 @@
         "clicks": 25.0,
         "CVR": 16.0
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 3635.66,
+        "sales": 6725.0,
+        "orders": 5.0,
+        "ROAS": 1.85,
+        "impressions": 387.0,
+        "clicks": 25.0,
+        "CVR": 20.0
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1752,7 +1872,17 @@
         "clicks": 23.0,
         "CVR": 13.0
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 3755.5699999999997,
+        "sales": 5127.0,
+        "orders": 3.0,
+        "ROAS": 1.37,
+        "impressions": 471.0,
+        "clicks": 24.0,
+        "CVR": 12.5
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1778,7 +1908,17 @@
         "clicks": 44.0,
         "CVR": 13.6
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 3525.1,
+        "sales": 5380.0,
+        "orders": 4.0,
+        "ROAS": 1.53,
+        "impressions": 234.0,
+        "clicks": 25.0,
+        "CVR": 16.0
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1804,7 +1944,17 @@
         "clicks": 10.0,
         "CVR": 70.0
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 4410.36,
+        "sales": 21072.0,
+        "orders": 10.0,
+        "ROAS": 4.78,
+        "impressions": 218.0,
+        "clicks": 24.0,
+        "CVR": 41.67
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1830,7 +1980,17 @@
         "clicks": 51.0,
         "CVR": 13.7
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 8401.75,
+        "sales": 15836.0,
+        "orders": 9.0,
+        "ROAS": 1.88,
+        "impressions": 1907.0,
+        "clicks": 52.0,
+        "CVR": 17.31
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1856,7 +2016,17 @@
         "clicks": 16.0,
         "CVR": 25.0
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 1117.5900000000001,
+        "sales": 3600.0,
+        "orders": 1.0,
+        "ROAS": 3.22,
+        "impressions": 1195.0,
+        "clicks": 11.0,
+        "CVR": 9.09
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1882,7 +2052,17 @@
         "clicks": 65.0,
         "CVR": 6.2
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 8014.58,
+        "sales": 8198.0,
+        "orders": 5.0,
+        "ROAS": 1.02,
+        "impressions": 4652.0,
+        "clicks": 66.0,
+        "CVR": 7.58
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1908,7 +2088,17 @@
         "clicks": 20.0,
         "CVR": 15.0
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 2364.6800000000003,
+        "sales": 2724.0,
+        "orders": 2.0,
+        "ROAS": 1.15,
+        "impressions": 105.0,
+        "clicks": 15.0,
+        "CVR": 13.33
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1934,7 +2124,17 @@
         "clicks": 14.0,
         "CVR": 35.7
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 3404.37,
+        "sales": 15015.0,
+        "orders": 10.0,
+        "ROAS": 4.41,
+        "impressions": 3312.0,
+        "clicks": 24.0,
+        "CVR": 41.67
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1960,7 +2160,17 @@
         "clicks": 22.0,
         "CVR": 0.0
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 700.0,
+        "sales": 0.0,
+        "orders": 0.0,
+        "ROAS": 0.0,
+        "impressions": 71.0,
+        "clicks": 4.0,
+        "CVR": 0.0
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
