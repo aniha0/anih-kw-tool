@@ -1075,6 +1075,38 @@
           "ROAS": 5.22
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T02:10:12.855788",
+      "entries": [
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "犬ひげやけケア",
+          "orders": 3,
+          "clicks": 6,
+          "cost": 486.26,
+          "sales": 4035.0,
+          "ROAS": 8.3
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬 顔拭きシート",
+          "orders": 5,
+          "clicks": 8,
+          "cost": 1378.52,
+          "sales": 6524.0,
+          "ROAS": 4.73
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬なみだやけくりーなー",
+          "orders": 6,
+          "clicks": 16,
+          "cost": 2339.61,
+          "sales": 8084.0,
+          "ROAS": 3.46
+        }
+      ]
     }
   ]
 }
