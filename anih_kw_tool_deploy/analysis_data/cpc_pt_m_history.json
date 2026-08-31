@@ -769,6 +769,39 @@
           "orders": 2
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T03:31:34.043513",
+      "entries": [
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CJ4BDGZF",
+          "avg_cpc": 163,
+          "rec_cpc": 153,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 84587.0,
+          "cost": 62187.46,
+          "ROAS": 1.36,
+          "orders": 63
+        },
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0BCK9CRJC",
+          "avg_cpc": 126,
+          "rec_cpc": 116,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 2690.0,
+          "cost": 3035.37,
+          "ROAS": 0.89,
+          "orders": 2
+        }
+      ]
     }
   ]
 }
