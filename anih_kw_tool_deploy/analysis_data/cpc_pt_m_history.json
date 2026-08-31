@@ -708,6 +708,67 @@
           "orders": 2
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T03:28:34.378441",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B08B6LZJ3C",
+          "avg_cpc": 146,
+          "rec_cpc": 151,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 9413.0,
+          "cost": 1457.0,
+          "ROAS": 6.46,
+          "orders": 6
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B09HBG4R7Q",
+          "avg_cpc": 156,
+          "rec_cpc": 161,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 13554.0,
+          "cost": 2650.5,
+          "ROAS": 5.11,
+          "orders": 9
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DW8NGJQC",
+          "avg_cpc": 134,
+          "rec_cpc": 124,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 4518.0,
+          "cost": 4017.52,
+          "ROAS": 1.12,
+          "orders": 3
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0D1K25M77",
+          "avg_cpc": 137,
+          "rec_cpc": 127,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 3159.0,
+          "cost": 3709.83,
+          "ROAS": 0.85,
+          "orders": 2
+        }
+      ]
     }
   ]
 }
