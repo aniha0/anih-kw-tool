@@ -1299,6 +1299,91 @@
           "ROAS": 2.07
         }
       ]
+    },
+    {
+      "exported_at": "2026-08-31T02:21:52.180075",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B08B6LZJ3C",
+          "orders": 6,
+          "clicks": 10,
+          "cost": 1457.0,
+          "sales": 9413.0,
+          "ROAS": 6.46
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B09HBG4R7Q",
+          "orders": 9,
+          "clicks": 17,
+          "cost": 2650.5,
+          "sales": 13554.0,
+          "ROAS": 5.11
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0F1FF6TKW",
+          "orders": 8,
+          "clicks": 35,
+          "cost": 4383.18,
+          "sales": 14257.0,
+          "ROAS": 3.25
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DLG4C46Z",
+          "orders": 12,
+          "clicks": 48,
+          "cost": 6511.15,
+          "sales": 18422.0,
+          "ROAS": 2.83
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0BT4LHCRH",
+          "orders": 6,
+          "clicks": 20,
+          "cost": 3115.51,
+          "sales": 8595.0,
+          "ROAS": 2.76
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DF71W1SK",
+          "orders": 34,
+          "clicks": 134,
+          "cost": 19081.23,
+          "sales": 51757.0,
+          "ROAS": 2.71
+        },
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：カテゴリターゲ",
+          "asin": "B0DRDDK2RD",
+          "orders": 6,
+          "clicks": 30,
+          "cost": 3757.33,
+          "sales": 9478.0,
+          "ROAS": 2.52
+        },
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：カテゴリターゲ",
+          "asin": "B0C5NQZJPD",
+          "orders": 4,
+          "clicks": 23,
+          "cost": 2856.7599999999998,
+          "sales": 6290.0,
+          "ROAS": 2.2
+        }
+      ]
     }
   ]
 }
