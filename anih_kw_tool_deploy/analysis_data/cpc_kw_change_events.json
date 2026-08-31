@@ -2120,6 +2120,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260831031950_0541",
+      "campaign_name": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+      "keyword": "ダニ ペット",
+      "target_key": "【ダニ捕り】sp広告(マニュアル):kwターゲ|【ダニ捕り】sp広告(マニュアル):kwターゲ|ダニ ペット",
+      "changed_at": "2026-08-31T03:19:50.982269",
+      "before_cpc": 146.0,
+      "after_cpc": 136.0,
+      "change_rate": -6.8,
+      "compare_from": {
+        "period_start": "2026-07-30",
+        "period_end": "2026-08-30",
+        "cost": 9209.12,
+        "sales": 8610.0,
+        "orders": 6.0,
+        "ROAS": 0.93,
+        "impressions": 610.0,
+        "clicks": 63.0,
+        "CVR": 9.5
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
