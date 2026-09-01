@@ -1283,6 +1283,9 @@ if run:
             "dbg":{"kc":kc,"sc":sc,"oc_":oc_,"od":od,
                    "clk":clk,"imp":imp,"rn":len(reg),"br":brands},
         })
+        # ─── CPC効果測定用スナップショット保存（追加処理・既存ロジック非破壊）────
+        _save_effect_csv(sf, dfs)
+        # ──────────────────────────────────────────────────────────────────────
         st.write("keyword rows", len(df_auto_del_kw_keyword_))
         st.write("product rows", len(df_auto_del_kw_product_))
         st.write("video rows", len(df_auto_del_kw_video_))
@@ -2227,6 +2230,70 @@ def _gh_write(fname: str, records: list) -> bool:
 # ─── GitHub永続化ヘルパーここまで ───────────────────────────────────────────
 
 
+# ─── CPC効果測定用スナップショット保存ヘルパー（新規追加・既存非破壊）────────
+# 既存の _gh_read / _gh_write / _gh_token を再利用するのみ。
+# 保存先JSONは既存CPC履歴JSONとは完全に別ファイル（effect_snapshots.json）。
+_EFFECT_SNAPSHOTS_FNAME = "effect_snapshots.json"
+
+def _save_effect_csv(sf_file, dfs: pd.DataFrame) -> None:
+    """
+    【追加処理のみ・既存ロジック無変更】
+    アップロードされた30日CSVを効果測定用スナップショットとしてGitHubへ保存する。
+    - 保存先: analysis_data/effect_snapshots.json（CPC履歴とは別）
+    - 重複防止: period_key（期間） + content_hash（MD5）が一致したらスキップ
+    - 失敗しても既存処理には一切影響しない（try/exceptで完全隔離）
+    - dfs は分析済みDataFrame（rcsv呼び出し済み）を受け取り再読み込みしない
+    """
+    import hashlib as _eff_md5_lib
+    if not _gh_token():
+        return
+    try:
+        # ① CSVバイト列取得＋MD5ハッシュ
+        sf_file.seek(0)
+        csv_bytes = sf_file.read()
+        sf_file.seek(0)
+        content_hash = _eff_md5_lib.md5(csv_bytes).hexdigest()
+
+        # ② 「期間」列からレポート期間を抽出（dfsを再利用、rcsv再呼び出しなし）
+        report_from, report_to = "", ""
+        _pc = fcol(dfs, ["期間"])
+        if _pc:
+            _parts = dfs[_pc].astype(str).str.split(" - ", expand=True)
+            _ss = pd.to_datetime(_parts[0], format="%Y/%m/%d", errors="coerce")
+            _es = (
+                pd.to_datetime(_parts[1], format="%Y/%m/%d", errors="coerce")
+                if _parts.shape[1] > 1 else _ss
+            )
+            if _ss.notna().any():
+                report_from = str(_ss.min().date())
+            if _es.notna().any():
+                report_to   = str(_es.max().date())
+        period_key = f"{report_from}__{report_to}"
+
+        # ③ 既存スナップショット読み込み＋重複チェック
+        existing, _eff_sha = _gh_read(_EFFECT_SNAPSHOTS_FNAME)
+        for rec in existing:
+            if (rec.get("period_key") == period_key
+                    and rec.get("content_hash") == content_hash):
+                return  # 同一期間・同一コンテンツは保存済み → スキップ
+
+        # ④ SHAをキャッシュしてから新レコード追加＆書き込み
+        if _eff_sha:
+            st.session_state[f"_gh_sha_{_EFFECT_SNAPSHOTS_FNAME}"] = _eff_sha
+        existing.append({
+            "saved_at":     _anls_dt.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "period_key":   period_key,
+            "report_from":  report_from,
+            "report_to":    report_to,
+            "content_hash": content_hash,
+            "csv_b64":      _gh_b64.b64encode(csv_bytes).decode("utf-8"),
+        })
+        _gh_write(_EFFECT_SNAPSHOTS_FNAME, existing)
+    except Exception:
+        pass  # 効果測定保存の失敗は既存処理を止めない
+# ─── CPC効果測定用スナップショット保存ヘルパーここまで ──────────────────────
+
+
 def _anls_load(fname: str) -> list:
     """JSONファイルを読み込む。ローカルに存在しない場合はGitHubから自動復元する。"""
     p = _get_analysis_dir() / fname
@@ -3037,6 +3104,10 @@ def page_cpc_change_history():
     def _fmt_roas(v): return f"{float(v or 0):.2f}"
     def _fmt_pct(v): return f"{float(v or 0):.1f}%"
 
+    # ─── CPC効果測定：スナップショット一覧をページ描画ごとに1回だけ読み込む（追加処理・既存非破壊）───
+    _eff_snaps_cache, _ = _gh_read(_EFFECT_SNAPSHOTS_FNAME)
+    # ───────────────────────────────────────────────────────────────────────────────
+
     for _ev, _label, _id_col, _fname in _filtered[:50]:
         _tv = _ev.get("keyword", _ev.get("asin", "―"))
         _st_now = "🟢 比較完了" if _ev.get("compare_to") else "🟡 比較待ち"
@@ -3074,6 +3145,33 @@ def page_cpc_change_history():
             st.markdown(f"**メモ**：{_ev.get('memo') or '（未入力）'}")
             st.markdown(f"**評価**：{_ev.get('evaluation') or '（未入力）'}")
             st.markdown("---")
+            # ─── CPC効果測定：+2・+3週間スナップショット確認（追加・既存非破壊）────────
+            _eff_ca = _ev.get("changed_at", "")
+            if _eff_ca:
+                try:
+                    _eff_base = _anls_dt.datetime.fromisoformat(str(_eff_ca)).date()
+                    _eff_2w = _eff_base + _anls_dt.timedelta(weeks=2)
+                    _eff_3w = _eff_base + _anls_dt.timedelta(weeks=3)
+                    def _eff_find_snap(td):
+                        for _s in _eff_snaps_cache:
+                            try:
+                                if (_anls_dt.date.fromisoformat(_s.get("report_from", ""))
+                                        <= td <=
+                                        _anls_dt.date.fromisoformat(_s.get("report_to", ""))):
+                                    return _s.get("period_key", "")
+                            except Exception:
+                                continue
+                        return None
+                    _e2 = _eff_find_snap(_eff_2w)
+                    _e3 = _eff_find_snap(_eff_3w)
+                    st.markdown(
+                        f"**📊 効果測定CSV**　"
+                        f"+2週（{_eff_2w.strftime('%Y/%m/%d')}）：{'✅ ' + _e2 if _e2 else '⏳ 未到達'}　｜　"
+                        f"+3週（{_eff_3w.strftime('%Y/%m/%d')}）：{'✅ ' + _e3 if _e3 else '⏳ 未到達'}"
+                    )
+                except Exception:
+                    pass
+            # ──────────────────────────────────────────────────────────────────────
             # 【新規追加】1件ごとの削除ボタン。誤操作防止のため、確認チェックを
             # 入れてからのみ削除できる。既存の保存/比較ロジック・他のレコードには
             # 一切影響しない。
