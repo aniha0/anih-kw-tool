@@ -5016,6 +5016,39 @@
           "orders": 2
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:34:02.785699",
+      "entries": [
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫あごクリーナー",
+          "avg_cpc": 131,
+          "rec_cpc": 126,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 5380.0,
+          "cost": 3021.67,
+          "ROAS": 1.78,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫あごニキビケア",
+          "avg_cpc": 148,
+          "rec_cpc": 143,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 5380.0,
+          "cost": 3395.83,
+          "ROAS": 1.58,
+          "orders": 4
+        }
+      ]
     }
   ]
 }
