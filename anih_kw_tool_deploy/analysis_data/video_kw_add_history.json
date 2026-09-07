@@ -1064,6 +1064,47 @@
           "ROAS": 3.44
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:11:11.798422",
+      "entries": [
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "犬 顔拭きシート",
+          "orders": 5,
+          "clicks": 8,
+          "cost": 1423.52,
+          "sales": 6524.0,
+          "ROAS": 4.58
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "猫の目薬",
+          "orders": 3,
+          "clicks": 7,
+          "cost": 984.69,
+          "sales": 4490.0,
+          "ROAS": 4.56
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "涙やけ スプレー",
+          "orders": 4,
+          "clicks": 7,
+          "cost": 1206.0,
+          "sales": 5380.0,
+          "ROAS": 4.46
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "涙やけクリーナー 猫",
+          "orders": 5,
+          "clicks": 10,
+          "cost": 1691.1,
+          "sales": 6726.0,
+          "ROAS": 3.98
+        }
+      ]
     }
   ]
 }
