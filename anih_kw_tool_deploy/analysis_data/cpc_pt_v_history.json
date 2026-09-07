@@ -83,6 +83,25 @@
     {
       "exported_at": "2026-08-31T03:38:16.495725",
       "entries": []
+    },
+    {
+      "exported_at": "2026-09-07T02:44:56.894543",
+      "entries": [
+        {
+          "campaign_name": "【お口周り】SB広告(動画)：商品ターゲ",
+          "ad_group": "【お口周り】SB広告(動画)：商品ターゲ",
+          "asin": "B0CYMM2V24",
+          "avg_cpc": 117,
+          "rec_cpc": 122,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 7668.0,
+          "cost": 1642.3,
+          "ROAS": 4.67,
+          "orders": 6
+        }
+      ]
     }
   ]
 }
