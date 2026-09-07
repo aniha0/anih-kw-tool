@@ -1046,6 +1046,25 @@
           "orders": 14
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:43:36.969900",
+      "entries": [
+        {
+          "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【乳酸菌猫】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B07G38XB26",
+          "avg_cpc": 146,
+          "rec_cpc": 141,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 48264.0,
+          "cost": 31764.1,
+          "ROAS": 1.52,
+          "orders": 28
+        }
+      ]
     }
   ]
 }
