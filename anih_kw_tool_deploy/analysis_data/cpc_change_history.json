@@ -5049,6 +5049,25 @@
           "orders": 4
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:34:10.232784",
+      "entries": [
+        {
+          "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫 下痢",
+          "avg_cpc": 117,
+          "rec_cpc": 122,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 8636.0,
+          "cost": 2109.0099999999998,
+          "ROAS": 4.09,
+          "orders": 5
+        }
+      ]
     }
   ]
 }
