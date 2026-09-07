@@ -439,6 +439,61 @@
           "ROAS": 5.72
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:19:20.198124",
+      "entries": [
+        {
+          "campaign_name": "【ふりかけ犬】SB広告(動画)：商品ターゲ",
+          "ad_group": "【ふりかけ犬】SB広告(動画)：商品ターゲ",
+          "asin": "B0C28FZK8J",
+          "orders": 3,
+          "clicks": 13,
+          "cost": 1272.73,
+          "sales": 6163.0,
+          "ROAS": 4.84
+        },
+        {
+          "campaign_name": "【お口周り】SB広告(動画)：商品ターゲ",
+          "ad_group": "【お口周り】SB広告(動画)：商品ターゲ",
+          "asin": "B0CYMM2V24",
+          "orders": 6,
+          "clicks": 14,
+          "cost": 1642.3,
+          "sales": 7668.0,
+          "ROAS": 4.67
+        },
+        {
+          "campaign_name": "【ジェル】SB広告(動画)：商品ターゲ",
+          "ad_group": "【ジェル】SB広告(動画)：商品ターゲ",
+          "asin": "B0F1FF6TKW",
+          "orders": 8,
+          "clicks": 32,
+          "cost": 3892.84,
+          "sales": 12412.0,
+          "ROAS": 3.19
+        },
+        {
+          "campaign_name": "【イヤー】SB広告(動画)：商品ターゲ",
+          "ad_group": "【イヤー】SB広告(動画)：商品ターゲ",
+          "asin": "B08BJ9SWTG",
+          "orders": 3,
+          "clicks": 13,
+          "cost": 1202.64,
+          "sales": 3834.0,
+          "ROAS": 3.19
+        },
+        {
+          "campaign_name": "【ダニ捕り】SB広告(動画)：商品ターゲ",
+          "ad_group": "【ダニ捕り】SB広告(動画)：商品ターゲ",
+          "asin": "B0DJ8B3F7R",
+          "orders": 3,
+          "clicks": 17,
+          "cost": 1500.84,
+          "sales": 3633.0,
+          "ROAS": 2.42
+        }
+      ]
     }
   ]
 }
