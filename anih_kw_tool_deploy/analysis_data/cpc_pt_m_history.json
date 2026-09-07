@@ -1027,6 +1027,25 @@
           "orders": 36
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:41:56.137211",
+      "entries": [
+        {
+          "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ふりかけ犬】SP広告(マニュアル)：商品",
+          "asin": "B0CYP43QKN",
+          "avg_cpc": 147,
+          "rec_cpc": 142,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 22818.0,
+          "cost": 12898.119999999999,
+          "ROAS": 1.77,
+          "orders": 14
+        }
+      ]
     }
   ]
 }
