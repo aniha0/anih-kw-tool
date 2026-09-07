@@ -1449,6 +1449,29 @@
           "ROAS": 2.55
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T01:58:59.675992",
+      "entries": [
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "猫 オーラルケア",
+          "orders": 4,
+          "clicks": 8,
+          "cost": 1364.38,
+          "sales": 6227.0,
+          "ROAS": 4.56
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "猫 はみがみ",
+          "orders": 3,
+          "clicks": 13,
+          "cost": 2213.31,
+          "sales": 5582.0,
+          "ROAS": 2.52
+        }
+      ]
     }
   ]
 }
