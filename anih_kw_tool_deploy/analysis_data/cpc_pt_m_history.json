@@ -933,6 +933,81 @@
           "orders": 2
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:39:14.285440",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B09HBG4R7Q",
+          "avg_cpc": 152,
+          "rec_cpc": 157,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 14436.0,
+          "cost": 3189.85,
+          "ROAS": 4.53,
+          "orders": 9
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B08B6LZJ3C",
+          "avg_cpc": 144,
+          "rec_cpc": 149,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 8154.0,
+          "cost": 2017.96,
+          "ROAS": 4.04,
+          "orders": 6
+        },
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：カテゴリターゲ",
+          "asin": "B0DRDDK2RD",
+          "avg_cpc": 124,
+          "rec_cpc": 119,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 9478.0,
+          "cost": 5320.26,
+          "ROAS": 1.78,
+          "orders": 6
+        },
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：カテゴリターゲ",
+          "asin": "B0C5NQZJPD",
+          "avg_cpc": 129,
+          "rec_cpc": 124,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 4945.0,
+          "cost": 3086.67,
+          "ROAS": 1.6,
+          "orders": 3
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0D1K25M77",
+          "avg_cpc": 139,
+          "rec_cpc": 129,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 3159.0,
+          "cost": 3466.45,
+          "ROAS": 0.91,
+          "orders": 2
+        }
+      ]
     }
   ]
 }
