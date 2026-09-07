@@ -698,6 +698,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260907024311_4466",
+      "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【ふりかけ犬】SP広告(マニュアル)：商品",
+      "asin": "B0CYP43QKN",
+      "target_key": "【ふりかけ犬】sp広告(マニュアル):商品ターゲ|【ふりかけ犬】sp広告(マニュアル):商品|b0cyp43qkn",
+      "changed_at": "2026-09-07T02:43:11.566343",
+      "before_cpc": 147.0,
+      "after_cpc": 142.0,
+      "change_rate": -3.4,
+      "compare_from": {
+        "period_start": "2026-08-06",
+        "period_end": "2026-09-06",
+        "cost": 12898.119999999999,
+        "sales": 22818.0,
+        "orders": 14.0,
+        "ROAS": 1.77,
+        "impressions": 4261.0,
+        "clicks": 88.0,
+        "CVR": 15.9
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
