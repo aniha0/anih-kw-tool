@@ -2460,6 +2460,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260907023547_1191",
+      "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【乳酸菌猫】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 下痢",
+      "target_key": "【乳酸菌猫】sp広告(マニュアル):kwターゲ|【乳酸菌猫】sp広告(マニュアル):kwターゲ|猫 下痢",
+      "changed_at": "2026-09-07T02:35:47.190231",
+      "before_cpc": 117.0,
+      "after_cpc": 122.0,
+      "change_rate": 4.3,
+      "compare_from": {
+        "period_start": "2026-08-06",
+        "period_end": "2026-09-06",
+        "cost": 2109.0099999999998,
+        "sales": 8636.0,
+        "orders": 5.0,
+        "ROAS": 4.09,
+        "impressions": 543.0,
+        "clicks": 18.0,
+        "CVR": 27.8
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
