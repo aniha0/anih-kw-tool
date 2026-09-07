@@ -1151,6 +1151,56 @@
           "ROAS": 4.01
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:15:18.429424",
+      "entries": [
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬よだれやけクリーナー",
+          "orders": 3,
+          "clicks": 7,
+          "cost": 609.0,
+          "sales": 4035.0,
+          "ROAS": 6.63
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "犬ひげやけケア",
+          "orders": 3,
+          "clicks": 7,
+          "cost": 644.8299999999999,
+          "sales": 4035.0,
+          "ROAS": 6.26
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "猫 めやに",
+          "orders": 4,
+          "clicks": 6,
+          "cost": 923.78,
+          "sales": 5193.0,
+          "ROAS": 5.62
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬なみだやけくりーなー",
+          "orders": 6,
+          "clicks": 17,
+          "cost": 2448.9700000000003,
+          "sales": 8084.0,
+          "ROAS": 3.3
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "フムスキンウォーター 犬",
+          "orders": 3,
+          "clicks": 10,
+          "cost": 1584.71,
+          "sales": 4035.0,
+          "ROAS": 2.55
+        }
+      ]
     }
   ]
 }
