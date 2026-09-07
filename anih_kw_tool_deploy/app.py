@@ -277,6 +277,38 @@ def cpc_camp_zip(df_cpc: pd.DataFrame) -> bytes:
     return buf.getvalue()
 
 # ===================================================
+# 【新規追加】ターゲティングレポートKW抽出ユーティリティ
+# 既存関数・既存ロジックには一切手を加えない独立関数。
+# ===================================================
+_TGT_RPT_AUTO_TYPES = {"close-match", "loose-match", "substitutes", "complements"}
+
+def extract_kws_from_targeting_report(file) -> set:
+    """ターゲティングレポートCSVから登録済みマニュアルKWセット（canonical）を返す。
+    ファイルが None の場合は空セットを返す（オプション扱い・既存動作に影響なし）。"""
+    if file is None:
+        return set()
+    try:
+        df = rcsv(file)
+        tkc2 = fcol(df, ["キーワードテキスト", "Keyword Text", "ターゲティング", "Targeting", "keyword"])
+        cc2  = fcol(df, ["キャンペーン名", "Campaign Name", "campaign name"])
+        if not tkc2:
+            return set()
+        rows = df[tkc2] if cc2 is None else df.loc[
+            ~df[cc2].str.contains("オート|auto", case=False, na=False), tkc2
+        ]
+        result: set = set()
+        for v in rows:
+            vs = str(v).strip()
+            if (not vs or vs in _TGT_RPT_AUTO_TYPES
+                    or vs.startswith(("asin", "category=", "audience=", "keyword-group",
+                                      "keywords-related-to-your-brand"))):
+                continue
+            result.add(canonical_keyword(vs))
+        return result
+    except Exception:
+        return set()
+
+# ===================================================
 # Streamlit アプリ
 # ===================================================
 
@@ -519,6 +551,23 @@ if st.button("🗑 比較CSVをクリア", use_container_width=True):
     st.session_state["csv_uploader_reset_id"] += 1
     (st.rerun if hasattr(st, "rerun") else st.experimental_rerun)()
 
+# ── 【新規追加】ターゲティングレポートアップローダー ──────────────────────────
+# 既存のcsv_bucketアップローダーとは完全に独立。オプション扱い（未アップロード時は除外スキップ）。
+st.markdown("---")
+_tgt_rpt_file = st.file_uploader(
+    "📋 ターゲティングレポートCSV（任意・既登録KW除外用）",
+    type=["csv"],
+    key="targeting_report_uploader",
+    help="Amazon広告コンソール → レポート → ターゲティングレポート（SP）をDLしてアップロード。"
+         "インプレッション問わず登録済み全KWを除外候補リストから取り除きます。",
+)
+if _tgt_rpt_file is not None:
+    st.caption(f"✅ ターゲティングレポート読込済: {_tgt_rpt_file.name}")
+else:
+    st.caption("ℹ️ 未アップロードの場合、検索用語CSV内の配信実績があるマニュアルKWのみ除外されます。")
+_targeting_report_kws: set = extract_kws_from_targeting_report(_tgt_rpt_file)
+# ─────────────────────────────────────────────────────────────────────────────
+
 def _sf_earliest_by_period(_held_files):
     # 「期間」列（既存の_anls_render_tabのcpc_kw等と同じ"YYYY/MM/DD - YYYY/MM/DD"形式）
     # の開始日が最も古いファイルを選ぶ。rcsv/fcolは呼び出すのみで一切変更しない。
@@ -683,6 +732,12 @@ if run:
         _dw_canon = dw["keyword"].apply(canonical_keyword)
         _n_already_registered = int(_dw_canon.isin(_manual_reg_kws).sum())
         dw = dw[~_dw_canon.isin(_manual_reg_kws)].copy()
+        # ── ターゲティングレポートによる追加除外（アップロード時のみ実行）──
+        if _targeting_report_kws:
+            _dw_canon2 = dw["keyword"].apply(canonical_keyword)
+            _n_tgt_rpt_ex = int(_dw_canon2.isin(_targeting_report_kws).sum())
+            dw = dw[~_dw_canon2.isin(_targeting_report_kws)].copy()
+            _n_already_registered += _n_tgt_rpt_ex
         nf = len(dw)
         # ─────────────────────────────────────────────────────────────────────────
 
