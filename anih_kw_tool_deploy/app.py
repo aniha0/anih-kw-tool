@@ -665,6 +665,27 @@ if run:
         nf = len(dw)
         win_kws = set(dw["keyword"].tolist())
 
+        # ── 【新規追加】マニュアルKW重複除外フィルター ──────────────────────────
+        # 既存の dw 生成ロジック（mask/d0/reg/agg/d1/deduplicate）には一切手を加えない。
+        # dw確定・win_kws確定の直後に、配信中マニュアルKWと突き合わせて除外するだけ。
+        # win_kws は除外前の dw から生成済み（削除候補保護用）なので変更しない。
+        _AUTO_TGT_TYPES = {"close-match", "loose-match", "substitutes", "complements"}
+        _manual_mask_ex = ~dfs[cc].str.contains("オート|auto", case=False, na=False)
+        _manual_reg_kws: set = set()
+        for _v in dfs.loc[_manual_mask_ex, tkc]:
+            _vs = str(_v).strip()
+            if (not _vs
+                    or _vs in _AUTO_TGT_TYPES
+                    or _vs.startswith(("asin", "category=", "audience=", "keyword-group",
+                                       "keywords-related-to-your-brand"))):
+                continue
+            _manual_reg_kws.add(canonical_keyword(_vs))
+        _dw_canon = dw["keyword"].apply(canonical_keyword)
+        _n_already_registered = int(_dw_canon.isin(_manual_reg_kws).sum())
+        dw = dw[~_dw_canon.isin(_manual_reg_kws)].copy()
+        nf = len(dw)
+        # ─────────────────────────────────────────────────────────────────────────
+
         # ── 動画KW追加専用: オート広告を母集団にして抽出 ──
         # 既存の「📋 キーワード追加」ロジック（上記のmask/d0/agg/d1/dw等）には
         # 一切手を加えていない。母集団の抽出条件は「オート広告」（オートで
@@ -1273,7 +1294,7 @@ if run:
                 "n_br":n_br,"n_cd":n_cd,"n_tl":n_tl,"n_ae":n_ae,
                 "n_sl":n_sl,"n_ro":n_ro,"n_of":n_of,
                 "n_clk_f":n_clk_f,"n_cost_f":n_cost_f,
-                "n_pre":n_pre,"n_af":n_af,"nf":nf,
+                "n_pre":n_pre,"n_af":n_af,"nf":nf,"n_already_registered":_n_already_registered,
                 "mo":int(min_ord),"mc":int(min_clk),"mco":int(min_cost),
                 "n_cpc_auto":n_cpc_auto,"n_cpc_pt":n_cpc_pt,
                 "n_cpc_empty":n_cpc_empty,"n_cpc_manual":n_cpc_manual,
