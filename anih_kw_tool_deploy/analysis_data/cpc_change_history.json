@@ -4983,6 +4983,39 @@
           "orders": 6
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:33:57.278671",
+      "entries": [
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 ドライシャンプー",
+          "avg_cpc": 115,
+          "rec_cpc": 105,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 5400.0,
+          "cost": 4251.28,
+          "ROAS": 1.27,
+          "orders": 3
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "keyword": "グルーミングスプレー 犬",
+          "avg_cpc": 120,
+          "rec_cpc": 110,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 3600.0,
+          "cost": 3943.6,
+          "ROAS": 0.91,
+          "orders": 2
+        }
+      ]
     }
   ]
 }
