@@ -1534,6 +1534,121 @@
           "ROAS": 2.07
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:01:12.729868",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B09HBG4R7Q",
+          "orders": 9,
+          "clicks": 21,
+          "cost": 3189.85,
+          "sales": 14436.0,
+          "ROAS": 4.53
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B08B6LZJ3C",
+          "orders": 6,
+          "clicks": 14,
+          "cost": 2017.96,
+          "sales": 8154.0,
+          "ROAS": 4.04
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B001F2N8KG",
+          "orders": 17,
+          "clicks": 49,
+          "cost": 6752.93,
+          "sales": 23947.0,
+          "ROAS": 3.55
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CNLFT7XF",
+          "orders": 353,
+          "clicks": 1049,
+          "cost": 128390.18000000001,
+          "sales": 453841.0,
+          "ROAS": 3.53
+        },
+        {
+          "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ふりかけ猫】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CRTC1XD6",
+          "orders": 3,
+          "clicks": 12,
+          "cost": 1849.0900000000001,
+          "sales": 6037.0,
+          "ROAS": 3.26
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DF71W1SK",
+          "orders": 30,
+          "clicks": 104,
+          "cost": 14627.580000000002,
+          "sales": 45621.0,
+          "ROAS": 3.12
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DLG4C46Z",
+          "orders": 12,
+          "clicks": 49,
+          "cost": 6493.360000000001,
+          "sales": 19304.0,
+          "ROAS": 2.97
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0F1FF6TKW",
+          "orders": 10,
+          "clicks": 48,
+          "cost": 5889.29,
+          "sales": 17481.0,
+          "ROAS": 2.97
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0BT4LHCRH",
+          "orders": 10,
+          "clicks": 38,
+          "cost": 5587.7,
+          "sales": 15731.0,
+          "ROAS": 2.82
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B08BJ9SWTG",
+          "orders": 76,
+          "clicks": 246,
+          "cost": 34056.93,
+          "sales": 94986.0,
+          "ROAS": 2.79
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B003CT3NGY",
+          "orders": 6,
+          "clicks": 43,
+          "cost": 4615.639999999999,
+          "sales": 9891.0,
+          "ROAS": 2.14
+        }
+      ]
     }
   ]
 }
