@@ -97,6 +97,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20260907024610_2799",
+      "campaign_name": "【お口周り】SB広告(動画)：商品ターゲ",
+      "ad_group": "【お口周り】SB広告(動画)：商品ターゲ",
+      "asin": "B0CYMM2V24",
+      "target_key": "【お口周り】sb広告(動画):商品ターゲ|【お口周り】sb広告(動画):商品ターゲ|b0cymm2v24",
+      "changed_at": "2026-09-07T02:46:10.840131",
+      "before_cpc": 117.0,
+      "after_cpc": 122.0,
+      "change_rate": 4.3,
+      "compare_from": {
+        "period_start": "2026-08-06",
+        "period_end": "2026-09-06",
+        "cost": 1642.3,
+        "sales": 7668.0,
+        "orders": 6.0,
+        "ROAS": 4.67,
+        "impressions": 282.0,
+        "clicks": 14.0,
+        "CVR": 42.9
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
