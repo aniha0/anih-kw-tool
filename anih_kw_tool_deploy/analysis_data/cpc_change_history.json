@@ -5068,6 +5068,81 @@
           "orders": 5
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:35:59.788077",
+      "entries": [
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ダニ 取り",
+          "avg_cpc": 145,
+          "rec_cpc": 150,
+          "cpc_delta": 5,
+          "cpc_rank": "SS+",
+          "cpc_action": "CPC上げ",
+          "sales": 54388.0,
+          "cost": 11850.02,
+          "ROAS": 4.59,
+          "orders": 31
+        },
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ダニ 駆除",
+          "avg_cpc": 112,
+          "rec_cpc": 117,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 4777.0,
+          "cost": 1124.8400000000001,
+          "ROAS": 4.25,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ダニ対策",
+          "avg_cpc": 135,
+          "rec_cpc": 130,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 4777.0,
+          "cost": 2834.81,
+          "ROAS": 1.69,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ダニ ペット",
+          "avg_cpc": 142,
+          "rec_cpc": 132,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 12243.0,
+          "cost": 10800.62,
+          "ROAS": 1.13,
+          "orders": 9
+        },
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ダニ退治",
+          "avg_cpc": 147,
+          "rec_cpc": 137,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 3631.0,
+          "cost": 3670.31,
+          "ROAS": 0.99,
+          "orders": 2
+        }
+      ]
     }
   ]
 }
