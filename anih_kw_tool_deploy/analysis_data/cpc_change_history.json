@@ -5162,6 +5162,39 @@
           "orders": 4
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:38:17.553911",
+      "entries": [
+        {
+          "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫 歯",
+          "avg_cpc": 166,
+          "rec_cpc": 156,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 5582.0,
+          "cost": 3982.75,
+          "ROAS": 1.4,
+          "orders": 3
+        },
+        {
+          "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫 ふりかけ",
+          "avg_cpc": 160,
+          "rec_cpc": 150,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 9000.0,
+          "cost": 6570.02,
+          "ROAS": 1.37,
+          "orders": 5
+        }
+      ]
     }
   ]
 }
