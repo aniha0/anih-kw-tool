@@ -539,6 +539,21 @@
           "ROAS": 4.84
         }
       ]
+    },
+    {
+      "exported_at": "2026-09-07T02:23:01.335665",
+      "entries": [
+        {
+          "campaign_name": "【お口周り】SB広告(動画)：商品ターゲ",
+          "ad_group": "【お口周り】SB広告(動画)：商品ターゲ",
+          "asin": "B0CYMM2V24",
+          "orders": 6,
+          "clicks": 14,
+          "cost": 1642.3,
+          "sales": 7668.0,
+          "ROAS": 4.67
+        }
+      ]
     }
   ]
 }
