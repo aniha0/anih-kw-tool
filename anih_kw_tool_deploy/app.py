@@ -427,6 +427,7 @@ _VALID_PAGES = {
     "📹 動画KW停止",   "📹 動画商品停止",
     "📄 オートKW削除", "🎯 オート商品削除", "🎥 オート動画削除",
     "📥 ダウンロード", "📖 取扱説明書", "📂 分析履歴", "📝 CPC変更履歴",
+    "🗓 1か月チェック",  # 【新規追加・既存非破壊】既存ページ名は一切変更していない
 }
 _ADD_PAGES = {"📋 キーワード追加", "➕ 商品追加", "📹 動画KW追加", "📹 動画商品追加"}
 _DEL_PAGES = {"🚫 キーワード停止", "🗑️ 商品削除", "📹 動画KW停止", "📹 動画商品停止"}
@@ -474,6 +475,7 @@ with st.sidebar:
     _nav_btn("ダウンロード",           "📥 ダウンロード",          "📥 ")
     _nav_btn("分析履歴",               "📂 分析履歴",              "📂 ")
     _nav_btn("CPC変更履歴",           "📝 CPC変更履歴",           "📝 ")
+    _nav_btn("1か月チェック",         "🗓 1か月チェック",         "🗓 ")  # 【新規追加・既存非破壊】
     _nav_btn("取扱説明書",             "📖 取扱説明書",            "📖 ")
     st.markdown("---")
     # 💲 売価マスタ
@@ -3258,6 +3260,278 @@ def page_cpc_change_history():
                     _cpc_change_delete_event(_fname, _ev.get("id", ""))
                     st.success("削除しました。")
                     st.rerun()
+
+
+# ===================================================
+# 【新規追加・既存非破壊】1か月チェック（月次チェックポイント + アーカイブ）
+# ここから先はすべて完全新規。既存の_anls_load/_anls_save/csv_bucket_7d/30d/other・
+# compare_from/compare_to方式・page_cpc_change_history・_cpc_change_fill_after_comparisons・
+# _cpc_change_delete_event等、既存の関数・仕様・保存フォーマットには一切変更を加えない。
+# 既存イベントJSONは「読み込むだけ」で使用し、新規に追加するのは
+#   ・新規のアーカイブ専用ファイル（*_archive.json。既存ファイルとは別名・別ファイル）
+#   ・アーカイブへ移す1件にだけ付与する新規キー "_monthly_checkpoint"（既存キーは変更しない）
+# のみ。既存ページ・既存の判定/削除/比較ロジックは呼び出しも改変も行わない。
+# ===================================================
+
+_MONTHLY_CHECK_TARGETS = [
+    ("cpc_kw_change_events.json", "キーワード", "keyword"),
+    ("cpc_pt_m_change_events.json", "商品", "asin"),
+    ("cpc_pt_v_change_events.json", "動画", "asin"),
+    ("cpc_pt_sbv_change_events.json", "SB動画KW", "keyword"),
+]
+_MONTHLY_CHECK_DEFAULT_MIN_DAYS = 30  # デフォルトの対象経過日数（画面上で変更可能）
+
+
+def _monthly_check_archive_fname(fname: str) -> str:
+    """既存イベントJSON名に対応する、新規のアーカイブ専用ファイル名を返す。
+    既存ファイル名(fname)は一切変更しない。戻り値は常に新規の別ファイル名。"""
+    return fname.replace(".json", "_archive.json")
+
+
+def _monthly_check_row_target(raw_val, id_col: str) -> str:
+    """検索用語CSVの1行から比較対象キー用の値（KWテキスト or ASIN）を取り出す。
+    既存の_cpc_change_fill_after_comparisons内にある同趣旨の抽出規則を踏襲した
+    新規の独立関数（既存関数は一切呼び出さない・変更しない）。"""
+    s = str(raw_val or "").strip()
+    if id_col == "asin":
+        if s.lower().startswith("asin:"):
+            return s[5:]
+        m = re.match(r'asin="([^"]+)"', s, re.IGNORECASE)
+        if m:
+            return m.group(1)
+    return s
+
+
+def _monthly_check_load_csv_rows(id_col: str) -> dict:
+    """csv_bucket_7d/30d/other（既存の保持CSV。読み取りのみ・既存のバケット処理や
+    既存のsf選定ロジックには一切触れない）から、target_key別に
+    (開始日, 終了日, cost, sales, orders) のリストを新規に構築する。
+    複数バケット・複数CSVすべてを対象にする（1ファイルに絞らない）。"""
+    _rows_by_key: dict = {}
+    _held_files = []
+    for _bk in ("csv_bucket_7d", "csv_bucket_30d", "csv_bucket_other"):
+        _held_files.extend(st.session_state.get(_bk, {}).values())
+    for _f in _held_files:
+        try:
+            _df = rcsv(_f)
+            _pc = fcol(_df, ["期間"])
+            if not _pc:
+                continue
+            _cc = fcol(_df, ["キャンペーン名", "Campaign Name", "campaign name"])
+            _agn = fcol(_df, ["Ad Group Name", "広告グループ名", "Ad Group", "広告グループ", "ad group"])
+            _sc = fcol(_df, ["売上", "売上額", "合計売上", "広告費売上高", "7日間の総売上高", "Attributed Sales", "Sales"])
+            _oc = fcol(_df, ["合計費用", "費用", "広告費", "コスト", "Cost", "Spend", "spend"])
+            _od = fcol(_df, ["商品購入数", "注文数", "注文された商品点数", "Orders", "Purchases"])
+            _tkc = fcol(_df, ["ターゲティング", "ターゲッティング", "キーワード", "Targeting", "targeting", "Keyword", "keyword"])
+            _kwt = fcol(_df, ["Keyword Text", "Keyword text", "keyword text", "キーワードテキスト"])
+            _tcol = _kwt if (id_col == "keyword" and _kwt) else _tkc
+            if not all([_cc, _sc, _oc, _tcol]):
+                continue
+            _parts = _df[_pc].astype(str).str.split(" - ", expand=True)
+            _starts = pd.to_datetime(_parts[0], format="%Y/%m/%d", errors="coerce")
+            _ends = pd.to_datetime(_parts[1], format="%Y/%m/%d", errors="coerce") if _parts.shape[1] > 1 else _starts
+            for _idx in _df.index:
+                if pd.isna(_starts.loc[_idx]) or pd.isna(_ends.loc[_idx]):
+                    continue
+                _a = _starts.loc[_idx].date()
+                _b = _ends.loc[_idx].date()
+                _cn = str(_df.at[_idx, _cc] or "")
+                _ag = str(_df.at[_idx, _agn] or "") if _agn else ""
+                _tv = _monthly_check_row_target(_df.at[_idx, _tcol], id_col)
+                _key = f"{norm(_cn)}|{norm(_ag)}|{norm(_tv)}"
+                _cost = float(tonum(pd.Series([_df.at[_idx, _oc]])).iloc[0] or 0)
+                _sales = float(tonum(pd.Series([_df.at[_idx, _sc]])).iloc[0] or 0)
+                _orders = float(tonum(pd.Series([_df.at[_idx, _od]])).iloc[0] or 0) if _od else 0.0
+                _rows_by_key.setdefault(_key, []).append((_a, _b, _cost, _sales, _orders))
+        except Exception:
+            continue
+    return _rows_by_key
+
+
+def _monthly_check_aggregate(records: list, win_start, win_end):
+    """日数按分による新規の独立集計関数（既存の_cpc_change_fill_after_comparisons
+    とは別実装・既存関数は変更しない）。重なり日数 / バケット全体日数 で按分し合算する。"""
+    total_cost = total_sales = total_orders = 0.0
+    found = False
+    for (a, b, cost, sales, orders) in records:
+        ov_start = max(a, win_start)
+        ov_end = min(b, win_end)
+        if ov_start > ov_end:
+            continue
+        found = True
+        span_days = (b - a).days + 1
+        ov_days = (ov_end - ov_start).days + 1
+        frac = ov_days / span_days if span_days > 0 else 0
+        total_cost += cost * frac
+        total_sales += sales * frac
+        total_orders += orders * frac
+    if not found:
+        return None
+    return {"cost": total_cost, "sales": total_sales, "orders": total_orders}
+
+
+def _monthly_check_confound(all_events_for_type: list, target_key: str, changed_at, now):
+    """同一target_keyについて、今回の変更日〜現在までの間に別のCPC変更が
+    入っていないか確認する新規関数（既存イベントを読むだけ・保存や判定には
+    一切関与しない）。該当があればそのイベントの変更日時を返す（Noneなら混入なし）。"""
+    for _ev in all_events_for_type:
+        if _ev.get("target_key") != target_key:
+            continue
+        try:
+            _ca = _anls_dt.datetime.fromisoformat(str(_ev.get("changed_at", "")))
+        except Exception:
+            continue
+        if changed_at < _ca <= now:
+            return _ca
+    return None
+
+
+def _monthly_check_move_to_archive(fname: str, event_id: str, checkpoint_result: dict) -> bool:
+    """1件のイベントを、既存のアクティブJSON(fname)から新規のアーカイブ専用JSON
+    (_monthly_check_archive_fname(fname))へ移動する。既存の_anls_load/_anls_save
+    （無改変）のみを使用し、既存の削除処理（_cpc_change_delete_event）と全く同じ
+    「読み込み→対象を除いて絞り込み→保存し直す」パターンを、新規のアーカイブ
+    ファイル向けに適用するだけ。既存ファイルの他レコード・既存キーの値は一切
+    変更しない（アーカイブ側のコピーにのみ新規キー"_monthly_checkpoint"を追記）。"""
+    _active = _anls_load(fname)
+    _target = None
+    _remaining = []
+    for _e in _active:
+        if _e.get("id") == event_id:
+            _target = _e
+        else:
+            _remaining.append(_e)
+    if _target is None:
+        return False
+    _target = dict(_target)
+    _target["_monthly_checkpoint"] = checkpoint_result
+    _archive_fname = _monthly_check_archive_fname(fname)
+    _archived = _anls_load(_archive_fname)
+    _archived.append(_target)
+    ok1 = _anls_save(_archive_fname, _archived)
+    ok2 = _anls_save(fname, _remaining)
+    return ok1 and ok2
+
+
+def page_cpc_monthly_check():
+    """🗓 1か月チェック — 完全新規の独立ページ。既存のpage_cpc_change_history()・
+    既存のCPC調整各ページ・既存のcompare_from/compare_to方式・既存の保存/削除
+    ロジックには一切触れない。読み取り専用の判定と、新規アーカイブファイルへの
+    退避のみを行う独立機能。"""
+    st.markdown("### 🗓 1か月チェック（月次チェックポイント）")
+    st.caption(
+        "CPC変更から30日以上経過し、かつ既存の「比較先期間」判定が完了しているイベントについて、"
+        "直近30日の実績を変更前(比較元期間)の実績と比較します。期間中に同じ対象へ別のCPC変更が"
+        "入っていないかも確認し、「改善維持」「未改善（再調整候補）」「要確認（他要因の可能性あり／"
+        "データ不足）」に振り分けます。判定用の実績は、上部の比較CSV（7日/30日/その他バケット。"
+        "既存のアップロード欄と共通）を日数按分して算出します。既存のCPC変更履歴・既存の判定ロジックは"
+        "一切変更していません。"
+    )
+    _min_days = st.number_input(
+        "対象とする経過日数（これ以上経過したイベントのみ表示）",
+        min_value=1, value=_MONTHLY_CHECK_DEFAULT_MIN_DAYS, step=1,
+    )
+    _now = _anls_dt.datetime.now()
+
+    _rows_cache: dict = {}
+    _results = {"improved": [], "not_improved": [], "review": []}
+
+    for _fname, _label, _id_col in _MONTHLY_CHECK_TARGETS:
+        _events = _anls_load(_fname)
+        if not _events:
+            continue
+        if _id_col not in _rows_cache:
+            _rows_cache[_id_col] = _monthly_check_load_csv_rows(_id_col)
+        _rows_by_key = _rows_cache[_id_col]
+        for _ev in _events:
+            if not _ev.get("compare_to"):
+                continue  # 既存の「後1週目」比較すら終わっていないものは対象外
+            try:
+                _ca = _anls_dt.datetime.fromisoformat(str(_ev.get("changed_at", "")))
+            except Exception:
+                continue
+            _age_days = (_now - _ca).days
+            if _age_days < _min_days:
+                continue
+            _tkey = _ev.get("target_key", "")
+            _confound_at = _monthly_check_confound(_events, _tkey, _ca, _now)
+            _cf = _ev.get("compare_from") or {}
+            _base_roas = float(_cf.get("ROAS", 0) or 0)
+            _entry = {
+                "fname": _fname, "label": _label, "id_col": _id_col, "ev": _ev,
+                "age_days": _age_days, "base_roas": _base_roas,
+            }
+            if _confound_at:
+                _entry["reason"] = f"期間中に別のCPC変更あり（{_confound_at.strftime('%Y-%m-%d')}）。他要因の影響を切り分けられないため自動判定していません。"
+                _results["review"].append(_entry)
+                continue
+            _win_end = _now.date()
+            _win_start = _win_end - _anls_dt.timedelta(days=29)
+            _agg = _monthly_check_aggregate(_rows_by_key.get(_tkey, []), _win_start, _win_end)
+            if _agg is None:
+                _entry["reason"] = "直近30日の実績データが比較CSV内に見つかりません（該当期間のCSVが未アップロードの可能性があります）。"
+                _results["review"].append(_entry)
+                continue
+            _cur_roas = (_agg["sales"] / _agg["cost"]) if _agg["cost"] else 0.0
+            _entry["current"] = _agg
+            _entry["current_roas"] = _cur_roas
+            _entry["window"] = (_win_start, _win_end)
+            if _cur_roas >= _base_roas:
+                _results["improved"].append(_entry)
+            else:
+                _results["not_improved"].append(_entry)
+
+    st.markdown("---")
+    _c1, _c2, _c3 = st.columns(3)
+    _c1.metric("改善維持", len(_results["improved"]))
+    _c2.metric("未改善（再調整候補）", len(_results["not_improved"]))
+    _c3.metric("要確認", len(_results["review"]))
+
+    def _render_group(title: str, items: list, verdict: str, show_archive_btn: bool):
+        st.markdown(f"#### {title}（{len(items)}件）")
+        if not items:
+            st.caption("該当なし")
+            return
+        for _it in items:
+            _ev = _it["ev"]
+            _tv = _ev.get("keyword", _ev.get("asin", "―"))
+            with st.expander(f"{_it['label']}　{_tv}　変更日:{str(_ev.get('changed_at',''))[:10]}　経過{_it['age_days']}日"):
+                st.markdown(f"**キャンペーン**：{_ev.get('campaign_name','―')}　｜　**広告グループ**：{_ev.get('ad_group','―')}")
+                st.markdown(f"**変更前ROAS（基準）**：{_it['base_roas']:.2f}")
+                if "current_roas" in _it:
+                    _ws, _we = _it["window"]
+                    st.markdown(
+                        f"**直近30日実績（{_ws}〜{_we}）ROAS**：{_it['current_roas']:.2f}　"
+                        f"｜広告費 ¥{_it['current']['cost']:,.0f}　売上 ¥{_it['current']['sales']:,.0f}　"
+                        f"注文 {_it['current']['orders']:.0f}件"
+                    )
+                if _it.get("reason"):
+                    st.warning(_it["reason"])
+                if show_archive_btn:
+                    _ck = f"_monthly_check_archive_confirm_{_ev.get('id','')}"
+                    if st.checkbox("この記録をアーカイブへ移動する", key=_ck):
+                        if st.button("📦 アーカイブへ移動", key=f"_monthly_check_archive_btn_{_ev.get('id','')}"):
+                            _cp_result = {
+                                "checked_at": _now.isoformat(),
+                                "base_roas": _it["base_roas"],
+                                "current_roas": _it.get("current_roas"),
+                                "verdict": verdict,
+                            }
+                            if _monthly_check_move_to_archive(_it["fname"], _ev.get("id", ""), _cp_result):
+                                st.success("アーカイブへ移動しました。")
+                                st.rerun()
+                            else:
+                                st.error("アーカイブへの移動に失敗しました。")
+
+    _render_group("✅ 改善維持（アーカイブ候補）", _results["improved"], "improved", show_archive_btn=True)
+    _render_group("🔁 未改善（再調整候補）", _results["not_improved"], "not_improved", show_archive_btn=True)
+    _render_group("⚠️ 要確認（他要因の可能性あり／データ不足）", _results["review"], "review", show_archive_btn=False)
+
+    st.markdown("---")
+    st.caption(
+        "※ アーカイブしてもデータは削除されません。アクティブなCPC変更履歴（「📝 CPC変更履歴」ページや"
+        "既存のCSVダウンロード）からは外れますが、対応する `*_archive.json` に全項目そのまま保存されます。"
+    )
 
 
 def _anls_save_kw_add_history(df_disp):
@@ -8161,6 +8435,7 @@ _PAGE_FUNCS = {
     "📥 ダウンロード":                 page_download,
     "📂 分析履歴":                     page_anls_history,
     "📝 CPC変更履歴":                 page_cpc_change_history,
+    "🗓 1か月チェック":               page_cpc_monthly_check,  # 【新規追加・既存非破壊】
     "📖 取扱説明書":                   page_manual,
 }
 _PAGE_FUNCS[current_page]()
