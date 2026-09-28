@@ -2305,6 +2305,193 @@ def _gh_write(fname: str, records: list) -> bool:
             st.session_state[sha_key] = new_sha
         return True
     return False
+
+
+# ===================================================
+# 【新規追加】GitHub永続化 信頼性強化（既存ロジック・UIは一切変更しない、追加のみ）
+# -----------------------------------------------------
+# 背景：_anls_save() が _gh_write() の戻り値を捨てていたため、Streamlit Cloud
+# 再起動時にGitHub同期が裏で失敗していても誰にも気づかれず、記録消失に
+# つながっていた。ここでは (1) 戻り値を捕捉して最大3回まで自動リトライし、
+# (2) それでも失敗した場合はローカルの保留キューに控えて次回アプリ起動時に
+# 自動で再送する（＝「必ず記録する形」）ことで、消失の窓を大幅に狭める。
+# 失敗はすべてサーバーサイドのログにのみ記録し、st.error/st.warning等の
+# 画面表示は一切行わない。既存の関数名・戻り値の意味・呼び出し元コードは
+# 一切変更していない。
+# ===================================================
+import logging as _gh_logging
+
+_gh_persist_logger = _gh_logging.getLogger("aniha.github_persist")
+if not _gh_persist_logger.handlers:
+    _gh_persist_handler = _gh_logging.StreamHandler()
+    _gh_persist_handler.setFormatter(_gh_logging.Formatter("%(message)s"))
+    _gh_persist_logger.addHandler(_gh_persist_handler)
+    _gh_persist_logger.setLevel(_gh_logging.INFO)
+    _gh_persist_logger.propagate = False
+
+
+def _gh_log(level: str, event: str, **fields) -> None:
+    """GitHub永続化の成否をサーバーサイドのログにのみ出力する（画面表示は一切行わない）。
+    ログ出力自体の失敗が本処理に影響しないよう、内部で例外を握りつぶす。"""
+    try:
+        payload = {"ts": _anls_dt.datetime.now().isoformat(), "event": event, **fields}
+        msg = _anls_json.dumps(payload, ensure_ascii=False, default=str)
+        getattr(_gh_persist_logger, level.lower(), _gh_persist_logger.info)(msg)
+    except Exception:
+        pass
+
+
+# ─── 「必ず記録する形」用：ローカル保留キュー ──────────────────────────
+# 3回リトライしても失敗した場合、失敗した事実をログに残すだけでは
+# 「コンテナ再起動までの間に誰も気づかなければ、その後も永久に同期され
+# ない」ため、真の意味で「必ず記録する」ことにはならない。そこで、リトライ
+# を使い切ってもGitHub同期できなかったファイル名をローカルの小さなJSON
+# ファイル（_gh_pending_sync.json、analysis_data配下）に控えておき、次に
+# 誰かがアプリを開いた瞬間（新しいセッション開始時）に自動的に再送を試みる。
+# これにより「同期失敗が誰にも気づかれないまま放置される」という従来の
+# 完全無音の失敗モードを閉じ、失敗が残るのは「保留ファイルの書き込み自体
+# が同時に失われるほどの再起動」という、はるかに狭いケースのみになる。
+# 既存の _anls_save / _gh_write の呼び出し元・戻り値の意味は一切変更しない。
+_GH_PENDING_FNAME = "_gh_pending_sync.json"
+
+
+def _gh_pending_path() -> _anls_plib.Path:
+    return _get_analysis_dir() / _GH_PENDING_FNAME
+
+
+def _gh_pending_load() -> list:
+    """保留中（GitHub同期に失敗した）ファイル名の一覧を読み込む。
+    ファイルが存在しない・壊れている等の場合は空リストを返す（例外は握りつぶす）。"""
+    try:
+        _p = _gh_pending_path()
+        if not _p.exists():
+            return []
+        _data = _anls_json.loads(_p.read_text(encoding="utf-8"))
+        _pending = _data.get("pending", [])
+        return list(_pending) if isinstance(_pending, list) else []
+    except Exception:
+        return []
+
+
+def _gh_pending_save(pending: list) -> None:
+    """保留リストをローカルに書き込む。失敗しても例外を握りつぶす
+    （保留キュー自体の書き込み失敗で本処理を止めない）。"""
+    try:
+        _p = _gh_pending_path()
+        _tmp = _p.with_name(_p.name + ".tmp")
+        _tmp.write_text(
+            _anls_json.dumps({"pending": sorted(set(pending))}, ensure_ascii=False, indent=2),
+            encoding="utf-8"
+        )
+        _tmp.replace(_p)
+    except Exception:
+        pass
+
+
+def _gh_pending_add(fname: str) -> None:
+    """同期に失敗したファイル名を保留リストに追加する（重複は自動排除）。"""
+    try:
+        _pending = _gh_pending_load()
+        if fname not in _pending:
+            _pending.append(fname)
+            _gh_pending_save(_pending)
+    except Exception:
+        pass
+
+
+def _gh_pending_remove(fname: str) -> None:
+    """同期に成功したファイル名を保留リストから取り除く。"""
+    try:
+        _pending = _gh_pending_load()
+        if fname in _pending:
+            _pending = [f for f in _pending if f != fname]
+            _gh_pending_save(_pending)
+    except Exception:
+        pass
+
+
+def _gh_flush_pending_sync() -> None:
+    """保留中の（過去に同期失敗した）ファイルを、現在のローカル内容で再度
+    GitHubへの同期を試みる。新しいブラウザセッションが開始されるたびに
+    1回だけ呼び出される（呼び出し元でst.session_stateにより多重実行を防止）。
+    GITHUB_TOKEN未設定時は何もしない（既存同様、ローカル運用のみの正常な
+    状態のため）。成功すれば保留リストから除去し、失敗すれば保留リストに
+    残したままログのみ記録する（画面表示は一切行わない）。"""
+    if not _gh_token():
+        return
+    try:
+        _pending = _gh_pending_load()
+    except Exception:
+        _pending = []
+    if not _pending:
+        return
+    for _fname in list(_pending):
+        try:
+            _p = _get_analysis_dir() / _fname
+            if not _p.exists():
+                _gh_pending_remove(_fname)
+                continue
+            _records = _anls_json.loads(_p.read_text(encoding="utf-8")).get("records", [])
+        except Exception as _e:
+            _gh_log("ERROR", "gh_pending_flush_read_failed", fname=_fname, error=str(_e))
+            continue
+        _ok = _gh_write_with_retry(_fname, _records)
+        if _ok:
+            _gh_pending_remove(_fname)
+            _gh_log("INFO", "gh_pending_flush_succeeded", fname=_fname)
+        else:
+            _gh_log("WARNING", "gh_pending_flush_still_failing", fname=_fname)
+
+
+def _gh_write_with_retry(fname: str, records: list, max_attempts: int = 3) -> bool:
+    """_gh_write()（既存・無改変）を最大 max_attempts 回まで試行するだけの追加ラッパー。
+    既存の_gh_write本体・既存のpayload生成・既存のsha運用ロジックには一切手を加えない。
+    GITHUB_TOKEN未設定（ローカル運用のみのケース）は既存同様の正常な状態のため、
+    リトライもログ出力も行わずFalseを返す。実際の失敗（ネットワーク瞬断・GitHub側の
+    sha競合等）の場合のみ、リトライの間にキャッシュ済みsha（st.session_state内、既存の
+    _gh_writeが使う値）を破棄してから再試行する（stale shaのままリトライし続けて
+    同じ失敗を繰り返すのを防ぐための追加処理。_gh_write自体の実装は変更しない）。
+    成否はサーバーサイドのログにのみ記録し、st.error/st.warning等の画面表示は一切
+    行わない。戻り値の意味（True=GitHub同期成功／False=失敗）は既存の_gh_write と同一。
+    max_attempts回のリトライを使い切っても失敗した場合、_gh_pending_add() でファイル
+    名をローカル保留キューに記録する（＝「必ず記録する形」。次回アプリ起動時に
+    _gh_flush_pending_sync() 経由で自動再送される）。"""
+    if not _gh_token():
+        return False
+    import time as _gh_time
+    _ok = False
+    for _attempt in range(1, max_attempts + 1):
+        try:
+            _ok = _gh_write(fname, records)
+        except Exception as _e:
+            _ok = False
+            _gh_log("ERROR", "gh_write_exception", fname=fname, attempt=_attempt, error=str(_e))
+        if _ok:
+            if _attempt > 1:
+                _gh_log("INFO", "gh_write_retry_succeeded", fname=fname, attempt=_attempt)
+            _gh_pending_remove(fname)
+            return True
+        _gh_log("WARNING", "gh_write_failed", fname=fname, attempt=_attempt, max_attempts=max_attempts)
+        if _attempt < max_attempts:
+            st.session_state.pop(f"_gh_sha_{fname}", None)
+            try:
+                _gh_time.sleep(0.6 * _attempt)
+            except Exception:
+                pass
+    _gh_log("ERROR", "gh_sync_lost_after_retries", fname=fname, record_count=len(records))
+    _gh_pending_add(fname)
+    return False
+
+
+# 新しいブラウザセッションが開始されるたびに1回だけ、保留中の同期を自動フラッシュする。
+# st.session_stateのフラグで多重実行を防止するのみで、画面表示・既存ロジックには
+# 一切影響しない（失敗時も従来通りサーバーログにのみ記録される）。
+if "_gh_pending_flush_done" not in st.session_state:
+    st.session_state["_gh_pending_flush_done"] = True
+    try:
+        _gh_flush_pending_sync()
+    except Exception:
+        pass
 # ─── GitHub永続化ヘルパーここまで ───────────────────────────────────────────
 
 
@@ -2415,8 +2602,14 @@ def _anls_save(fname: str, records: list) -> bool:
     if _readback is None or len(_readback) != len(records):
         st.error(f"⚠️ History保存の検証に失敗しました（{fname}）。保存内容を確認してください。")
         return False
-    # GitHubへコミット（失敗してもローカル保存は成功扱い）
-    _gh_write(fname, records)
+    # GitHubへコミット（失敗してもローカル保存は成功扱い＝既存動作は不変）。
+    # 以前は _gh_write() の戻り値を捨てていたため、失敗が完全に無音だった。
+    # ここでは戻り値を捕捉し、自動リトライ＋失敗時のローカル保留キュー登録
+    # （次回起動時に自動再送＝「必ず記録する形」）のみを追加する。画面表示・
+    # 戻り値の意味（Trueを返す条件）・既存の呼び出し元の挙動は一切変更しない。
+    _gh_ok = _gh_write_with_retry(fname, records)
+    if not _gh_ok:
+        _gh_log("ERROR", "gh_sync_failed_in_anls_save", fname=fname, record_count=len(records))
     return True
 
 
