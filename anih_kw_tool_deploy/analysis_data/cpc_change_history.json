@@ -5616,6 +5616,67 @@
           "orders": 12
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-05T04:13:57.288638",
+      "entries": [
+        {
+          "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+          "keyword": "カケテミーナ",
+          "avg_cpc": 116,
+          "rec_cpc": 121,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 12438.0,
+          "cost": 1040.17,
+          "ROAS": 11.96,
+          "orders": 5
+        },
+        {
+          "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 ふりかけ",
+          "avg_cpc": 215,
+          "rec_cpc": 210,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 170887.0,
+          "cost": 97454.71,
+          "ROAS": 1.75,
+          "orders": 82
+        },
+        {
+          "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 デンタルケア",
+          "avg_cpc": 177,
+          "rec_cpc": 167,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 1773.0,
+          "cost": 3188.49,
+          "ROAS": 0.56,
+          "orders": 1
+        },
+        {
+          "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 歯",
+          "avg_cpc": 178,
+          "rec_cpc": 168,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 2227.0,
+          "cost": 4452.97,
+          "ROAS": 0.5,
+          "orders": 1
+        }
+      ]
     }
   ]
 }
