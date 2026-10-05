@@ -2104,6 +2104,21 @@
           "ROAS": 3.01
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-05T03:37:33.590969",
+      "entries": [
+        {
+          "campaign_name": "【肉球】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【肉球】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B07KVYGDND",
+          "orders": 3,
+          "clicks": 10,
+          "cost": 1439.0,
+          "sales": 3874.0,
+          "ROAS": 2.69
+        }
+      ]
     }
   ]
 }
