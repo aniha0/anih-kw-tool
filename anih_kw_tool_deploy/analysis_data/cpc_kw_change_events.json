@@ -3938,6 +3938,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20261005041311_8632",
+      "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+      "keyword": "猫 デンタルケア",
+      "target_key": "【液体】sp広告(マニュアル):kwターゲ|【液体】sp広告(マニュアル):kwtg自社|猫 デンタルケア",
+      "changed_at": "2026-10-05T04:13:11.674532",
+      "before_cpc": 97.0,
+      "after_cpc": 102.0,
+      "change_rate": 5.2,
+      "compare_from": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 968.21,
+        "sales": 9364.0,
+        "orders": 5.0,
+        "ROAS": 9.67,
+        "impressions": 363.0,
+        "clicks": 10.0,
+        "CVR": 50.0
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
