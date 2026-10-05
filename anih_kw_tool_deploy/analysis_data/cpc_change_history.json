@@ -5677,6 +5677,95 @@
           "orders": 1
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-05T04:15:21.156876",
+      "entries": [
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "keyword": "グルーミングスプレー",
+          "avg_cpc": 111,
+          "rec_cpc": 106,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 7200.0,
+          "cost": 4666.9800000000005,
+          "ROAS": 1.54,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫 ブラッシングスプレー",
+          "avg_cpc": 121,
+          "rec_cpc": 111,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 3600.0,
+          "cost": 3266.5299999999997,
+          "ROAS": 1.1,
+          "orders": 2
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "keyword": "ペット ドライシャンプー",
+          "avg_cpc": 111,
+          "rec_cpc": 101,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 3600.0,
+          "cost": 3320.25,
+          "ROAS": 1.08,
+          "orders": 2
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 かゆみ",
+          "avg_cpc": 102,
+          "rec_cpc": 92,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 3600.0,
+          "cost": 3372.4300000000003,
+          "ROAS": 1.07,
+          "orders": 2
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "keyword": "keyword-group=\"商品カテゴリーに関連するキーワード\"",
+          "avg_cpc": 112,
+          "rec_cpc": 102,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 4945.0,
+          "cost": 4723.43,
+          "ROAS": 1.05,
+          "orders": 3
+        },
+        {
+          "campaign_name": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【グルーミング】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫 かゆみ",
+          "avg_cpc": 111,
+          "rec_cpc": 101,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 1800.0,
+          "cost": 3109.48,
+          "ROAS": 0.58,
+          "orders": 1
+        }
+      ]
     }
   ]
 }
