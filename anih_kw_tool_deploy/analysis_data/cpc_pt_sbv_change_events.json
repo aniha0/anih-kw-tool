@@ -505,7 +505,17 @@
         "clicks": 36.0,
         "CVR": 8.3
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 2349.94,
+        "sales": 0.0,
+        "orders": 0.0,
+        "ROAS": 0.0,
+        "impressions": 8009.0,
+        "clicks": 29.0,
+        "CVR": 0.0
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -531,7 +541,17 @@
         "clicks": 12.0,
         "CVR": 33.3
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 1088.23,
+        "sales": 9415.0,
+        "orders": 4.0,
+        "ROAS": 8.65,
+        "impressions": 1040.0,
+        "clicks": 11.0,
+        "CVR": 36.36
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -557,7 +577,17 @@
         "clicks": 13.0,
         "CVR": 38.5
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 179.69,
+        "sales": 4035.0,
+        "orders": 3.0,
+        "ROAS": 22.46,
+        "impressions": 28.0,
+        "clicks": 3.0,
+        "CVR": 100.0
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -583,7 +613,17 @@
         "clicks": 66.0,
         "CVR": 21.2
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 5025.83,
+        "sales": 13869.0,
+        "orders": 7.0,
+        "ROAS": 2.76,
+        "impressions": 5693.0,
+        "clicks": 58.0,
+        "CVR": 12.07
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -609,7 +649,17 @@
         "clicks": 35.0,
         "CVR": 31.4
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 3641.92,
+        "sales": 15007.0,
+        "orders": 11.0,
+        "ROAS": 4.12,
+        "impressions": 569.0,
+        "clicks": 37.0,
+        "CVR": 29.73
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -635,7 +685,17 @@
         "clicks": 11.0,
         "CVR": 36.4
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 1088.23,
+        "sales": 9415.0,
+        "orders": 4.0,
+        "ROAS": 8.65,
+        "impressions": 1040.0,
+        "clicks": 11.0,
+        "CVR": 36.36
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -661,7 +721,17 @@
         "clicks": 6.0,
         "CVR": 83.3
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 475.00999999999993,
+        "sales": 5113.0,
+        "orders": 4.0,
+        "ROAS": 10.76,
+        "impressions": 30.0,
+        "clicks": 4.0,
+        "CVR": 100.0
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -687,7 +757,17 @@
         "clicks": 25.0,
         "CVR": 36.0
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 2982.2299999999996,
+        "sales": 17800.0,
+        "orders": 8.0,
+        "ROAS": 5.97,
+        "impressions": 403.0,
+        "clicks": 20.0,
+        "CVR": 40.0
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -712,6 +792,42 @@
         "impressions": 476.0,
         "clicks": 40.0,
         "CVR": 40.0
+      },
+      "compare_to": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 5111.710000000001,
+        "sales": 21500.0,
+        "orders": 10.0,
+        "ROAS": 4.21,
+        "impressions": 386.0,
+        "clicks": 32.0,
+        "CVR": 31.25
+      },
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
+    },
+    {
+      "id": "20261005043810_7685",
+      "campaign_name": "【ふりかけ犬】SB広告(動画)：KWターゲ",
+      "ad_group": "【ふりかけ犬】SB広告(動画)",
+      "keyword": "デンタルふりかけ",
+      "target_key": "【ふりかけ犬】sb広告(動画):kwターゲ|【ふりかけ犬】sb広告(動画)|デンタルふりかけ",
+      "changed_at": "2026-10-05T04:38:10.981666",
+      "before_cpc": 100.0,
+      "after_cpc": 105.0,
+      "change_rate": 5.0,
+      "compare_from": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 702.12,
+        "sales": 7573.0,
+        "orders": 4.0,
+        "ROAS": 10.79,
+        "impressions": 154.0,
+        "clicks": 7.0,
+        "CVR": 57.1
       },
       "compare_to": null,
       "reason": "",
