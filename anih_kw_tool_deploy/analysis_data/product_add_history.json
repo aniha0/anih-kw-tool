@@ -1999,6 +1999,31 @@
           "ROAS": 2.51
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-05T03:28:49.826023",
+      "entries": [
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B004ZX19EE",
+          "orders": 8,
+          "clicks": 16,
+          "cost": 2233.9,
+          "sales": 10761.0,
+          "ROAS": 4.82
+        },
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CYK5745R",
+          "orders": 6,
+          "clicks": 26,
+          "cost": 3219.58,
+          "sales": 8071.0,
+          "ROAS": 2.51
+        }
+      ]
     }
   ]
 }
