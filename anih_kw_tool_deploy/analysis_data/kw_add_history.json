@@ -1720,6 +1720,47 @@
           "ROAS": 2.14
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-05T03:04:54.977339",
+      "entries": [
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "犬用液体ハミガキ",
+          "orders": 5,
+          "clicks": 7,
+          "cost": 1133.3,
+          "sales": 9000.0,
+          "ROAS": 7.94
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "口腔ケア 猫",
+          "orders": 3,
+          "clicks": 5,
+          "cost": 909.95,
+          "sales": 5400.0,
+          "ROAS": 5.93
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "猫 ししゅうびょう 薬",
+          "orders": 6,
+          "clicks": 13,
+          "cost": 2342.88,
+          "sales": 12864.0,
+          "ROAS": 5.49
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "犬歯磨き水",
+          "orders": 4,
+          "clicks": 7,
+          "cost": 1427.4,
+          "sales": 7200.0,
+          "ROAS": 5.04
+        }
+      ]
     }
   ]
 }
