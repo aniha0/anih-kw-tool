@@ -1777,6 +1777,65 @@
           "ROAS": 4.62
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-05T04:00:17.129685",
+      "entries": [
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "あには 猫",
+          "orders": 8,
+          "clicks": 14,
+          "cost": 663.1,
+          "sales": 16737.0,
+          "ROAS": 25.24
+        },
+        {
+          "ad_group": "【ふりかけ猫】SP広告(オート)",
+          "keyword": "猫こうしゅう 口臭ケア",
+          "orders": 3,
+          "clicks": 7,
+          "cost": 1134.95,
+          "sales": 7464.0,
+          "ROAS": 6.58
+        },
+        {
+          "ad_group": "【ふりかけ猫】SP広告(オート)",
+          "keyword": "猫こうしゅう 口臭ケア 歯周病",
+          "orders": 3,
+          "clicks": 6,
+          "cost": 952.96,
+          "sales": 5764.0,
+          "ROAS": 6.05
+        },
+        {
+          "ad_group": "【ふりかけ猫】SP広告(オート)",
+          "keyword": "猫 オーラルケア",
+          "orders": 8,
+          "clicks": 21,
+          "cost": 3619.99,
+          "sales": 15128.0,
+          "ROAS": 4.18
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "猫用デンタルケア",
+          "orders": 4,
+          "clicks": 18,
+          "cost": 2362.17,
+          "sales": 7564.0,
+          "ROAS": 3.2
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "猫はみがきおやつ 歯石除去",
+          "orders": 3,
+          "clicks": 12,
+          "cost": 2023.91,
+          "sales": 5400.0,
+          "ROAS": 2.67
+        }
+      ]
     }
   ]
 }
