@@ -1802,6 +1802,38 @@
           "ROAS": 2.81
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-05T03:08:02.555222",
+      "entries": [
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "ペット歯磨き",
+          "orders": 3,
+          "clicks": 6,
+          "cost": 961.98,
+          "sales": 7100.0,
+          "ROAS": 7.38
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "ペットはみがき",
+          "orders": 4,
+          "clicks": 6,
+          "cost": 1250.49,
+          "sales": 6762.0,
+          "ROAS": 5.41
+        },
+        {
+          "ad_group": "【ジェル】SP広告(オート)",
+          "keyword": "犬歯磨き粉",
+          "orders": 4,
+          "clicks": 16,
+          "cost": 2847.13,
+          "sales": 6735.0,
+          "ROAS": 2.37
+        }
+      ]
     }
   ]
 }
