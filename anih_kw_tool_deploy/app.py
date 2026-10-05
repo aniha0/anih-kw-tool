@@ -3281,7 +3281,8 @@ def page_cpc_change_history():
                         for _zname in _zf.namelist():
                             if _zname.endswith(".json"):
                                 _zdata = _ij.loads(_zf.read(_zname).decode("utf-8"))
-                                _anls_save(_zname, _zdata)
+                                _zrecords = _zdata.get("records", []) if isinstance(_zdata, dict) else (_zdata if isinstance(_zdata, list) else [])
+                                _anls_save(_zname, _zrecords)
                                 _imported += 1
                     st.success(f"✅ インポート完了（{_imported}ファイルを復元）")
                     st.rerun()
