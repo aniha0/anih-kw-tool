@@ -569,6 +569,41 @@
           "ROAS": 2.42
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-05T04:01:12.068720",
+      "entries": [
+        {
+          "campaign_name": "【乳酸菌猫】SB広告(動画)：商品ターゲ",
+          "ad_group": "【乳酸菌猫】SB広告(動画)：商品ターゲ",
+          "asin": "B07G38XB26",
+          "orders": 3,
+          "clicks": 9,
+          "cost": 885.35,
+          "sales": 5218.0,
+          "ROAS": 5.89
+        },
+        {
+          "campaign_name": "【イヤー】SB広告(動画)：商品ターゲ",
+          "ad_group": "【イヤー】SB広告(動画)：商品ターゲ",
+          "asin": "B08BJ9SWTG",
+          "orders": 6,
+          "clicks": 24,
+          "cost": 2243.4,
+          "sales": 7802.0,
+          "ROAS": 3.48
+        },
+        {
+          "campaign_name": "【イヤー】SB広告(動画)：商品ターゲ",
+          "ad_group": "【イヤー】SB広告(動画)：商品ターゲ",
+          "asin": "B0CNLFT7XF",
+          "orders": 3,
+          "clicks": 19,
+          "cost": 1671.3899999999999,
+          "sales": 3901.0,
+          "ROAS": 2.33
+        }
+      ]
     }
   ]
 }
