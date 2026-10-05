@@ -1558,6 +1558,56 @@
           "ROAS": 5.04
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-05T03:46:47.649313",
+      "entries": [
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "なみだやけ",
+          "orders": 3,
+          "clicks": 5,
+          "cost": 597.63,
+          "sales": 4035.0,
+          "ROAS": 6.75
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "猫 目薬 結膜炎",
+          "orders": 5,
+          "clicks": 13,
+          "cost": 1663.08,
+          "sales": 6725.0,
+          "ROAS": 4.04
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "犬涙やけ",
+          "orders": 5,
+          "clicks": 13,
+          "cost": 2077.58,
+          "sales": 6726.0,
+          "ROAS": 3.24
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "犬用涙やけクリーナー",
+          "orders": 4,
+          "clicks": 11,
+          "cost": 1747.04,
+          "sales": 5381.0,
+          "ROAS": 3.08
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "涙やけ犬",
+          "orders": 7,
+          "clicks": 24,
+          "cost": 3346.7,
+          "sales": 9415.0,
+          "ROAS": 2.81
+        }
+      ]
     }
   ]
 }
