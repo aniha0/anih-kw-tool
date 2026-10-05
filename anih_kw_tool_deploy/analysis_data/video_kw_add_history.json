@@ -1224,6 +1224,299 @@
           "ROAS": 2.52
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-05T03:44:33.097111",
+      "entries": [
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "あには 猫",
+          "orders": 8,
+          "clicks": 14,
+          "cost": 663.1,
+          "sales": 16737.0,
+          "ROAS": 25.24
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "犬用液体ハミガキ",
+          "orders": 5,
+          "clicks": 7,
+          "cost": 1133.3,
+          "sales": 9000.0,
+          "ROAS": 7.94
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "ペット歯磨き",
+          "orders": 3,
+          "clicks": 6,
+          "cost": 961.98,
+          "sales": 7100.0,
+          "ROAS": 7.38
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "なみだやけ",
+          "orders": 3,
+          "clicks": 5,
+          "cost": 597.63,
+          "sales": 4035.0,
+          "ROAS": 6.75
+        },
+        {
+          "ad_group": "【ふりかけ猫】SP広告(オート)",
+          "keyword": "猫こうしゅう 口臭ケア",
+          "orders": 3,
+          "clicks": 7,
+          "cost": 1134.95,
+          "sales": 7464.0,
+          "ROAS": 6.58
+        },
+        {
+          "ad_group": "歯磨きシリーズ(2本セット～)",
+          "keyword": "マウスクリーナー 犬",
+          "orders": 3,
+          "clicks": 8,
+          "cost": 1032.1100000000001,
+          "sales": 6645.0,
+          "ROAS": 6.44
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "猫 口周り",
+          "orders": 4,
+          "clicks": 7,
+          "cost": 846.06,
+          "sales": 5381.0,
+          "ROAS": 6.36
+        },
+        {
+          "ad_group": "【ふりかけ猫】SP広告(オート)",
+          "keyword": "猫こうしゅう 口臭ケア 歯周病",
+          "orders": 3,
+          "clicks": 6,
+          "cost": 952.96,
+          "sales": 5764.0,
+          "ROAS": 6.05
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "口腔ケア 猫",
+          "orders": 3,
+          "clicks": 5,
+          "cost": 909.95,
+          "sales": 5400.0,
+          "ROAS": 5.93
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "猫 ししゅうびょう 薬",
+          "orders": 6,
+          "clicks": 13,
+          "cost": 2342.88,
+          "sales": 12864.0,
+          "ROAS": 5.49
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "ペットはみがき",
+          "orders": 4,
+          "clicks": 6,
+          "cost": 1250.49,
+          "sales": 6762.0,
+          "ROAS": 5.41
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "犬歯磨き水",
+          "orders": 4,
+          "clicks": 7,
+          "cost": 1427.4,
+          "sales": 7200.0,
+          "ROAS": 5.04
+        },
+        {
+          "ad_group": "【肉球】SP広告(オート)",
+          "keyword": "犬のにくきゅうクリーム売れ筋",
+          "orders": 3,
+          "clicks": 5,
+          "cost": 833.18,
+          "sales": 3847.0,
+          "ROAS": 4.62
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "よだれやけ 犬",
+          "orders": 7,
+          "clicks": 16,
+          "cost": 2151.96,
+          "sales": 9415.0,
+          "ROAS": 4.38
+        },
+        {
+          "ad_group": "【ふりかけ猫】SP広告(オート)",
+          "keyword": "猫 オーラルケア",
+          "orders": 8,
+          "clicks": 21,
+          "cost": 3619.99,
+          "sales": 15128.0,
+          "ROAS": 4.18
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "猫 目薬 結膜炎",
+          "orders": 5,
+          "clicks": 13,
+          "cost": 1663.08,
+          "sales": 6725.0,
+          "ROAS": 4.04
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "猫用涙やけクリーナー",
+          "orders": 5,
+          "clicks": 11,
+          "cost": 1932.77,
+          "sales": 6726.0,
+          "ROAS": 3.48
+        },
+        {
+          "ad_group": "【肉球】SP広告(オート)",
+          "keyword": "ペット用品",
+          "orders": 6,
+          "clicks": 23,
+          "cost": 2885.4300000000003,
+          "sales": 9863.0,
+          "ROAS": 3.42
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "犬よだれやけクリーナーランキング",
+          "orders": 6,
+          "clicks": 24,
+          "cost": 2424.3900000000003,
+          "sales": 8070.0,
+          "ROAS": 3.33
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "猫 あこにきび",
+          "orders": 4,
+          "clicks": 10,
+          "cost": 1634.22,
+          "sales": 5380.0,
+          "ROAS": 3.29
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "犬涙やけ",
+          "orders": 5,
+          "clicks": 13,
+          "cost": 2077.58,
+          "sales": 6726.0,
+          "ROAS": 3.24
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "猫用デンタルケア",
+          "orders": 4,
+          "clicks": 18,
+          "cost": 2362.17,
+          "sales": 7564.0,
+          "ROAS": 3.2
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "犬用涙やけクリーナー",
+          "orders": 4,
+          "clicks": 11,
+          "cost": 1747.04,
+          "sales": 5381.0,
+          "ROAS": 3.08
+        },
+        {
+          "ad_group": "【イヤー】SP広告(オート)",
+          "keyword": "耳掃除 犬",
+          "orders": 4,
+          "clicks": 13,
+          "cost": 1732.52,
+          "sales": 5246.0,
+          "ROAS": 3.03
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "肉球クリーム 猫",
+          "orders": 3,
+          "clicks": 9,
+          "cost": 1390.0,
+          "sales": 3981.0,
+          "ROAS": 2.86
+        },
+        {
+          "ad_group": "【ジェル】SP広告(オート)",
+          "keyword": "犬歯磨き",
+          "orders": 27,
+          "clicks": 100,
+          "cost": 18231.29,
+          "sales": 51524.0,
+          "ROAS": 2.83
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "涙やけ犬",
+          "orders": 7,
+          "clicks": 24,
+          "cost": 3346.7,
+          "sales": 9415.0,
+          "ROAS": 2.81
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "猫はみがきおやつ 歯石除去",
+          "orders": 3,
+          "clicks": 12,
+          "cost": 2023.91,
+          "sales": 5400.0,
+          "ROAS": 2.67
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "ペット 強力消臭スプレー",
+          "orders": 3,
+          "clicks": 20,
+          "cost": 2204.4,
+          "sales": 5400.0,
+          "ROAS": 2.45
+        },
+        {
+          "ad_group": "【ジェル】SP広告(オート)",
+          "keyword": "犬歯磨き粉",
+          "orders": 4,
+          "clicks": 16,
+          "cost": 2847.13,
+          "sales": 6735.0,
+          "ROAS": 2.37
+        },
+        {
+          "ad_group": "【ジェル】SP広告(オート)",
+          "keyword": "犬用歯磨きジェル",
+          "orders": 4,
+          "clicks": 14,
+          "cost": 2631.99,
+          "sales": 5886.0,
+          "ROAS": 2.24
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "犬口臭",
+          "orders": 5,
+          "clicks": 21,
+          "cost": 4396.96,
+          "sales": 9427.0,
+          "ROAS": 2.14
+        }
+      ]
     }
   ]
 }
