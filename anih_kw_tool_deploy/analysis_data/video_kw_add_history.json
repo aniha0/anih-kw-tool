@@ -1677,6 +1677,92 @@
           "ROAS": 2.83
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-05T03:55:27.893416",
+      "entries": [
+        {
+          "ad_group": "歯磨きシリーズ(2本セット～)",
+          "keyword": "マウスクリーナー 犬",
+          "orders": 3,
+          "clicks": 8,
+          "cost": 1032.1100000000001,
+          "sales": 6645.0,
+          "ROAS": 6.44
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "猫 口周り",
+          "orders": 4,
+          "clicks": 7,
+          "cost": 846.06,
+          "sales": 5381.0,
+          "ROAS": 6.36
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "よだれやけ 犬",
+          "orders": 7,
+          "clicks": 16,
+          "cost": 2151.96,
+          "sales": 9415.0,
+          "ROAS": 4.38
+        },
+        {
+          "ad_group": "【肉球】SP広告(オート)",
+          "keyword": "ペット用品",
+          "orders": 6,
+          "clicks": 23,
+          "cost": 2885.4300000000003,
+          "sales": 9863.0,
+          "ROAS": 3.42
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "犬よだれやけクリーナーランキング",
+          "orders": 6,
+          "clicks": 24,
+          "cost": 2424.3900000000003,
+          "sales": 8070.0,
+          "ROAS": 3.33
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "猫 あこにきび",
+          "orders": 4,
+          "clicks": 10,
+          "cost": 1634.22,
+          "sales": 5380.0,
+          "ROAS": 3.29
+        },
+        {
+          "ad_group": "【イヤー】SP広告(オート)",
+          "keyword": "耳掃除 犬",
+          "orders": 4,
+          "clicks": 13,
+          "cost": 1732.52,
+          "sales": 5246.0,
+          "ROAS": 3.03
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "肉球クリーム 猫",
+          "orders": 3,
+          "clicks": 9,
+          "cost": 1390.0,
+          "sales": 3981.0,
+          "ROAS": 2.86
+        },
+        {
+          "ad_group": "【液体】SP広告(オート)",
+          "keyword": "犬口臭",
+          "orders": 5,
+          "clicks": 21,
+          "cost": 4396.96,
+          "sales": 9427.0,
+          "ROAS": 2.14
+        }
+      ]
     }
   ]
 }
