@@ -3964,6 +3964,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20261005041509_3534",
+      "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+      "keyword": "犬 ふりかけ",
+      "target_key": "【ふりかけ犬】sp広告(マニュアル):kwターゲ|【ふりかけ犬】sp広告(マニュアル):kwターゲ|犬 ふりかけ",
+      "changed_at": "2026-10-05T04:15:09.427322",
+      "before_cpc": 215.0,
+      "after_cpc": 210.0,
+      "change_rate": -2.3,
+      "compare_from": {
+        "period_start": "2026-09-04",
+        "period_end": "2026-10-04",
+        "cost": 97454.71,
+        "sales": 170887.0,
+        "orders": 82.0,
+        "ROAS": 1.75,
+        "impressions": 43092.0,
+        "clicks": 453.0,
+        "CVR": 18.1
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
