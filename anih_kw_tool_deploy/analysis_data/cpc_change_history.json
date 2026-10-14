@@ -6266,6 +6266,39 @@
           "orders": 5
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-14T04:00:48.839878",
+      "entries": [
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬めやに除去人気",
+          "avg_cpc": 145,
+          "rec_cpc": 150,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 5380.0,
+          "cost": 870.31,
+          "ROAS": 6.18,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：KWターゲ",
+          "keyword": "涙焼け 犬",
+          "avg_cpc": 157,
+          "rec_cpc": 147,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 8070.0,
+          "cost": 8029.66,
+          "ROAS": 1.01,
+          "orders": 6
+        }
+      ]
     }
   ]
 }
