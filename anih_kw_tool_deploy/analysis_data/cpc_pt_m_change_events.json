@@ -1140,6 +1140,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20261014041605_4803",
+      "campaign_name": "【除菌消臭】SP広告(マニュアル)：商品ターゲ",
+      "ad_group": "【除菌消臭】SP広告(マニュアル)：商品ターゲ",
+      "asin": "B07PRV3NRF",
+      "target_key": "【除菌消臭】sp広告(マニュアル):商品ターゲ|【除菌消臭】sp広告(マニュアル):商品ターゲ|b07prv3nrf",
+      "changed_at": "2026-10-14T04:16:05.882861",
+      "before_cpc": 116.0,
+      "after_cpc": 121.0,
+      "change_rate": 4.3,
+      "compare_from": {
+        "period_start": "2026-09-11",
+        "period_end": "2026-10-11",
+        "cost": 2089.84,
+        "sales": 11600.0,
+        "orders": 7.0,
+        "ROAS": 5.55,
+        "impressions": 604.0,
+        "clicks": 18.0,
+        "CVR": 38.9
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
