@@ -2564,6 +2564,31 @@
           "ROAS": 5.55
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-14T03:40:39.120261",
+      "entries": [
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B095W1QW6J",
+          "orders": 7,
+          "clicks": 50,
+          "cost": 4873.91,
+          "sales": 12054.0,
+          "ROAS": 2.47
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CTMPNMFZ",
+          "orders": 3,
+          "clicks": 24,
+          "cost": 2490.25,
+          "sales": 5127.0,
+          "ROAS": 2.06
+        }
+      ]
     }
   ]
 }
