@@ -4198,6 +4198,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20261014041149_6952",
+      "campaign_name": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ふりかけ猫】SP広告(マニュアル)：KWターゲ",
+      "keyword": "ねこ　歯磨き",
+      "target_key": "【ふりかけ猫】sp広告(マニュアル):kwターゲ|【ふりかけ猫】sp広告(マニュアル):kwターゲ|ねこ 歯磨き",
+      "changed_at": "2026-10-14T04:11:49.175250",
+      "before_cpc": 170.0,
+      "after_cpc": 175.0,
+      "change_rate": 2.9,
+      "compare_from": {
+        "period_start": "2026-09-11",
+        "period_end": "2026-10-11",
+        "cost": 1529.54,
+        "sales": 10820.0,
+        "orders": 5.0,
+        "ROAS": 7.07,
+        "impressions": 90.0,
+        "clicks": 9.0,
+        "CVR": 55.6
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
