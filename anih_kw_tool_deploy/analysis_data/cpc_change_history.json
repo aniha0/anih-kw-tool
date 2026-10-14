@@ -6426,6 +6426,39 @@
           "orders": 1
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-14T04:07:46.048819",
+      "entries": [
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "猫 クリーナー",
+          "avg_cpc": 117,
+          "rec_cpc": 122,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 8071.0,
+          "cost": 1992.42,
+          "ROAS": 4.05,
+          "orders": 6
+        },
+        {
+          "campaign_name": "【お口周り】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【お口周り】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬　よだれ",
+          "avg_cpc": 119,
+          "rec_cpc": 109,
+          "cpc_delta": -10,
+          "cpc_rank": "D",
+          "cpc_action": "CPC下げ",
+          "sales": 8070.0,
+          "cost": 8429.31,
+          "ROAS": 0.96,
+          "orders": 6
+        }
+      ]
     }
   ]
 }
