@@ -102,6 +102,25 @@
           "orders": 6
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-14T04:18:12.562043",
+      "entries": [
+        {
+          "campaign_name": "【イヤー】SB広告(動画)：商品ターゲ",
+          "ad_group": "【イヤー】SB広告(動画)：商品ターゲ",
+          "asin": "B08BJ9SWTG",
+          "avg_cpc": 93,
+          "rec_cpc": 98,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 9147.0,
+          "cost": 2235.34,
+          "ROAS": 4.09,
+          "orders": 7
+        }
+      ]
     }
   ]
 }
