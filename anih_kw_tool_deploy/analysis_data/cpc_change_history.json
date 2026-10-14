@@ -6299,6 +6299,25 @@
           "orders": 6
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-14T04:00:53.821891",
+      "entries": [
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：KWターゲ",
+          "keyword": "犬 耳かゆみ止め",
+          "avg_cpc": 125,
+          "rec_cpc": 120,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 5246.0,
+          "cost": 3119.08,
+          "ROAS": 1.68,
+          "orders": 4
+        }
+      ]
     }
   ]
 }
