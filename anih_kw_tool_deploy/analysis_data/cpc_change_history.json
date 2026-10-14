@@ -6177,6 +6177,95 @@
           "orders": 0
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-14T03:59:03.103573",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "猫 歯磨き 水",
+          "avg_cpc": 137,
+          "rec_cpc": 142,
+          "cpc_delta": 5,
+          "cpc_rank": "SS+",
+          "cpc_action": "CPC上げ",
+          "sales": 36748.0,
+          "cost": 9160.22,
+          "ROAS": 4.01,
+          "orders": 20
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "猫 デンタルケア",
+          "avg_cpc": 89,
+          "rec_cpc": 94,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 9364.0,
+          "cost": 891.71,
+          "ROAS": 10.5,
+          "orders": 5
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "犬 歯ブラシ",
+          "avg_cpc": 99,
+          "rec_cpc": 104,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 7200.0,
+          "cost": 696.0,
+          "ROAS": 10.34,
+          "orders": 4
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "猫 マウスクリーナー",
+          "avg_cpc": 120,
+          "rec_cpc": 125,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 28600.0,
+          "cost": 5645.44,
+          "ROAS": 5.07,
+          "orders": 14
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "猫 液体歯磨き",
+          "avg_cpc": 114,
+          "rec_cpc": 119,
+          "cpc_delta": 5,
+          "cpc_rank": "S",
+          "cpc_action": "CPC上げ",
+          "sales": 21500.0,
+          "cost": 4451.72,
+          "ROAS": 4.83,
+          "orders": 11
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：KWターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：KWTG自社",
+          "keyword": "リデンタ",
+          "avg_cpc": 120,
+          "rec_cpc": 115,
+          "cpc_delta": -5,
+          "cpc_rank": "C",
+          "cpc_action": "CPC下げ",
+          "sales": 9000.0,
+          "cost": 5045.46,
+          "ROAS": 1.78,
+          "orders": 5
+        }
+      ]
     }
   ]
 }
