@@ -4068,6 +4068,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20261014040245_0244",
+      "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ふりかけ犬】SP広告(マニュアル)：KWターゲ",
+      "keyword": "食べる 歯磨き 犬",
+      "target_key": "【ふりかけ犬】sp広告(マニュアル):kwターゲ|【ふりかけ犬】sp広告(マニュアル):kwターゲ|食べる 歯磨き 犬",
+      "changed_at": "2026-10-14T04:02:45.561604",
+      "before_cpc": 186.0,
+      "after_cpc": 181.0,
+      "change_rate": -2.7,
+      "compare_from": {
+        "period_start": "2026-09-11",
+        "period_end": "2026-10-11",
+        "cost": 4095.87,
+        "sales": 6681.0,
+        "orders": 3.0,
+        "ROAS": 1.63,
+        "impressions": 116.0,
+        "clicks": 22.0,
+        "CVR": 13.6
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
