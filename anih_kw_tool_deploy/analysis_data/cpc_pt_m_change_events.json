@@ -1084,7 +1084,17 @@
         "clicks": 75.0,
         "CVR": 22.7
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-09-11",
+        "period_end": "2026-10-11",
+        "cost": 6227.93,
+        "sales": 23400.0,
+        "orders": 13.0,
+        "ROAS": 3.76,
+        "impressions": 1424.0,
+        "clicks": 42.0,
+        "CVR": 30.95
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
@@ -1110,7 +1120,17 @@
         "clicks": 16.0,
         "CVR": 50.0
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-09-11",
+        "period_end": "2026-10-11",
+        "cost": 1282.15,
+        "sales": 6725.0,
+        "orders": 5.0,
+        "ROAS": 5.25,
+        "impressions": 278.0,
+        "clicks": 9.0,
+        "CVR": 55.56
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
