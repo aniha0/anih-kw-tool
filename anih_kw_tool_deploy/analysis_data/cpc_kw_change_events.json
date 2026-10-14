@@ -4146,6 +4146,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20261014041007_5037",
+      "campaign_name": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+      "ad_group": "【ダニ捕り】SP広告(マニュアル)：KWターゲ",
+      "keyword": "猫 ノミ",
+      "target_key": "【ダニ捕り】sp広告(マニュアル):kwターゲ|【ダニ捕り】sp広告(マニュアル):kwターゲ|猫 ノミ",
+      "changed_at": "2026-10-14T04:10:07.520993",
+      "before_cpc": 115.0,
+      "after_cpc": 110.0,
+      "change_rate": -4.3,
+      "compare_from": {
+        "period_start": "2026-09-11",
+        "period_end": "2026-10-11",
+        "cost": 6807.6900000000005,
+        "sales": 12105.0,
+        "orders": 8.0,
+        "ROAS": 1.78,
+        "impressions": 7328.0,
+        "clicks": 59.0,
+        "CVR": 13.6
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
