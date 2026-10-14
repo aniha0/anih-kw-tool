@@ -169,6 +169,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20261014041932_8179",
+      "campaign_name": "【イヤー】SB広告(動画)：商品ターゲ",
+      "ad_group": "【イヤー】SB広告(動画)：商品ターゲ",
+      "asin": "B08BJ9SWTG",
+      "target_key": "【イヤー】sb広告(動画):商品ターゲ|【イヤー】sb広告(動画):商品ターゲ|b08bj9swtg",
+      "changed_at": "2026-10-14T04:19:32.128081",
+      "before_cpc": 93.0,
+      "after_cpc": 98.0,
+      "change_rate": 5.4,
+      "compare_from": {
+        "period_start": "2026-09-11",
+        "period_end": "2026-10-11",
+        "cost": 2235.34,
+        "sales": 9147.0,
+        "orders": 7.0,
+        "ROAS": 4.09,
+        "impressions": 531.0,
+        "clicks": 24.0,
+        "CVR": 29.2
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
