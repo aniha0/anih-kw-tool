@@ -833,6 +833,32 @@
       "reason": "",
       "memo": "",
       "evaluation": ""
+    },
+    {
+      "id": "20261014041808_4623",
+      "campaign_name": "【ダニ捕り】SB広告(動画)：KWターゲ",
+      "ad_group": "【ダニ捕り】SB広告(動画)：KWターゲ",
+      "keyword": "ペット ダニ",
+      "target_key": "【ダニ捕り】sb広告(動画):kwターゲ|【ダニ捕り】sb広告(動画):kwターゲ|ペット ダニ",
+      "changed_at": "2026-10-14T04:18:08.666652",
+      "before_cpc": 83.0,
+      "after_cpc": 73.0,
+      "change_rate": -12.0,
+      "compare_from": {
+        "period_start": "2026-09-11",
+        "period_end": "2026-10-11",
+        "cost": 5416.91,
+        "sales": 5380.0,
+        "orders": 3.0,
+        "ROAS": 0.99,
+        "impressions": 14085.0,
+        "clicks": 65.0,
+        "CVR": 4.6
+      },
+      "compare_to": null,
+      "reason": "",
+      "memo": "",
+      "evaluation": ""
     }
   ]
 }
