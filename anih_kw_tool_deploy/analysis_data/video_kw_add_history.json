@@ -2317,6 +2317,101 @@
           "ROAS": 5.32
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-14T03:47:12.776895",
+      "entries": [
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬 トイレトレーニング スプレー",
+          "orders": 3,
+          "clicks": 5,
+          "cost": 660.0,
+          "sales": 3902.0,
+          "ROAS": 5.91
+        },
+        {
+          "ad_group": "【涙やけ】SP広告(オート)",
+          "keyword": "シュナウザー 髭やけクリーナー",
+          "orders": 3,
+          "clicks": 21,
+          "cost": 906.06,
+          "sales": 4035.0,
+          "ROAS": 4.45
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "よだれやけ 犬",
+          "orders": 7,
+          "clicks": 17,
+          "cost": 2191.74,
+          "sales": 9415.0,
+          "ROAS": 4.3
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "顎クリーナー 猫",
+          "orders": 4,
+          "clicks": 10,
+          "cost": 1436.07,
+          "sales": 5808.0,
+          "ROAS": 4.04
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "猫 あこにきび",
+          "orders": 5,
+          "clicks": 11,
+          "cost": 1821.42,
+          "sales": 6725.0,
+          "ROAS": 3.69
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "猫あごニキビクリーナー",
+          "orders": 3,
+          "clicks": 7,
+          "cost": 1118.32,
+          "sales": 4035.0,
+          "ROAS": 3.61
+        },
+        {
+          "ad_group": "【イヤー】SP広告(オート)",
+          "keyword": "耳掃除 犬",
+          "orders": 5,
+          "clicks": 15,
+          "cost": 2003.76,
+          "sales": 6591.0,
+          "ROAS": 3.29
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬用はみがき",
+          "orders": 3,
+          "clicks": 13,
+          "cost": 2366.74,
+          "sales": 7100.0,
+          "ROAS": 3.0
+        },
+        {
+          "ad_group": "【AMC】SP広告(オート)",
+          "keyword": "肉球クリーム 猫",
+          "orders": 4,
+          "clicks": 16,
+          "cost": 2425.0,
+          "sales": 5299.0,
+          "ROAS": 2.19
+        },
+        {
+          "ad_group": "【お口周り】SP広告(オート)",
+          "keyword": "犬 髭やけ",
+          "orders": 3,
+          "clicks": 16,
+          "cost": 1890.16,
+          "sales": 4035.0,
+          "ROAS": 2.13
+        }
+      ]
     }
   ]
 }
