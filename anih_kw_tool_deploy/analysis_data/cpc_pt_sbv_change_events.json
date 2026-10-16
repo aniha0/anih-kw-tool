@@ -865,7 +865,17 @@
         "clicks": 65.0,
         "CVR": 4.6
       },
-      "compare_to": null,
+      "compare_to": {
+        "period_start": "2026-09-16",
+        "period_end": "2026-10-15",
+        "cost": 5027.66,
+        "sales": 2690.0,
+        "orders": 2.0,
+        "ROAS": 0.54,
+        "impressions": 12413.0,
+        "clicks": 61.0,
+        "CVR": 3.28
+      },
       "reason": "",
       "memo": "",
       "evaluation": ""
