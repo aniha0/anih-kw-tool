@@ -2589,6 +2589,231 @@
           "ROAS": 2.06
         }
       ]
+    },
+    {
+      "exported_at": "2026-10-16T05:54:39.193698",
+      "entries": [
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DP8W6QZB",
+          "orders": 3,
+          "clicks": 5,
+          "cost": 652.5,
+          "sales": 5220.0,
+          "ROAS": 8.0
+        },
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B004ZX19EE",
+          "orders": 5,
+          "clicks": 9,
+          "cost": 1205.15,
+          "sales": 6725.0,
+          "ROAS": 5.58
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DLG4C46Z",
+          "orders": 38,
+          "clicks": 135,
+          "cost": 18016.0,
+          "sales": 92541.0,
+          "ROAS": 5.14
+        },
+        {
+          "campaign_name": "【除菌消臭】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【除菌消臭】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B07PRV3NRF",
+          "orders": 7,
+          "clicks": 23,
+          "cost": 2693.09,
+          "sales": 11600.0,
+          "ROAS": 4.31
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B09HBG4R7Q",
+          "orders": 57,
+          "clicks": 169,
+          "cost": 26396.47,
+          "sales": 106180.0,
+          "ROAS": 4.02
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B084VKG139",
+          "orders": 4,
+          "clicks": 14,
+          "cost": 2002.5,
+          "sales": 8010.0,
+          "ROAS": 4.0
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0FPWWS49N",
+          "orders": 3,
+          "clicks": 12,
+          "cost": 1620.0,
+          "sales": 5220.0,
+          "ROAS": 3.22
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0BT4LHCRH",
+          "orders": 26,
+          "clicks": 104,
+          "cost": 14878.839999999998,
+          "sales": 46330.0,
+          "ROAS": 3.11
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B001F2N8KG",
+          "orders": 144,
+          "clicks": 418,
+          "cost": 64792.83,
+          "sales": 189597.0,
+          "ROAS": 2.93
+        },
+        {
+          "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ふりかけ犬】SP広告(マニュアル)：商品",
+          "asin": "B0CYP43QKN",
+          "orders": 12,
+          "clicks": 65,
+          "cost": 9915.75,
+          "sales": 27582.0,
+          "ROAS": 2.78
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B08BJ9SWTG",
+          "orders": 26,
+          "clicks": 88,
+          "cost": 12126.8,
+          "sales": 33270.0,
+          "ROAS": 2.74
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DF71W1SK",
+          "orders": 4,
+          "clicks": 21,
+          "cost": 2681.67,
+          "sales": 7020.0,
+          "ROAS": 2.62
+        },
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CYK5745R",
+          "orders": 5,
+          "clicks": 22,
+          "cost": 2616.09,
+          "sales": 6726.0,
+          "ROAS": 2.57
+        },
+        {
+          "campaign_name": "【乳酸菌猫】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【乳酸菌猫】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0DV96J6VD",
+          "orders": 4,
+          "clicks": 26,
+          "cost": 2900.4300000000003,
+          "sales": 6836.0,
+          "ROAS": 2.36
+        },
+        {
+          "campaign_name": "【ふりかけ犬】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ふりかけ犬】SP広告(マニュアル)：商品",
+          "asin": "B0CRTC1XD6",
+          "orders": 5,
+          "clicks": 31,
+          "cost": 4616.29,
+          "sales": 10820.0,
+          "ROAS": 2.34
+        },
+        {
+          "campaign_name": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【シャンプー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CTMPNMFZ",
+          "orders": 3,
+          "clicks": 22,
+          "cost": 2311.5,
+          "sales": 5127.0,
+          "ROAS": 2.22
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B08B6LZJ3C",
+          "orders": 9,
+          "clicks": 46,
+          "cost": 6806.78,
+          "sales": 15013.0,
+          "ROAS": 2.21
+        },
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CXMFC9GN",
+          "orders": 6,
+          "clicks": 34,
+          "cost": 3582.65,
+          "sales": 7905.0,
+          "ROAS": 2.21
+        },
+        {
+          "campaign_name": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【イヤー】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0CNLFT7XF",
+          "orders": 59,
+          "clicks": 243,
+          "cost": 34723.380000000005,
+          "sales": 74441.0,
+          "ROAS": 2.14
+        },
+        {
+          "campaign_name": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【ダニ捕り】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B00L4ZSQSI",
+          "orders": 7,
+          "clicks": 47,
+          "cost": 5638.68,
+          "sales": 11940.0,
+          "ROAS": 2.12
+        },
+        {
+          "campaign_name": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【液体】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0F1FF6TKW",
+          "orders": 24,
+          "clicks": 199,
+          "cost": 22107.39,
+          "sales": 45957.0,
+          "ROAS": 2.08
+        },
+        {
+          "campaign_name": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "ad_group": "【涙やけ】SP広告(マニュアル)：商品ターゲ",
+          "asin": "B0B24XCDH4",
+          "orders": 3,
+          "clicks": 20,
+          "cost": 2913.98,
+          "sales": 5857.0,
+          "ROAS": 2.01
+        }
+      ]
     }
   ]
 }
